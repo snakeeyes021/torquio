@@ -19,17 +19,22 @@ These scripts are currently sitting in the repository root and serve to preserve
 *   **`setup_prefix.sh`:** Automates the creation of the Wine prefix and the installation of initial Winetricks dependencies.
 *   **`dorico.sh`:** Handles launching Dorico 6 with the correct `WINEPREFIX` and `PATH` inside the container.
 *   **`sam.sh`:** Handles the Activation Manager, including the handoff logic for `net-steinberg-sam://` URL tokens using the `--redirect` flag.
+*   **`install_noteperformer.sh`:** A generalized installer script that uses glob patterns (`NotePerformer-Installer-*.exe`) to handle the customer-specific personalized filenames used by NotePerformer.
+
+## Installed Components & Working Features
+*   **NotePerformer 5.1.2:** Successfully installed and verified running in Dorico. (Manual installation confirmed working under the `dcomp` Wine build).
 
 ## To-Do List (Tech Debt & Polish)
 *   **High-DPI / 4K Scaling:** Wine isn't scaling automatically on one particular 4K 28" screen (not sure about other 4K screens). We need to investigate Wine DPI registry keys or a dynamic DPI switcher alias.
 *   **VSTAudioEngine6.exe Crash:** The audio engine crashes cleanly upon closing Dorico. This does not prevent proper function of the application; it's just ugly/annoying. Need to investigate if this is a Pipewire/ASIO routing issue or a Wine teardown bug.
-*   **Install NotePerformer:** Add the NotePerformer installation to the standard reproducible deployment script.
 *   **Visual Glitches / GE-Proton Experiment:** The current `zhiyi/wine` build has transparent text in SDA and font ugliness. Create an experimental Git branch to try patching `dcomp` directly onto an *optimal* version of GE-Proton (known working verison of GE Proton without the visual glitches: GE Proton 10.33, but we probably want to test against either GE Proton current, GE Proton rc, or whatever GE Proton matches zhiyi/wine).
 *   **GNOME / Adwaita Theming:** Investigate applying a Windows `.msstyles` theme to make Wine scrollbars and menus match GNOME/Adwaita natively. Explore having this run automatically if GNOME is detected. Consider doing the same for KDE, or just leaving it for KDE and all other DEs.
 *   **Desktop Shortcut Cleanup (UX/UI):** Distrobox auto-exported `.desktop` files with proper icons, conflicting with our custom manual ones. Use the current "messy" state of this machine as a diagnostic baseline to merge the "Nice Icon" with the "Functional Link Handler" and establish actual scripted functionality.
 *   **Automate Wine-ICU Installation:** Add the silent download and installation of the `72.1` MSI to the build script.
 *   **Version Manifest Generation:** Programmatically extract and record the exact version numbers of every piece of installed Steinberg software to create a reproducible manifest.
 *   **"License Eater" Bug:** On prior attempts in Bottles, a (assumed) hardware fingerprinting issue is causing licenses to disappear. Determine if the issue exists under our current method, and, if so, figure out a strategy for maintaining hardware fingerprint (if that is the problem).
+
+*   **NotePerformer UI:** Fix graphical glitches in the NotePerformer VST window. (Determine if this is still an issue under the current custom Wine build).
 
 ## Reproducibility Artifacts (Hashes)
 *   **Wine Repository (`zhiyi/wine`):** Commit `ae88a705b5aa544cc60153d48c1ca8849f32ee14`.
