@@ -20,11 +20,11 @@ After initial attempts using Flatpak/Bottles were thwarted by aggressive sandbox
 *   **The Handoff:** We use custom `.desktop` URI handlers to seamlessly pass OAuth tokens from the host's native Linux web browser directly into the containerized Steinberg Activation Manager.
 
 ## Delivery Mechanisms & The Future
-Currently, we are building the "recipe" inside a Docker container. Depending on licensing and legal constraints from Steinberg, this recipe can be packaged in several ways:
+Currently, we are building the "recipe" inside a Docker container. Depending on licensing and legal constraints from Steinberg, this recipe can be distributed in several ways:
 
-1. **The "Template Prefix" Docker Image:** We can distribute a Docker image containing the compiled Wine engine and a pre-installed Dorico prefix. A first-run wrapper script copies this "Template Prefix" to the user's local home folder and updates the registry, providing a true one-click install without extra packaging layers.
-2. **AppImage:** If legally permitted, the engine and binaries can be packed into a single, executable AppImage. Because AppImages do not enforce strict sandboxing, this retains all the benefits of our current Distrobox architecture.
-3. **Flatpak:** The hardest route, as it would require us to re-engineer our solution to punch exact IPC and networking holes through the strict Flatpak sandbox, but it remains a viable distribution target once the core engine is perfected.
+1. **The "Bring Your Own Installer" Bootstrapper (Most Likely):** If we cannot distribute pre-packaged Steinberg software, we will provide a single "Zero-to-Hero" terminal command (e.g., `curl -sL ... | bash`) in this README. This command will download our installation framework, verify the user has Distrobox installed, generate the container, and present a wizard that automatically processes the user's downloaded `.exe` installers.
+2. **The "Template Prefix" Docker Image:** We can distribute a Docker image containing the compiled Wine engine and a pre-installed Dorico prefix. A first-run wrapper script copies this "Template Prefix" to the user's local home folder and updates the registry, providing a true one-click install without extra packaging layers.
+3. **AppImage / Flatpak:** If legally permitted, the engine and binaries can be packed into a single, executable AppImage or Flatpak manifest.
 
 ## Repository Structure & Documentation
 *   `dorico_linux_state.md`: The active, living blueprint, tracking our current environment, hashes, and Technical Debt / To-Do list.
