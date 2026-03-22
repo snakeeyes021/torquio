@@ -25,6 +25,11 @@ These scripts are currently sitting in the repository root and serve to preserve
 *   **NotePerformer 5.1.2:** Successfully installed and verified running in Dorico. (Manual installation confirmed working under the `dcomp` Wine build).
 
 ## To-Do List (Tech Debt & Polish)
+*   **The Master Installer Wrapper (User Experience):** Assuming Steinberg legal does not allow pre-packaged distribution, the end-user will need to provide their own `.exe` and `.zip` installers. We must not force Linux novices to run 5 separate shell scripts. We need to architect a single "Master Setup" script (or an interactive wizard). This wrapper will:
+    1. Detect the provided installer files (SDA, MediaBay, NotePerformer).
+    2. Bootstrap the prefix (`setup_prefix.sh`).
+    3. Sequentially execute the software installers.
+    4. Automatically merge the `.desktop` stubs with the icon exports, push them to the host, and register the MIME type handlers (`xdg-mime`).
 *   **Production Path Refactoring:** Transition from isolated development paths (`~/dev/...`) to standard production paths. Scripts must be updated to dynamically generate the Wine prefix in a user-agnostic XDG location (e.g., `~/.local/share/wineprefixes/dorico`) rather than the repo directory.
 *   **High-DPI / 4K Scaling:** Wine isn't scaling automatically on one particular 4K 28" screen (not sure about other 4K screens). We need to investigate Wine DPI registry keys or a dynamic DPI switcher alias.
 *   **VSTAudioEngine6.exe Crash:** The audio engine crashes cleanly upon closing Dorico. This does not prevent proper function of the application; it's just ugly/annoying. Need to investigate if this is a Pipewire/ASIO routing issue or a Wine teardown bug.
