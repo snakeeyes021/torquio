@@ -26,6 +26,18 @@ Currently, we are building the "recipe" inside a Docker container. Depending on 
 3. **AppImage / Flatpak:** If legally permitted, the engine and binaries can be packed into a single, executable AppImage or Flatpak manifest.
 
 ## Repository Structure & Documentation
-*   `dorico_linux_state.md`: The active, living blueprint, tracking our current environment, hashes, and Technical Debt / To-Do list.
-*   `archive_bottles_flatpak_method.md`: A historical record of our previous attempts and roadblocks using Bottles.
-*   `build/` & `setup/` scripts: The shell scripts used to bootstrap the Wine engine and prefix.
+```text
+steinberg-on-linux/
+├── README.md                 # Master introducer doc (You are here)
+├── .gitignore                # Prevents massive prefixes/binaries from being tracked
+├── desktop_stubs/            # URI handlers and .desktop templates for the host
+├── docs/
+│   ├── dorico_linux_state.md             # Active blueprint, roadmap, and To-Do list
+│   ├── backlog.md                        # Granular, nitty-gritty implementation subtasks
+│   ├── archive_bottles_flatpak_method.md # Historical record of the Bottles sandbox attempt
+│   └── shared_conversation.md            # The original LLM brainstorming context
+└── scripts/
+    ├── 1-build/              # Scripts to compile custom Wine and its dependencies
+    ├── 2-install/            # Scripts to bootstrap the prefix and install software
+    └── 3-runtime_handlers/   # Wrappers to launch the apps and handle URI web-login handoffs
+```
