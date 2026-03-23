@@ -30,6 +30,7 @@ We currently have `install_noteperformer.sh`, but we lack dedicated automation s
 *   [ ] Need a post-install script that runs `distrobox-export --app` for SDA, SAM, and Dorico.
 *   [ ] Extract the generated `Icon=` lines from the Distrobox-exported files located in the host's `~/.local/share/applications/`.
 *   [ ] Inject those Icon paths into our custom URI-handler stubs and overwrite the Distrobox ones, ensuring the user gets one clean icon that launches the app *and* handles the login links.
+*   [ ] Investigate: currently, with both our custom .desktop files and the Distrobox-exported ones, GNOME/Wayland are using the icons from the Distrobox-exported file for displaying running apps in the dash and overview (and in the app picker lists for running unknown file types). We need to see if that still occurs when there is only our correct one, and if so, we need to figure out how to fully integrate ours into these system functions 
 
 ### Epic: Engine Dependency Automation (libicu)
 **Context:** Wine requires native ICU support for core Unicode translation, and Steinberg apps require Windows-side ICU binaries within the prefix.
