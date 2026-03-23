@@ -14,8 +14,8 @@ We currently have `install_noteperformer.sh`, but we lack dedicated automation s
     *   Must use a generalized glob pattern (e.g., `Steinberg_Download_Assistant_*_Installer_win.exe`) to find the user-provided installer regardless of the version number they downloaded.
     *   Must handle the execution inside the container prefix.
 *   [ ] **`install_mediabay.sh`**:
-    *   Currently, `setup_prefix.sh` unzips the MediaBay installer and deletes the broken `preinstall.ps1` file, but it doesn't *run* the actual setup.
-    *   Need a dedicated script that navigates into the `MediaBay_extracted/` directory, dynamically finds the subfolder (e.g., `MediaBay 1.3.60` — this must be dynamic as versions will change), and executes `wine Setup.exe`.
+    *   Move the unzip logic currently inside `setup_prefix.sh` into this dedicated script. It should look for the user-provided `.zip` inside the designated `installers/` directory rather than the repo root.
+    *   After unzipping and deleting the broken `preinstall.ps1`, the script must navigate into the `MediaBay_extracted/` directory, dynamically find the subfolder (e.g., `MediaBay 1.3.60` — this must be dynamic as versions will change), and execute `wine Setup.exe`.
 
 #### Subtasks: The "one-click" Bootstrapper (`install.sh`)
 *   [ ] **The Curl Command:** Create a single terminal command (e.g., `curl -sL ... | bash`) that users copy/paste from the GitHub README to download the installer framework.
@@ -38,7 +38,7 @@ We currently have `install_noteperformer.sh`, but we lack dedicated automation s
 ### Epic: Engine Dependency Automation (libicu)
 **Context:** Wine requires native ICU support for core Unicode translation, and Steinberg apps require Windows-side ICU binaries within the prefix.
 *   [ ] **Native Dependencies:** Add `libicu-dev` and `libicu-dev:i386` to the `apt-get install` list in `scripts/1-build/build_wine.sh`.
-*   [ ] **Prefix Dependencies:** Add the silent download and installation of `wine-icu-72.1-x86.msi` and `wine-icu-72.1-x86_64.msi` to `scripts/2-install/setup_prefix.sh`.
+*   [ ] **Prefix Dependencies:** Add `curl` or `wget` commands to download `wine-icu-72.1-x86.msi` and `wine-icu-72.1-x86_64.msi` from WineHQ, and run silent installation (`wine msiexec /i`) in `scripts/2-install/setup_prefix.sh`. (Note: the versions of the wine-icu msi's that we download and install should be whichever version has been tested against that container image release)
 *   [ ] **Cleanup:** Delete `scripts/1-build/TO_BE_DELETED_rebuild_wine_icu.sh` once the above are verified working in a fresh build.
 
 ### Epic: Documentation & Repository Polish
@@ -49,7 +49,9 @@ We currently have `install_noteperformer.sh`, but we lack dedicated automation s
 ## Undefined Work (Backlog)
 This section tracks high-level goals and ideas that have not yet been broken down into concrete subtasks.
 
-*   [ ] **Production Path Refactoring:** Transition from isolated development paths (`~/dev/...`) to standard production paths. Scripts must be updated to dynamically generate the Wine prefix in a user-agnostic XDG location (e.g., `~/.local/share/wineprefixes/dorico`) rather than the repo directory.
+*   [ ] **Production Path Refactoring:** Transition from isolated development paths (`~/dev/...`) to standard production paths.
+    *   Remove hardcoded `$HOME/dev/steinberg-on-linux` references in `build_wine.sh` and `setup_prefix.sh` and replace them with dynamic workspace variables (e.g., `WORKSPACE_DIR="$(pwd)"` or `WORKSPACE_DIR="$HOME/.local/share/steinberg-on-linux"`).
+    *   Scripts must be updated to dynamically generate the Wine prefix in a user-agnostic XDG location (e.g., `~/.local/share/wineprefixes/dorico`) rather than the repo directory.
 *   [ ] **High-DPI / 4K Scaling:** Wine isn't scaling automatically on one particular 4K 28" screen (not sure about other 4K screens). We need to investigate Wine DPI registry keys or a dynamic DPI switcher alias.
 *   [ ] **VSTAudioEngine6.exe Crash:** The audio engine crashes cleanly upon closing Dorico. This does not prevent proper function of the application; it's just ugly/annoying. Need to investigate if this is a Pipewire/ASIO routing issue or a Wine teardown bug.
 *   [ ] **Visual Glitches / GE-Proton Experiment:** The current `zhiyi/wine` build has transparent text in SDA and font ugliness. Create an experimental Git branch to try patching `dcomp` directly onto an *optimal* version of GE-Proton (known working verison of GE Proton without the visual glitches: GE Proton 10.33, but we probably want to test against either GE Proton current, GE Proton rc, or whatever GE Proton matches zhiyi/wine).
