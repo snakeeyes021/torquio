@@ -25,7 +25,7 @@ These scripts are currently sitting in the repository root and serve to preserve
 *   **NotePerformer 5.1.2:** Successfully installed and verified running in Dorico. (Manual installation confirmed working under the `dcomp` Wine build).
 
 ## To-Do List (Tech Debt & Polish)
-*   **The Master Installer Wrapper (User Experience):** Assuming Steinberg legal does not allow pre-packaged distribution, the end-user will need to provide their own `.exe` and `.zip` installers. We must not force Linux novices to use `git clone` or run multiple shell scripts. We need to architect a "Zero-to-Hero" bootstrapper:
+*   **The Master Installer Wrapper (User Experience):** Assuming Steinberg legal does not allow pre-packaged distribution, the end-user will need to provide their own `.exe` and `.zip` installers. We must not force Linux novices to use `git clone` or run multiple shell scripts. We need to architect a "one-click" bootstrapper:
     1. **The Curl Command:** A single terminal command (e.g., `curl -sL ... | bash`) that users copy/paste from the GitHub README to download the installer framework.
     2. **Prerequisite Check:** The script must check if Distrobox/Distroshelf and Docker/Podman are installed (prompting the user to install them via Flatpak/system packages if missing).
     3. **The Wrapper:** Once prerequisites are met, the script detects the provided Steinberg installer files, bootstraps the container prefix, sequentially executes the software installers, and automatically registers the `.desktop` stubs and MIME types.

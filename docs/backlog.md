@@ -14,7 +14,7 @@ We currently have `install_noteperformer.sh`, but we lack dedicated automation s
     *   Currently, `setup_prefix.sh` unzips the MediaBay installer and deletes the broken `preinstall.ps1` file, but it doesn't *run* the actual setup.
     *   Need a dedicated script that navigates into the `MediaBay_extracted/` directory, dynamically finds the subfolder (e.g., `MediaBay 1.3.60` — this must be dynamic as versions will change), and executes `wine Setup.exe`.
 
-### Subtasks: The Zero-to-Hero Bootstrapper (`install.sh`)
+### Subtasks: The "one-click" Bootstrapper (`install.sh`)
 *   [ ] **Prerequisite Checks:** Script must check for `distrobox` (or `distroshelf`) and `docker`/`podman`. If missing, halt and print clear instructions to install them.
 *   [ ] **Asset Validation:** Ensure an `installers/` directory exists and prompt the user to drop their `.exe` files into it before continuing.
 *   [ ] **Execution Chain:** Sequentially call `build_wine.sh` -> `setup_prefix.sh` -> `install_sda.sh` -> `install_mediabay.sh` -> `install_noteperformer.sh`.
