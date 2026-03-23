@@ -3,7 +3,7 @@
 ## The Mission
 This project aims to bring Steinberg Dorico to Linux with near-native performance and stability. 
 
-Steinberg software has historically been difficult to run on Linux due largely to installer compatibility, account logins and token handoffs, and a host of other related technical hurdles. That is to say, the software itself generally runs decently well... if you can get that far.
+Steinberg software has historically been difficult to run on Linux due largely to installer compatibility, account logins and token handoffs, and a small handful of other related technical hurdles. That is to say, the software itself generally runs decently well... if you can get that far.
 
 Our goal is to solve these technical challenges and create a **reproducible, automated, and user-friendly** deployment system.
 
