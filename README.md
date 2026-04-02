@@ -1,4 +1,4 @@
-# Steinberg Dorico on Linux
+# Valerio (Steinberg Dorico on Linux)
 
 ## The Mission
 This project aims to bring Steinberg Dorico to Linux with near-native performance and stability. 
