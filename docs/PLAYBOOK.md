@@ -108,8 +108,9 @@ We must create an isolated Windows 10 environment for the Steinberg software.
    wineboot -u
    # (Click through any popups that appear)
    
-   # Download Winetricks
-   wget https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks
+   # Download Winetricks (Ensure this matches the version in RELEASES.md)
+   # Example (v0.1.1-alpha):
+   wget https://raw.githubusercontent.com/Winetricks/winetricks/20260125-next/src/winetricks
    chmod +x winetricks
    
    ./winetricks -q d3dx9 msls31 allfonts d3dcompiler_43 d3dcompiler_47 vcrun2019 dotnet48 win10

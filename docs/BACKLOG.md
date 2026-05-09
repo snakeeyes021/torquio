@@ -49,6 +49,7 @@ We currently have `install_noteperformer.sh`, but we lack dedicated automation s
 ## Undefined Work (Backlog)
 This section tracks high-level goals and ideas that have not yet been broken down into concrete subtasks.
 
+*   [ ] **Container Digest Pinning:** To achieve maximum reproducibility and avoid potential issues with rolling `apt` updates on the host image, investigate pinning the Distrobox container to a specific SHA256 digest (e.g., `ubuntu@sha256:...`) rather than the floating `ubuntu:24.04` tag in the automated installer. We may actually NOT want to do this, as using an LTS may already be sufficient for reproducibility and any updates that get pushed to that OS version will likely be security patches and so forth but that do not affect API or binary compatibility.
 *   [ ] **Production Path Refactoring:** Transition from isolated development paths (`~/dev/...`) to standard production paths.
     *   Remove hardcoded `$HOME/dev/steinberg-on-linux` references in `build_wine.sh` and `setup_prefix.sh` and replace them with dynamic workspace variables (e.g., `WORKSPACE_DIR="$(pwd)"` or `WORKSPACE_DIR="$HOME/.local/share/steinberg-on-linux"`).
     *   Scripts must be updated to dynamically generate the Wine prefix in a user-agnostic XDG location (e.g., `~/.local/share/wineprefixes/dorico`) rather than the repo directory.
