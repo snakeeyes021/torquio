@@ -13,26 +13,35 @@ for DIR in "${SEARCH_DIRS[@]}"; do
         continue
     fi
     
-    # Look for the NotePerformer installer in this directory
-    # NotePerformer installers often include personalized names/IDs, so we use a loose glob.
-    MATCH=$(find "$DIR" -maxdepth 1 -name "NotePerformer-Installer-*.exe" | head -n 1)
+    # Look for the Cantai installer in this directory
+    # Using find is a bit safer than ls for getting absolute paths and handling weird characters
+    MATCH=$(find "$DIR" -maxdepth 1 -name "Cantai-Windows-Dorico-Installer-*.exe" | head -n 1)
     
     if [ -n "$MATCH" ]; then
         FOUND_INSTALLER="$MATCH"
-        echo "Found NotePerformer installer: $FOUND_INSTALLER"
+        echo "Found Cantai installer: $FOUND_INSTALLER"
         break
     fi
 done
 
 # 2. Download / Fallback Phase
 if [ -z "$FOUND_INSTALLER" ]; then
-    echo "Error: NotePerformer installer not found locally."
-    echo "NotePerformer must be downloaded manually from your personal link."
-    echo "Please place the installer in ~/Downloads, or run this script from the directory containing it."
+    echo "Error: Cantai installer not found locally."
+    echo "Please download the installer and place it in ~/Downloads, or run this script from the directory containing it."
     
     # ==============================================================================
     # FUTURE AUTOMATION SKELETON:
-    # If NotePerformer installer not found, we can send the user to the download page in their browser (NotePerformer bakes user activation into the installer-file, so we can't automate the download without user interaction).
+    # 
+    # mkdir -p "$CACHE_DIR"
+    # echo "Downloading Cantai installer to cache..."
+    # 
+    # # Example using wget:
+    # # wget -q --show-progress "https://api.example.com/downloads/cantai/latest" -O "$CACHE_DIR/Cantai-Installer-Latest.exe"
+    # 
+    # # Example using curl:
+    # # curl -L "https://api.example.com/downloads/cantai/latest" -o "$CACHE_DIR/Cantai-Installer-Latest.exe"
+    # 
+    # FOUND_INSTALLER="$CACHE_DIR/Cantai-Installer-Latest.exe"
     # ==============================================================================
 
     exit 1
