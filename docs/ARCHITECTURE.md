@@ -21,7 +21,7 @@ We use a **containerized approach using Distrobox and Docker** (or Podman) to is
 
 ## 2. Delivery Mechanisms & The Future
 
-Currently, the "recipe" is executed manually via shell scripts. Depending on licensing and legal constraints from Steinberg, the end-goal deployment strategy takes one of these forms:
+Currently, the "recipe" is executed manually via shell scripts (the exact manual baseline procedure is documented in `docs/PLAYBOOK.md`). Depending on licensing and legal constraints from Steinberg, the end-goal deployment strategy takes one of these forms:
 
 1. **The "Bring Your Own Installer" Bootstrapper (Most Likely):** A single "one-click" terminal command (`curl -sL ... | bash`) that downloads our framework, verifies host dependencies (Distrobox), generates the container, and automatically processes the user's downloaded `.exe` installers.
 2. **The "Template Prefix" Docker Image:** Distributing a Docker image containing the compiled Wine engine and a pre-installed prefix. A wrapper script copies this "Template Prefix" to the user's local home folder.

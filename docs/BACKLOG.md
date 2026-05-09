@@ -6,7 +6,7 @@ This document is the single source of truth for all tasks, bugs, and enhancement
 This section tracks epics that have been broken down into concrete, actionable subtasks.
 
 ### Epic: The Master Installer Wrapper (User Experience)
-**Context:** Assuming Steinberg legal does not allow pre-packaged distribution, the end-user will need to provide their own `.exe` and `.zip` installers. We must not force Linux novices to use `git clone` or run multiple shell scripts. We need a single-command `curl | bash` installation experience.
+**Context:** Assuming Steinberg legal does not allow pre-packaged distribution, the end-user will need to provide their own `.exe` and `.zip` installers. We must not force Linux novices to use `git clone` or run multiple shell scripts. We need a single-command `curl | bash` installation experience. *(Note: The exact sequence this master script must automate is codified in `docs/PLAYBOOK.md`.)*
 
 #### Subtasks: Missing Component Scripts
 We currently have `install_noteperformer.sh`, but we lack dedicated automation scripts for the core Steinberg components. Before we can build the master wrapper, we must build and test:

@@ -15,14 +15,17 @@ Our goal is to solve these technical challenges and create a **reproducible, aut
     *   **Note:** Currently, all that is necessary is the Steinberg Download Assistant and Steinberg MediaBay; the Download Assistant installs the rest. (optional: Noteperformer)
 
 ## Installation
-*(Coming Soon)*
-A single-command bootstrapper will be provided here to automatically build your isolated Steinberg environment.
+
+A single-command automated bootstrapper is currently in development. 
+
+In the meantime, adventurous users can follow the **[Manual Deployment Playbook](docs/PLAYBOOK.md)** for a step-by-step guide to building the environment.
 
 ---
 
 ## For Developers & Contributors
 If you are looking to understand how this system works, contribute to the scripts, or read the historical design decisions, please refer to the `docs/` directory:
 
+*   **[Manual Playbook](docs/PLAYBOOK.md):** The step-by-step procedure to build the environment by hand.
 *   **[Architecture & Blueprint](docs/ARCHITECTURE.md):** The core technical design (Containers, Custom Wine, URI Handoffs).
 *   **[Release Manifests](docs/RELEASES.md):** The verifiable combinations of Wine versions and Steinberg app versions.
 *   **[Project Backlog](docs/BACKLOG.md):** Current tasks and active sprint items.
