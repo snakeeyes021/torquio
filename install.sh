@@ -7,6 +7,11 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/scripts/common.sh"
 
+AUTO_ACCEPT=false
+if [[ "$1" == "-y" ]] || [[ "$1" == "--yes" ]]; then
+    AUTO_ACCEPT=true
+fi
+
 echo "==========================================="
 echo "   Valerio: Steinberg on Linux Installer   "
 echo "==========================================="
@@ -30,10 +35,65 @@ fi
 # 2. Asset Validation
 echo "Validating installers..."
 mkdir -p "$VALERIO_INSTALLERS_DIR"
-if [ ! -f "$VALERIO_INSTALLERS_DIR/MediaBay_Installer_win64.zip" ] && [ ! -f "$HOME/Downloads/MediaBay_Installer_win64.zip" ]; then
-    echo "Warning: MediaBay_Installer_win64.zip not found."
-    echo "Please place it in $VALERIO_INSTALLERS_DIR or ~/Downloads before continuing."
-    read -p "Press Enter to continue once the file is in place, or Ctrl+C to abort."
+SEARCH_DIRS=("$VALERIO_INSTALLERS_DIR" "$HOME/Downloads" "$PWD")
+
+FOUND_MEDIABAY=""
+FOUND_SDA=""
+FOUND_NP=""
+
+for DIR in "${SEARCH_DIRS[@]}"; do
+    if [ ! -d "$DIR" ]; then continue; fi
+    
+    if [ -z "$FOUND_MEDIABAY" ] && [ -f "$DIR/MediaBay_Installer_win64.zip" ]; then
+        FOUND_MEDIABAY="$DIR/MediaBay_Installer_win64.zip"
+    fi
+    
+    if [ -z "$FOUND_SDA" ]; then
+        MATCH=$(find "$DIR" -maxdepth 1 -name "Steinberg_Download_Assistant_*_Installer_win.exe" | head -n 1)
+        if [ -n "$MATCH" ]; then FOUND_SDA="$MATCH"; fi
+    fi
+    
+    if [ -z "$FOUND_NP" ]; then
+        MATCH=$(find "$DIR" -maxdepth 1 -name "NotePerformer-Installer-*.exe" | head -n 1)
+        if [ -n "$MATCH" ]; then FOUND_NP="$MATCH"; fi
+    fi
+done
+
+MISSING_MANDATORY=false
+if [ -z "$FOUND_MEDIABAY" ]; then
+    echo "❌ Missing Mandatory: MediaBay_Installer_win64.zip"
+    MISSING_MANDATORY=true
+fi
+if [ -z "$FOUND_SDA" ]; then
+    echo "❌ Missing Mandatory: Steinberg_Download_Assistant_*_Installer_win.exe"
+    MISSING_MANDATORY=true
+fi
+
+if [ "$MISSING_MANDATORY" = true ]; then
+    echo ""
+    echo "Error: Mandatory installers were not found."
+    echo "Please place them in $VALERIO_INSTALLERS_DIR or ~/Downloads and run this script again."
+    exit 1
+fi
+
+echo ""
+echo "--- Installation Manifest ---"
+echo "✅ MediaBay: Found ($FOUND_MEDIABAY)"
+echo "✅ SDA:      Found ($FOUND_SDA)"
+if [ -n "$FOUND_NP" ]; then
+    echo "✅ NotePerf: Found ($FOUND_NP)"
+else
+    echo "⚠️ NotePerf: Not Found (Skipping)"
+fi
+echo "-----------------------------"
+echo ""
+
+if [ "$AUTO_ACCEPT" = false ]; then
+    read -p "Proceed with the installation? [Y/n] " confirm
+    if [[ "$confirm" =~ ^[Nn]$ ]]; then
+        echo "Installation cancelled."
+        exit 0
+    fi
 fi
 
 # 3. Container Creation
@@ -59,30 +119,15 @@ distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && .
 # 6. Software Component Installation
 echo "Phase 4: Installing Steinberg Components..."
 
-echo "Installing SDA..."
-distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && ./scripts/2-install/install_sda.sh"
-
 echo "Installing MediaBay..."
 distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && ./scripts/2-install/install_mediabay.sh"
 
-echo "Checking for NotePerformer..."
-# Find NotePerformer installer if it exists
-NP_FOUND=""
-for DIR in "$VALERIO_INSTALLERS_DIR" "$HOME/Downloads" "$WORKSPACE_DIR"; do
-    if [ -d "$DIR" ]; then
-        MATCH=$(find "$DIR" -maxdepth 1 -name "NotePerformer-Installer-*.exe" | head -n 1)
-        if [ -n "$MATCH" ]; then
-            NP_FOUND="true"
-            break
-        fi
-    fi
-done
+echo "Installing SDA..."
+distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && ./scripts/2-install/install_sda.sh"
 
-if [ -n "$NP_FOUND" ]; then
+if [ -n "$FOUND_NP" ]; then
     echo "Installing NotePerformer..."
     distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && ./scripts/2-install/install_noteperformer.sh"
-else
-    echo "NotePerformer installer not found. Skipping."
 fi
 
 # 7. Host Integration
