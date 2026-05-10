@@ -63,11 +63,9 @@ This phase establishes the isolated environment. The future master installer wil
 * Creates the Windows 10 prefix at `~/.local/share/valerio/prefix`.
 * Installs core dependencies via Winetricks (`d3dx9`, `dotnet48`, etc.).
 * **Automated:** Downloads and installs `wine-icu-72.1` (required for Dorico).
-* **Automated:** Extracts MediaBay and robustly cleans up blocked files (e.g., `preinstall.ps1`).
 
 **Execution:**
 ```bash
-# Ensure you have dropped MediaBay_Installer_win64.zip into the installers/ folder or ~/Downloads
 ./scripts/2-install/setup_prefix.sh
 ```
 
@@ -75,20 +73,16 @@ This phase establishes the isolated environment. The future master installer wil
 
 ## Phase 4: Software Component Installation
 
-**Execution Context:** Host OS (outside the container).
+**Execution Context:** Inside the container.
 **Prerequisites:** The prefix must be initialized. Installers must be downloaded by the user and placed in `~/Downloads` or the `installers/` directory within the repository.
 
 **1. Install MediaBay**
-*   **Module:** `scripts/2-install/setup_prefix.sh` (Handling extraction for now)
-*   **Manual Step:** Run the installer inside the container:
-    ```bash
-    cd "$HOME/.local/share/valerio/MediaBay_extracted" && cd MediaBay* && wine Setup.exe
-    ```
+*   **Module:** `scripts/2-install/install_mediabay.sh`
+*   **Execution:** `./scripts/2-install/install_mediabay.sh`
 
 **2. Install Steinberg Download Assistant (SDA)**
 *   **Module:** `scripts/2-install/install_sda.sh`
 *   **Execution:** `./scripts/2-install/install_sda.sh`
-*   **Manual Fallback:** Run `wine Steinberg_Download_Assistant_...exe`.
 
 **3. Install NotePerformer (Optional)**
 *   **Module:** `scripts/2-install/install_noteperformer.sh`

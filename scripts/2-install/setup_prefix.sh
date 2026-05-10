@@ -32,28 +32,4 @@ wine msiexec /i "$VALERIO_CACHE_DIR/icu/wine-icu-x86.msi" /qn
 echo "Installing ICU x64..."
 wine msiexec /i "$VALERIO_CACHE_DIR/icu/wine-icu-x64.msi" /qn
 
-echo "Extracting MediaBay..."
-# Search locations for the zip
-SEARCH_DIRS=("$VALERIO_INSTALLERS_DIR" "$HOME/Downloads" "$(pwd)")
-FOUND_ZIP=""
-
-for DIR in "${SEARCH_DIRS[@]}"; do
-    if [ -f "$DIR/MediaBay_Installer_win64.zip" ]; then
-        FOUND_ZIP="$DIR/MediaBay_Installer_win64.zip"
-        break
-    fi
-done
-
-if [ -n "$FOUND_ZIP" ]; then
-    echo "Found MediaBay installer: $FOUND_ZIP"
-    unzip -o "$FOUND_ZIP" -d "$VALERIO_DATA_DIR/MediaBay_extracted"
-    # Find and remove any preinstall.ps1 scripts recursively within the extracted folder
-    # These often cause "Not Trusted" errors during installation
-    find "$VALERIO_DATA_DIR/MediaBay_extracted" -name "preinstall.ps1" -delete
-    echo "Removed preinstall.ps1 script(s) to prevent installation failures."
-else
-    echo "Warning: MediaBay_Installer_win64.zip not found in search locations."
-    echo "Please place it in $VALERIO_INSTALLERS_DIR or ~/Downloads."
-fi
-
-echo "Done with winetricks, ICU, and MediaBay extraction!"
+echo "Done with winetricks and ICU installation!"
