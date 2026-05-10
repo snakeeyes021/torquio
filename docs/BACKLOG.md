@@ -33,6 +33,7 @@ We currently have `install_noteperformer.sh`, but we lack dedicated automation s
 **Context:** Distrobox auto-exports `.desktop` files with proper icons, conflicting with our custom manual ones which handle the `net-steinberg-sam://` URI schemes. We need to merge the "Nice Icon" with the "Functional Link Handler" and establish actual scripted functionality. There may be other good stuff in the exported .desktop files that we want in ours.
 
 #### Subtasks: .desktop File Merging
+*   [ ] **Suppress winemenubuilder:** Wine automatically creates `.desktop` links for Windows applications and file extensions (e.g., in `~/.local/share/applications/wine/Programs/`). This pollutes the host environment. We need to export `WINEDLLOVERRIDES="winemenubuilder.exe=d"` in our installation scripts so Wine stops spamming the host's app menu. *Note: When we write the cleanup script for these, it must be carefully targeted (e.g., only deleting Steinberg/Dorico specific files) so we don't accidentally wipe a user's desktop files from other non-Valerio Wine prefixes.*
 *   [ ] Use the current "messy" state of the host machine as a diagnostic baseline.
 *   [ ] The stubs in `desktop_stubs/` currently lack `Icon=` paths. 
 *   [ ] Need a post-install script that runs `distrobox-export --app` for SDA, SAM, and Dorico.
