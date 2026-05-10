@@ -17,6 +17,18 @@ Before starting, please consult **[docs/RELEASES.md](RELEASES.md)**.
 
 ---
 
+## ⚠️ WARNING: Hardcoded Paths (Temporary)
+
+Currently, the scripts have hardcoded paths expecting the repository to be located at `~/dev/steinberg-on-linux`. Because the project is now called **Valerio**, cloning it would create a folder named `valerio`. 
+
+**Until this is fixed, you MUST do one of the following before proceeding:**
+1. Clone the repo directly into the expected folder:
+   `git clone <repo-url> ~/dev/steinberg-on-linux`
+2. OR, if already cloned as `valerio`, create a symlink:
+   `ln -s ~/dev/valerio ~/dev/steinberg-on-linux`
+
+---
+
 ## Phase 1: Host Preparation (Manual)
 
 This phase establishes the isolated environment. The future master installer will likely handle this, but currently, it must be done manually on the host.
@@ -111,6 +123,9 @@ wine msiexec /i wine-icu-72.1-x86_64.msi
 **Execution:**
 ```bash
 exit # Leave the container
+mkdir -p ~/.local/bin
+cp ~/dev/steinberg-on-linux/scripts/3-runtime_handlers/*.sh ~/.local/bin/
+chmod +x ~/.local/bin/*.sh
 cp ~/dev/steinberg-on-linux/desktop_stubs/*.desktop ~/.local/share/applications/
 update-desktop-database ~/.local/share/applications/
 ```

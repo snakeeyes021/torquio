@@ -21,6 +21,8 @@ A single-command automated bootstrapper is currently in development.
 
 In the meantime, the intrepid among us can follow the **[Manual Deployment Playbook](docs/PLAYBOOK.md)** for a step-by-step guide to building the environment.
 
+> **⚠️ Important Note on Hardcoded Paths:** The scripts currently expect the repository to be located exactly at `~/dev/steinberg-on-linux`. Because the project is now called **Valerio**, cloning it the normal way would create a folder named `valerio`. You must ensure the project resides at or is symlinked to `~/dev/steinberg-on-linux` before running any scripts. See the Playbook for details.
+
 ---
 
 ## For Developers & Contributors
