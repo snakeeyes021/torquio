@@ -24,7 +24,9 @@ Currently, the scripts have hardcoded paths expecting the repository to be locat
 **Until this is fixed, you MUST do one of the following before proceeding:**
 1. Clone the repo directly into the expected folder:
    `git clone <repo-url> ~/dev/steinberg-on-linux`
-2. OR, if already cloned as `valerio`, create a symlink:
+2. OR, if already cloned as `valerio`, simply rename the directory
+   `mv ~/dev/valerio ~/dev/steinberg-on-linux`
+3. OR, if you prefer to keep the folder name as is, create a symlink:
    `ln -s ~/dev/valerio ~/dev/steinberg-on-linux`
 
 ---
