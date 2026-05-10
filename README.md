@@ -1,8 +1,8 @@
 # Valerio 
-A unified installer for Steinberg Dorico on Linux
+A unified installer for Dorico on Linux
 
 ## The Mission
-This project aims to bring Steinberg Dorico to Linux via WINE.
+This project aims to bring Steinberg's Dorico to Linux via WINE.
 
 Steinberg software has historically been difficult to run on Linux due largely to installer compatibility, account logins and token handoffs, and a small handful of other related technical hurdles. That is to say, the software itself generally runs decently well... if you can get that far.
 
