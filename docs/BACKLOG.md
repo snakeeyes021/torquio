@@ -15,9 +15,11 @@ We currently have `install_noteperformer.sh`, but we lack dedicated automation s
     *   Must handle the execution inside the container prefix.
 *   [ ] **`install_mediabay.sh`**:
     *   Move the unzip logic currently inside `setup_prefix.sh` into this dedicated script. It should look for the user-provided `.zip` inside the designated `installers/` directory rather than the repo root.
-    *   After unzipping and deleting the broken `preinstall.ps1`, the script must navigate into the `MediaBay_extracted/` directory, dynamically find the subfolder (e.g., `MediaBay 1.3.60` — this must be dynamic as versions will change), and execute `wine Setup.exe`.
+    *   After unzipping, the script must perform a **recursive cleanup** of blocked files (e.g., `preinstall.ps1`) within the extracted directory to prevent "Not Trusted" error code 231.
+    *   After cleanup, navigate into the versioned subfolder and execute `wine Setup.exe`.
 *   [ ] **`update_mediabay.sh` (or integrated into `install_mediabay.sh`)**:
     *   Allow for independent updates of MediaBay to prevent SDA from attempting (and failing) to update it automatically.
+    *   The script must be aware of the fact that the MediaBay installer installs three components: MediaBay, Library Manager, and VST Sound Content Updates. If we were to e.g. take an approach of nuking the MediaBay install and reinstalling anytime we see there's an update, the script would need to know what to do about the other items. It may be moot; the installer might handle an update to individual components just fine.
 
 #### Subtasks: The "one-click" Bootstrapper (`install.sh`)
 *   [ ] **The Curl Command:** Create a single terminal command (e.g., `curl -sL ... | bash`) that users copy/paste from the GitHub README to download the installer framework.
@@ -35,12 +37,13 @@ We currently have `install_noteperformer.sh`, but we lack dedicated automation s
 *   [ ] Need a post-install script that runs `distrobox-export --app` for SDA, SAM, and Dorico.
 *   [ ] Extract the generated `Icon=` lines from the Distrobox-exported files located in the host's `~/.local/share/applications/`.
 *   [ ] Inject those Icon paths into our custom URI-handler stubs and overwrite the Distrobox ones, ensuring the user gets one clean icon that launches the app *and* handles the login links.
+*   [ ] **MIME/Protocol Handler Priority:** Resolve the conflict where GNOME prompts the user to choose between the "SDA" and the "SDA Handler" when clicking login links. Ensure our handler is the default for `net-steinberg-*` protocols (OR, preferably, the SDA itself and the SDA handler need to be the same thing somehow so the choice couldn't even exist in the first place--our handlers are essentially hacks that we overlay on top of a legitimate Dorico install; we want to get as close to normal native function as possible).
 *   [ ] Investigate: currently, with both our custom .desktop files and the Distrobox-exported ones, GNOME/Wayland are using the icons from the Distrobox-exported file for displaying running apps in the dash and overview (and in the app picker lists for running unknown file types). We need to see if that still occurs when there is only our correct one, and if so, we need to figure out how to fully integrate ours into these system functions.
 
 ### Epic: Engine Dependency Automation (libicu)
 **Context:** Wine requires native ICU support for core Unicode translation, and Steinberg apps require Windows-side ICU binaries within the prefix.
-*   [ ] **Native Dependencies:** Add `libicu-dev` and `libicu-dev:i386` to the `apt-get install` list in `scripts/1-build/build_wine.sh`.
-*   [ ] **Prefix Dependencies:** Add `curl` or `wget` commands to download `wine-icu-72.1-x86.msi` and `wine-icu-72.1-x86_64.msi` from WineHQ, and run silent installation (`wine msiexec /i`) in `scripts/2-install/setup_prefix.sh`. (Note: the versions of the wine-icu msi's that we download and install should be whichever version has been tested against that container image release)
+*   [x] **Native Dependencies:** Added `winetricks`, `unzip`, and `cabextract` to `scripts/1-build/build_wine.sh`.
+*   [x] **Prefix Dependencies:** Automated `wine-icu-72.1` download and silent MSI installation in `scripts/2-install/setup_prefix.sh`.
 *   [ ] **Cleanup:** Delete `scripts/1-build/TO_BE_DELETED_rebuild_wine_icu.sh` once the above are verified working in a fresh build.
 
 ### Epic: Documentation & Repository Polish

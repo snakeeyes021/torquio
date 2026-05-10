@@ -62,32 +62,28 @@ This phase establishes the isolated environment. The future master installer wil
 **What it does:**
 * Creates the Windows 10 prefix at `~/.local/share/valerio/prefix`.
 * Installs core dependencies via Winetricks (`d3dx9`, `dotnet48`, etc.).
+* **Automated:** Downloads and installs `wine-icu-72.1` (required for Dorico).
+* **Automated:** Extracts MediaBay and robustly cleans up blocked files (e.g., `preinstall.ps1`).
 
 **Execution:**
 ```bash
-# Ensure you have dropped MediaBay_Installer_win64.zip into the installers/ folder
+# Ensure you have dropped MediaBay_Installer_win64.zip into the installers/ folder or ~/Downloads
 ./scripts/2-install/setup_prefix.sh
-```
-
-**⚠️ Temporary Manual Step (See Backlog):** 
-Until `setup_prefix.sh` is updated to automate this, you must manually install the Wine-ICU MSIs into the prefix. (Check `RELEASES.md` for the correct version).
-```bash
-wget https://gitlab.winehq.org/api/v4/projects/2302/packages/generic/wine-icu/72.1/wine-icu-72.1-x86.msi
-wget https://gitlab.winehq.org/api/v4/projects/2302/packages/generic/wine-icu/72.1/wine-icu-72.1-x86_64.msi
-wine msiexec /i wine-icu-72.1-x86.msi
-wine msiexec /i wine-icu-72.1-x86_64.msi
 ```
 
 ---
 
 ## Phase 4: Software Component Installation
 
-**Execution Context:** Inside the container.
-**Prerequisites:** The prefix must be initialized. Installers must be downloaded by the user and placed in the `installers/` directory within the repository.
+**Execution Context:** Host OS (outside the container).
+**Prerequisites:** The prefix must be initialized. Installers must be downloaded by the user and placed in `~/Downloads` or the `installers/` directory within the repository.
 
 **1. Install MediaBay**
 *   **Module:** `scripts/2-install/setup_prefix.sh` (Handling extraction for now)
-*   **Manual Fallback:** Unzip the MediaBay installer, delete the broken `preinstall.ps1`, and run `wine Setup.exe`.
+*   **Manual Step:** Run the installer inside the container:
+    ```bash
+    cd "$HOME/.local/share/valerio/MediaBay_extracted" && cd MediaBay* && wine Setup.exe
+    ```
 
 **2. Install Steinberg Download Assistant (SDA)**
 *   **Module:** `scripts/2-install/install_sda.sh`
