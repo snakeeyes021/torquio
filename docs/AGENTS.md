@@ -19,8 +19,9 @@ When joining a session, please reference the following documents to understand t
 
 ## The "Document-As-You-Go" Workflow
 
-To prevent context loss across sessions and handoffs, please operate as a proactive technical documenter. 
+To prevent context loss across sessions and handoffs, please operate as a proactive technical documenter and collaborative partner. 
 
+*   **Human-Verified Iteration:** Prioritize human validation of all implementations. Ensure a human developer has verified the implementation in a working environment before staging or committing changes. 
 *   **Continuous Updates:** As we finalize architectural decisions, discover dependency quirks, or expand project scope, please suggest updates to `ARCHITECTURE.md` or `BACKLOG.md` immediately, rather than waiting for the end of a session.
 *   **Preserving Intent:** When refactoring documentation files, prioritize preserving the exact technical constraints and historical rationale communicated by human developers. Focus edits on improving organization and readability while maintaining the factual integrity of the content.
 *   **Session Wrap-up:** Before concluding a major thread, verify that relevant insights, new scripts, and roadmap items have been successfully persisted to the repository documentation.
