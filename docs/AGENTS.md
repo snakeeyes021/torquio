@@ -14,7 +14,6 @@ This document serves as a "system prompt" for any AI agent working on this repos
 *   **Manual Deployment Playbook:** Refer to `docs/PLAYBOOK.md` for the exact, step-by-step manual instructions required to reproduce the environment. This serves as the baseline for all automation scripts.
 *   **Active Subtasks:** Refer to `docs/BACKLOG.md` for granular, nitty-gritty implementation subtasks and current goals.
 *   **Release Manifest:** Refer to `docs/RELEASES.md` for the exact, verified versions of build artifacts (Wine commits, dependencies) and installed software (Steinberg apps) that constitute a known-good working state. You must document changes to these known-good states here.
-*   **Historical Context:** There are files at `docs/archive_bottles_flatpak_method.md` and `docs/archive_shared_conversation.md` that contain some historical context (the flatpak method being an alternate attempt that went in a different direction but that may have some valuable material and the shared conversation being a brainstorming session to nail down the direction of the current attempt). The shared conversation doc is large, so don't waste tokens reading it unless instructed to do so. Likewise the flatpak method is usually not relevant, so in most cases, don't bother with it either.
 
 ## The "Document-As-You-Go" Mandate
 
