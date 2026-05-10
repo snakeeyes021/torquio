@@ -5,7 +5,7 @@ Welcome! This document outlines the established engineering principles, architec
 ## Architectural Principles
 
 1. **Container-Native Isolation:** We utilize a Distrobox container (Ubuntu 24.04) which enables a universal solution for users running both mutable and immutable hosts. This provides the necessary isolation for Steinberg dependencies while maintaining direct integration with the host's audio (Pipewire) subsystem. Please focus all architectural solutions on this container-first approach.
-2. **The Custom Wine Engine:** Dorico 6 requires DirectComposition (`dcomp`) stubs that are not yet available in upstream Wine. Therefore, our engine relies exclusively on the custom `zhiyi/wine` branch. Ensure all Wine-related modifications build strictly upon this custom compilation path.
+2. **The Custom Wine Engine:** Dorico 6 requires DirectComposition (`dcomp`) stubs that are not yet available in upstream Wine. Currently, our engine relies exclusively on the custom `zhiyi/wine` branch. Ensure all immediate Wine-related modifications build strictly upon this path, unless you are actively executing an experimental engine refactor, as explicitly defined in the backlog or requested by the user.
 3. **Environment-Agnostic Scripting:** To ensure maximum transportability for users, scripts should rely on dynamic XDG directories (e.g., `~/.local/share/wineprefixes/dorico`) and relative paths, avoiding hardcoded paths to specific developer directories.
 4. **URI Handoff Architecture:** We solve Linux authentication by using `.desktop` handlers on the host OS to catch `net-steinberg-sam://` and `net-steinberg-sda://` login tokens, which are then passed into the containerized Windows binaries. This is our foundational solution for Steinberg licensing.
 
