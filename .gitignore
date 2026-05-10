@@ -7,13 +7,13 @@ rebuild_wine_icu.sh
 build_wine.log
 setup_prefix.log
 
-# Wine Prefix (Crucial: This is huge and user-specific)
+# Wine Prefix
 dorico-prefix/
 
 # Extracted Installers
 MediaBay_extracted/
 
-# Large Binary Installers (already in initial commit, but good to ignore future ones)
+# Large Binary Installers
 *.exe
 *.zip
 *.msi
