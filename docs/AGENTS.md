@@ -1,28 +1,26 @@
-# AI Development Guide & System Prompts
+# AI Development Guide
 
-This document serves as a "system prompt" for any AI agent working on this repository. Please read and adhere to these constraints before making architectural changes or suggesting solutions.
+Welcome! This document outlines the established engineering principles, architectural decisions, and documentation workflows for this repository. Please use this context to guide your suggestions and implementations.
 
-## Core Architectural Constraints
+## Architectural Principles
 
-1. **The Containerized Environment:** This project strictly uses a Distrobox container (currently Ubuntu 24.04) running on an immutable host. Do *not* suggest Flatpak, Snap, or AppImage packaging for the core engine unless explicitly directed. Always respect the container boundaries.
-2. **The Custom Wine Engine:** We compile a specific custom branch of Wine (`zhiyi/wine`) to get experimental `dcomp` stubs necessary for Steinberg's UI. Do *not* suggest replacing this with standard Wine-Staging or Proton unless explicitly directed, as it will break the application.
-3. **No Absolute Development Paths:** Scripts must be user-agnostic. Do not hardcode paths like `~/dev/steinberg-on-linux`. Use relative paths or dynamic XDG directories (e.g., `~/.local/share/wineprefixes/dorico`).
-4. **URI Handoff Logic:** Web login tokens (`net-steinberg-sam://`, `net-steinberg-sda://`) are passed from the host browser to the containerized Windows binaries using custom `.desktop` files. Do not alter this fundamental handoff mechanism; it is the core solution to the authentication problem on Linux.
+1. **Container-Native Isolation:** We utilize a Distrobox container (Ubuntu 24.04) which enables a universal solution for users running both mutable and immutable hosts. This provides the necessary isolation for Steinberg dependencies while maintaining direct integration with the host's audio (Pipewire) subsystem. Please focus all architectural solutions on this container-first approach.
+2. **The Custom Wine Engine:** Dorico 6 requires DirectComposition (`dcomp`) stubs that are not yet available in upstream Wine. Therefore, our engine relies exclusively on the custom `zhiyi/wine` branch. Ensure all Wine-related modifications build strictly upon this custom compilation path.
+3. **Environment-Agnostic Scripting:** To ensure maximum transportability for users, scripts should rely on dynamic XDG directories (e.g., `~/.local/share/wineprefixes/dorico`) and relative paths, avoiding hardcoded paths to specific developer directories.
+4. **URI Handoff Architecture:** We solve Linux authentication by using `.desktop` handlers on the host OS to catch `net-steinberg-sam://` and `net-steinberg-sda://` login tokens, which are then passed into the containerized Windows binaries. This is our foundational solution for Steinberg licensing.
 
-## Context & Roadmap Retention
-*   **Blueprint & Philosophy:** Refer to `docs/ARCHITECTURE.md` (formerly `dorico_linux_state.md`) to understand the technical blueprint and current state of the machine.
-*   **Manual Deployment Playbook:** Refer to `docs/PLAYBOOK.md` for the exact, step-by-step manual instructions required to reproduce the environment. This serves as the baseline for all automation scripts.
-*   **Active Subtasks:** Refer to `docs/BACKLOG.md` for granular, nitty-gritty implementation subtasks and current goals.
-*   **Release Manifest:** Refer to `docs/RELEASES.md` for the exact, verified versions of build artifacts (Wine commits, dependencies) and installed software (Steinberg apps) that constitute a known-good working state. You must document changes to these known-good states here.
+## Repository Context
 
-## The "Document-As-You-Go" Mandate
+When joining a session, please reference the following documents to understand the current state of the project:
+*   **[ARCHITECTURE.md](ARCHITECTURE.md):** The core technical design and dependency structures.
+*   **[PLAYBOOK.md](PLAYBOOK.md):** The manual Standard Operating Procedure (SOP) that serves as the logic blueprint for future automation.
+*   **[BACKLOG.md](BACKLOG.md):** Active tasks, known issues, and planned epics.
+*   **[RELEASES.md](RELEASES.md):** The verified manifest of Wine commits, dependencies, and Steinberg app versions known to work together.
 
-**CRITICAL INSTRUCTION FOR ALL AI AGENTS:**
+## The "Document-As-You-Go" Workflow
 
-Treat your context window as highly volatile and ephemeral. To prevent "context rot" and ensure smooth handoffs to future agents (or human developers), you must act as a Senior Engineer and proactively document your work *while* you work.
+To prevent context loss across sessions and handoffs, please operate as a proactive technical documenter. 
 
-*   **Distill Insights:** When a complex problem is solved, a new architectural decision is made, or an important dependency quirk is discovered (e.g., the `libicu` native vs. MSI requirement), immediately distill this finding into `docs/ARCHITECTURE.md`.
-*   **Track Work:** When new subtasks are discovered or scope expands, immediately append them to `docs/BACKLOG.md`.
-*   **Update Continuously:** Do not wait until the end of a long session to summarize. Update documentation files continuously as part of your natural development cycle.
-*   **Never Lose Context:** If a conversation thread is reaching a conclusion, explicitly verify that all valuable context, script modifications, and roadmap items have been persisted to the repository files before concluding the task.
-*   **Refactor Structure, Not Facts:** When refactoring existing documentation, focus on improving organization and discoverability. Try to minimize wording rewrites, unless absolutely necessary for clarity (otherwise we get whisper-down-the-lane with endless agent rewrites), and **never hallucinate facts or jump to conclusions** based on file names or limited context (e.g., do not assume an `archive` file means a technology was entirely abandoned due to failure if the human hasn't explicitly stated that). Always prioritize and preserve the actual explanations and technical constraints communicated by the human.
+*   **Continuous Updates:** As we finalize architectural decisions, discover dependency quirks, or expand project scope, please suggest updates to `ARCHITECTURE.md` or `BACKLOG.md` immediately, rather than waiting for the end of a session.
+*   **Preserving Intent:** When refactoring documentation files, prioritize preserving the exact technical constraints and historical rationale communicated by human developers. Focus edits on improving organization and readability while maintaining the factual integrity of the content.
+*   **Session Wrap-up:** Before concluding a major thread, verify that relevant insights, new scripts, and roadmap items have been successfully persisted to the repository documentation.
