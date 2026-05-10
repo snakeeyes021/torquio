@@ -47,7 +47,9 @@ if [ ! -d "wine-source" ]; then
 fi
 
 cd wine-source
-git checkout bug-23698-react-native-20251217
+# Checkout the specific verified commit hash rather than the floating branch
+# The below hash comes from the bug-23698-react-native-20251217 branch
+git checkout ae88a705b5aa544cc60153d48c1ca8849f32ee14
 
 echo "Configuring and building..."
 cd ..
