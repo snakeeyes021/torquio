@@ -78,12 +78,14 @@ fi
 
 echo ""
 echo "--- Installation Manifest ---"
-echo "✅ MediaBay: Found ($FOUND_MEDIABAY)"
-echo "✅ SDA:      Found ($FOUND_SDA)"
+echo "✅ MediaBay:                     Found ($(basename "$FOUND_MEDIABAY"))"
+echo "✅ Steinberg Download Assistant: Found ($(basename "$FOUND_SDA"))"
 if [ -n "$FOUND_NP" ]; then
-    echo "✅ NotePerf: Found ($FOUND_NP)"
+    # Redact the personal user hash from the NotePerformer filename for privacy
+    NP_CLEAN_NAME=$(basename "$FOUND_NP" | sed -E 's/(NotePerformer-Installer-[0-9\.]+).*\.exe/\1-[REDACTED].exe/')
+    echo "✅ NotePerformer:                Found ($NP_CLEAN_NAME)"
 else
-    echo "⚠️ NotePerf: Not Found (Skipping)"
+    echo "⚠️ NotePerformer:                Not Found (Skipping)"
 fi
 echo "-----------------------------"
 echo ""
@@ -136,7 +138,10 @@ mkdir -p "$HOME/.local/bin"
 cp "$SCRIPT_DIR/scripts/3-runtime_handlers/"*.sh "$HOME/.local/bin/"
 chmod +x "$HOME/.local/bin/"*.sh
 
-cp "$SCRIPT_DIR/desktop_stubs/"*.desktop "$HOME/.local/share/applications/"
+mkdir -p "$HOME/.local/share/applications"
+for desktop_file in "$SCRIPT_DIR/desktop_stubs/"*.desktop; do
+    sed "s|\$HOME|$HOME|g" "$desktop_file" > "$HOME/.local/share/applications/$(basename "$desktop_file")"
+done
 update-desktop-database "$HOME/.local/share/applications/"
 
 echo ""

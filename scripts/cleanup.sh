@@ -8,7 +8,7 @@ source "$SCRIPT_DIR/common.sh"
 echo "⚠️  WARNING: This will permanently delete the following:"
 echo " - Distrobox container: $VALERIO_CONTAINER_NAME"
 echo " - Data directory: $VALERIO_DATA_DIR (includes Wine prefix)"
-echo " - Cache directory: $VALERIO_CACHE_DIR (includes Wine builds)"
+echo " - Cache directory: $VALERIO_CACHE_DIR (includes Wine source code and compilation artifacts)"
 echo " - Host integration scripts and .desktop files"
 echo ""
 read -p "Are you sure you want to continue? (y/N): " confirm
