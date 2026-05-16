@@ -42,8 +42,12 @@ rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/valerio-dorico.png"
 rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/valerio-sda.png"
 rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/valerio-sam.png"
 
+# Removing MIME types
+rm -f "$HOME/.local/share/mime/packages/application-x-dorico.xml"
+
 echo "Updating desktop database and icon cache..."
 update-desktop-database "$HOME/.local/share/applications/" || true
+update-mime-database "$HOME/.local/share/mime/" || true
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then
     gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor/" || true
 fi

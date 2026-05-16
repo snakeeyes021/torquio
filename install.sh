@@ -147,6 +147,11 @@ for desktop_file in "$SCRIPT_DIR/desktop_stubs/"*.desktop; do
 done
 update-desktop-database "$HOME/.local/share/applications/"
 
+echo "Registering MIME types..."
+mkdir -p "$HOME/.local/share/mime/packages"
+cp "$SCRIPT_DIR/desktop_stubs/application-x-dorico.xml" "$HOME/.local/share/mime/packages/"
+update-mime-database "$HOME/.local/share/mime/"
+
 echo ""
 echo "==========================================="
 echo "   Installation Complete!                 "
@@ -159,4 +164,3 @@ echo "Launching Steinberg Download Assistant now..."
 
 # Launch SDA via its host handler script
 "$HOME/.local/bin/steinberg-sda-handler.sh" &
-
