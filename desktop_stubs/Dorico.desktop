@@ -6,5 +6,6 @@ Icon=valerio-dorico
 Type=Application
 Terminal=false
 StartupWMClass=dorico6.exe
+PrefersNonDefaultGPU=true
 Categories=AudioVideo;Audio;
 MimeType=application/x-dorico;
