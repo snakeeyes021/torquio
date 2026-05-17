@@ -11,6 +11,8 @@ extract_icon() {
     local primary_path="$1"
     local search_pattern="$2"
     local icon_name="$3"
+    local extract_project="$4"
+    local project_res_id="$5"
     local exe_path=""
 
     # 1. Try the hardcoded primary path
@@ -57,6 +59,33 @@ extract_icon() {
         echo "No ICO resource found in $exe_path"
     fi
     
+    # --- Precision Project Icon Extraction ---
+    if [ "$extract_project" == "true" ] && [ -n "$project_res_id" ]; then
+        echo "Extracting project icon (ID: $project_res_id) from $exe_path to ${icon_name}-project..."
+        local proj_tmp=$(mktemp -d)
+        
+        # Extract ONLY the specific resource ID
+        wrestool -x -t 14 -n "$project_res_id" "$exe_path" -o "$proj_tmp/" 2>/dev/null || true
+        
+        local proj_ico=$(ls "$proj_tmp"/*.ico 2>/dev/null | head -n 1)
+        
+        if [ -n "$proj_ico" ]; then
+            icotool -x "$proj_ico" -o "$proj_tmp/" 2>/dev/null || true
+            local best_proj_png=$(ls -S "$proj_tmp"/*.png 2>/dev/null | head -n 1)
+            
+            if [ -n "$best_proj_png" ]; then
+                cp "$best_proj_png" "$ICON_DIR/${icon_name}-project.png"
+                echo "Successfully installed ${icon_name}-project.png"
+            else
+                echo "No PNG could be extracted from $proj_ico"
+            fi
+        else
+            echo "No ICO resource found for ID $project_res_id in $exe_path"
+        fi
+        rm -rf "$proj_tmp"
+    fi
+    # ----------------------------------------------
+
     rm -rf "$tmp_dir"
 }
 
@@ -67,25 +96,29 @@ echo "Extracting Steinberg icons..."
 extract_icon \
     "$VALERIO_PREFIX_DIR/drive_c/Program Files/Steinberg/Dorico6/Dorico6.exe" \
     "*dorico*.exe" \
-    "valerio-dorico"
+    "valerio-dorico" \
+    "true" \
+    "1"
 
 # SDA
 # Variations: Steinberg Download Assistant.exe, SteinbergDownloadAssistant.exe, SDA.exe
 extract_icon \
     "$VALERIO_PREFIX_DIR/drive_c/Program Files (x86)/Steinberg/Download Assistant/Steinberg Download Assistant.exe" \
     "*download*assistant*.exe" \
-    "valerio-sda"
+    "valerio-sda" \
+    "false"
 
 # SAM
 # Variations: Steinberg Activation Manager.exe, SteinbergActivationManager.exe, SAM.exe
 extract_icon \
     "$VALERIO_PREFIX_DIR/drive_c/Program Files/Steinberg/Activation Manager/SteinbergActivationManager.exe" \
     "*activation*manager*.exe" \
-    "valerio-sam"
+    "valerio-sam" \
+    "false"
 
 # Update icon cache
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then
-    gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor/" || true
+    gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor/" >/dev/null 2>&1 || true
 fi
 
 echo "Icon extraction complete."

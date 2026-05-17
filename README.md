@@ -50,7 +50,7 @@ The script will take a good while to run. It will:
 5. Map the Steinberg desktop shortcuts and web-login handlers to your native Linux application menu. 
     - Note: this part is still a work-in-progress. You may see multiple icons/app shortcuts be generated in your app drawer/menu. You'll generally want to always select the uglier ones without icons (the SDA and SAM have "handler" in the name as well). 
 
-Once complete, the Steinberg Download Assistant will launch automatically so you can sign in and download Dorico 6! We recommend using the "Install All" button for now, as the Steinberg Download Assistant is mostly illegible under the current build.
+Once complete, the Steinberg Download Assistant will launch automatically so you can sign in and download Dorico! We recommend using the "Install All" button for now, as the Steinberg Download Assistant is mostly illegible under the current build.
 
 ---
 

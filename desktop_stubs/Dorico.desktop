@@ -1,7 +1,7 @@
 [Desktop Entry]
-Name=Dorico 6
+Name=Dorico
 Comment=Music Notation Software
-Exec=bash -c '"$HOME/.local/bin/dorico.sh" "$@"' _ %F
+Exec=$HOME/.local/bin/dorico.sh %F
 Icon=valerio-dorico
 Type=Application
 Terminal=false

@@ -3,6 +3,6 @@
   <mime-type type="application/x-dorico">
     <comment>Dorico Project</comment>
     <glob pattern="*.dorico"/>
-    <icon name="valerio-dorico"/>
+    <icon name="valerio-dorico-project"/>
   </mime-type>
 </mime-info>

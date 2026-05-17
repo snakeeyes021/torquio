@@ -33,12 +33,14 @@ rm -f "$HOME/.local/bin/sam.sh"
 rm -f "$HOME/.local/bin/steinberg-sda-handler.sh"
 
 # Removing .desktop files
-rm -f "$HOME/.local/share/applications/Dorico 6.desktop"
+rm -f "$HOME/.local/share/applications/Dorico.desktop"
 rm -f "$HOME/.local/share/applications/Steinberg Activation Manager.desktop"
 rm -f "$HOME/.local/share/applications/steinberg-sda-handler.desktop"
+rm -f "$HOME/.local/share/applications/wine-extension-dorico.desktop"
 
 # Removing extracted icons
 rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/valerio-dorico.png"
+rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/valerio-dorico-project.png"
 rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/valerio-sda.png"
 rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/valerio-sam.png"
 
