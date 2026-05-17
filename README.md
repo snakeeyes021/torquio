@@ -68,6 +68,7 @@ If you ever need to completely wipe the Valerio environment (including the conta
 If you are looking to understand how this system works under the hood, contribute to the scripts, or read the historical design decisions, please refer to the `docs/` directory:
 
 *   **[Architecture & Blueprint](docs/ARCHITECTURE.md):** The core technical design (Containers, Custom Wine, URI Handoffs).
+*   **[Contributing Guide](CONTRIBUTING.md):** Our standard Git workflow, development guidelines, and how to safely test your changes.
 *   **[Release Manifests](docs/RELEASES.md):** The verifiable combinations of Wine versions and Steinberg app versions.
 *   **[Project Backlog](docs/BACKLOG.md):** Current tasks and active sprint items.
 *   **[Manual Playbook](docs/PLAYBOOK.md):** The step-by-step procedure the automated scripts are based on.
