@@ -12,6 +12,11 @@ export PATH="$WINE_CUSTOM_BIN:$PATH"
 # Suppress Wine Mono, Gecko installer prompts, and prevent winemenubuilder pollution
 export WINEDLLOVERRIDES="${WINEDLLOVERRIDES};mscoree=d;mshtml=d"
 
+if [ -d "$WINEPREFIX" ] && [ -f "$WINEPREFIX/.valerio_core_installed" ]; then
+    echo "Wine prefix already initialized with core dependencies. Skipping baseline setup."
+    exit 0
+fi
+
 echo "Initializing Wine prefix at $WINEPREFIX..."
 wineboot -u
 
@@ -32,4 +37,6 @@ wine msiexec /i "$VALERIO_CACHE_DIR/icu/wine-icu-x86.msi" /qn
 echo "Installing ICU x64..."
 wine msiexec /i "$VALERIO_CACHE_DIR/icu/wine-icu-x64.msi" /qn
 
+# Drop a marker file to indicate the prefix setup completed successfully
+touch "$WINEPREFIX/.valerio_core_installed"
 echo "Done with winetricks and ICU installation!"

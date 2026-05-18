@@ -4,6 +4,11 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../common.sh"
 
+if [ -f "/opt/wine-custom/bin/wine" ]; then
+    echo "Custom Wine engine is already compiled and installed at /opt/wine-custom. Skipping build."
+    exit 0
+fi
+
 echo "Adding i386 architecture..."
 sudo dpkg --add-architecture i386
 
