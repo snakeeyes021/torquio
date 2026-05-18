@@ -154,13 +154,23 @@ update-mime-database "$HOME/.local/share/mime/"
 
 echo ""
 echo "==========================================="
+echo "   Software Download Phase                 "
+echo "==========================================="
+echo "The Steinberg Download Assistant (SDA) will now open."
+echo "1. Sign in to your Steinberg account in your browser."
+echo "2. Install Dorico and all its related components ("Install All")."
+echo "3. When the installation finishes, CLOSE the Download Assistant window."
+echo ""
+echo "Waiting for you to close Steinberg Download Assistant before finalizing..."
+
+# Run Steinberg Download Assistant synchronously
+"$HOME/.local/bin/steinberg-sda-handler.sh" || true
+
+echo "Steinberg Download Assistant closed. Finalizing integrations..."
+# Run the extraction script a SECOND time to catch the newly installed Dorico and SAM
+distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && ./scripts/2-install/extract_icons.sh"
+
+echo ""
+echo "==========================================="
 echo "   Installation Complete!                 "
 echo "==========================================="
-echo "Note: The desktop icons for Dorico and Steinberg Activation Manager"
-echo "will not be fully functional until you download and install the actual"
-echo "software components from within the Steinberg Download Assistant."
-echo ""
-echo "Launching Steinberg Download Assistant now..."
-
-# Launch SDA via its host handler script
-"$HOME/.local/bin/steinberg-sda-handler.sh" &
