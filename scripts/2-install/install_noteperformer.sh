@@ -41,5 +41,10 @@ if [ -z "$FOUND_INSTALLER" ]; then
 fi
 
 # 3. Execution Phase
-echo "Launching NotePerformer installer..."
-wine "$FOUND_INSTALLER"
+if [[ "$1" == "--interactive" ]]; then
+    echo "Launching NotePerformer installer interactively..."
+    wine "$FOUND_INSTALLER" || true
+else
+    echo "Installing NotePerformer silently..."
+    wine "$FOUND_INSTALLER" /S || true
+fi

@@ -43,8 +43,13 @@ echo "Executing MediaBay Setup.exe..."
 SETUP_EXE=$(find "$VALERIO_DATA_DIR/MediaBay_extracted" -name "Setup.exe" | head -n 1)
 
 if [ -n "$SETUP_EXE" ]; then
-    echo "Running: wine $SETUP_EXE"
-    wine "$SETUP_EXE"
+    if [[ "$1" == "--interactive" ]]; then
+        echo "Running interactively: wine $SETUP_EXE"
+        wine "$SETUP_EXE" || true
+    else
+        echo "Running silently: wine $SETUP_EXE --silent"
+        wine "$SETUP_EXE" --silent || true
+    fi
 else
     echo "Error: Could not find Setup.exe in the extracted MediaBay folder."
     exit 1

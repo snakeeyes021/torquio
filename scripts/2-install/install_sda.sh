@@ -42,5 +42,10 @@ if [ -z "$FOUND_INSTALLER" ]; then
 fi
 
 # 3. Execution Phase
-echo "Launching SDA installer..."
-wine "$FOUND_INSTALLER"
+if [[ "$1" == "--interactive" ]]; then
+    echo "Launching SDA installer interactively..."
+    wine "$FOUND_INSTALLER" || true
+else
+    echo "Installing SDA silently..."
+    wine "$FOUND_INSTALLER" --mode unattended || true
+fi
