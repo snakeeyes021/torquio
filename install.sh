@@ -156,10 +156,15 @@ echo ""
 echo "==========================================="
 echo "   Software Download Phase                 "
 echo "==========================================="
-echo "The Steinberg Download Assistant (SDA) will now open."
+echo "The Steinberg Download Assistant (SDA) must now run. From there, you'll need to:"
 echo "1. Sign in to your Steinberg account in your browser."
 echo "2. Install Dorico and all its related components (\"Install All\")."
 echo "3. When the installation finishes, CLOSE the Download Assistant window."
+echo ""
+
+# The new interaction line
+read -p "Press [Enter] to open the Download Assistant..."
+
 echo ""
 echo "Waiting for you to close Steinberg Download Assistant before finalizing..."
 
