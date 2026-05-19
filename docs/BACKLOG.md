@@ -6,7 +6,7 @@ This document is the single source of truth for all tasks, bugs, and enhancement
 This section tracks epics that have been broken down into concrete, actionable subtasks.
 
 ### Epic: The Master Installer Wrapper (User Experience)
-**Context:** Assuming Steinberg legal does not allow pre-packaged distribution, the end-user will need to provide their own `.exe` and `.zip` installers. We must not force Linux novices to use `git clone` or run multiple shell scripts. We need a single-command `curl | bash` installation experience. *(Note: The exact sequence this master script must automate is codified in `docs/PLAYBOOK.md`.)*
+**Context:** Assuming Steinberg legal does not allow pre-packaged distribution, the end-user will need to provide their own `.exe` and `.zip` installers. We must not force Linux novices to use `git clone` or run multiple shell scripts. We need a single-command `curl | bash` installation experience.
 
 #### Subtasks: Missing Component Scripts
 We currently have `install_noteperformer.sh`, but we lack dedicated automation scripts for the core Steinberg components. Before we can build the master wrapper, we must build and test:
@@ -19,20 +19,6 @@ We currently have `install_noteperformer.sh`, but we lack dedicated automation s
     *   After cleanup, navigate into the versioned subfolder and execute `wine Setup.exe`.
 *   [ ] **`update_mediabay.sh` (or CLI Updater Mode):**
     *   SDA attempts to update MediaBay but fails due to the `preinstall.ps1` block (Error 231). We need to refactor `install_mediabay.sh` and/or the SDA's launcher (.desktop file or shell script) to handle subsequent updates (e.g., pre-emptively manually checking for updates prior to and outside of the SDA running; if an update is found, we automatically download the installer (which may be a feature we add in the future anyways), clean it, and finally run the new installer ALL BEFORE running the SDA).
-
-#### Subtasks: The "one-click" Bootstrapper (`install.sh`)
-*   [x] **The Curl Command:** Create a single terminal command (e.g., `curl -sL ... | bash`) that users copy/paste from the GitHub README to download the installer framework.
-*   [x] **Prerequisite Checks:** Script must check for `distrobox` (or `distroshelf`) and `docker`/`podman` (prompting the user to install them via Flatpak/system packages if missing). If missing, halt and print clear instructions to install them.
-*   [x] **Asset Validation:** Ensure an `installers/` directory exists and prompt the user to drop their `.exe` files into it before continuing.
-*   [x] **Execution Chain:** Sequentially call `build_wine.sh` -> `setup_prefix.sh` -> `install_sda.sh` -> `install_mediabay.sh` -> `install_noteperformer.sh`.
-*   [x] **Final Integration:** Automatically register the `.desktop` stubs and MIME types.
-*   [x] **Cleanup/Uninstaller Script (`scripts/cleanup.sh`):** Create a robust script to wipe the environment (container, XDG share/cache dirs, and host integrations) to allow for clean re-installs or uninstallation.
-
-### Epic: Engine Dependency Automation (libicu)
-**Context:** Wine requires native ICU support for core Unicode translation, and Steinberg apps require Windows-side ICU binaries within the prefix.
-*   [x] **Native Dependencies:** Added `winetricks`, `unzip`, and `cabextract` to `scripts/1-build/build_wine.sh`.
-*   [x] **Prefix Dependencies:** Automated `wine-icu-72.1` download and silent MSI installation in `scripts/2-install/setup_prefix.sh`.
-*   [ ] **Cleanup:** Delete `scripts/1-build/TO_BE_DELETED_rebuild_wine_icu.sh` once the above are verified working in a fresh build.
 
 ## Undefined Work (Backlog)
 This section tracks high-level goals and ideas that have not yet been broken down into concrete subtasks.
@@ -55,6 +41,20 @@ This section tracks high-level goals and ideas that have not yet been broken dow
 
 ## Done
 *(Move completed epics and tasks here for historical record)*
+
+### Subtasks: The "one-click" Bootstrapper (`install.sh`)
+*   [x] **The Curl Command:** Create a single terminal command (e.g., `curl -sL ... | bash`) that users copy/paste from the GitHub README to download the installer framework.
+*   [x] **Prerequisite Checks:** Script must check for `distrobox` (or `distroshelf`) and `docker`/`podman` (prompting the user to install them via Flatpak/system packages if missing). If missing, halt and print clear instructions to install them.
+*   [x] **Asset Validation:** Ensure an `installers/` directory exists and prompt the user to drop their `.exe` files into it before continuing.
+*   [x] **Execution Chain:** Sequentially call `build_wine.sh` -> `setup_prefix.sh` -> `install_sda.sh` -> `install_mediabay.sh` -> `install_noteperformer.sh`.
+*   [x] **Final Integration:** Automatically register the `.desktop` stubs and MIME types.
+*   [x] **Cleanup/Uninstaller Script (`scripts/cleanup.sh`):** Create a robust script to wipe the environment (container, XDG share/cache dirs, and host integrations) to allow for clean re-installs or uninstallation.
+
+### Epic: Engine Dependency Automation (libicu)
+**Context:** Wine requires native ICU support for core Unicode translation, and Steinberg apps require Windows-side ICU binaries within the prefix.
+*   [x] **Native Dependencies:** Added `winetricks`, `unzip`, and `cabextract` to `scripts/1-build/build_wine.sh`.
+*   [x] **Prefix Dependencies:** Automated `wine-icu-72.1` download and silent MSI installation in `scripts/2-install/setup_prefix.sh`.
+*   [x] **Cleanup:** Delete `scripts/1-build/TO_BE_DELETED_rebuild_wine_icu.sh` once the above are verified working in a fresh build.
 
 ### Epic: Documentation & Repository Polish
 **Context:** Prepare the repository for public consumption and preserve AI agent context.
@@ -84,3 +84,4 @@ This section tracks high-level goals and ideas that have not yet been broken dow
     *   Removed hardcoded `$HOME/dev/steinberg-on-linux` references in `build_wine.sh` and `setup_prefix.sh` and replaced them with dynamic workspace variables and XDG-compliant paths.
     *   Scripts now dynamically generate the Wine prefix in a user-agnostic XDG location (`~/.local/share/valerio/prefix`).
     *   Added `scripts/common.sh` for shared environment variables.
+

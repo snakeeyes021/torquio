@@ -13,7 +13,6 @@ Welcome! This document outlines the established engineering principles, architec
 
 When joining a session, please reference the following documents to understand the current state of the project:
 *   **[ARCHITECTURE.md](ARCHITECTURE.md):** The core technical design and dependency structures.
-*   **[PLAYBOOK.md](PLAYBOOK.md):** The manual Standard Operating Procedure (SOP) that serves as the logic blueprint for future automation.
 *   **[BACKLOG.md](BACKLOG.md):** Active tasks, known issues, and planned epics.
 *   **[RELEASES.md](RELEASES.md):** The verified manifest of Wine commits, dependencies, and Steinberg app versions known to work together.
 

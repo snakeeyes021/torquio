@@ -39,17 +39,18 @@ cd valerio
 ./install.sh
 ```
 
-*(You can append `-y` to `./install.sh` to bypass the installation manifest confirmation prompt).*
+*(You can append `-y` to `./install.sh` to bypass the installation manifest confirmation prompt AND the final pause before opening the Download Assistant).*
 
 ### What happens next?
-The script will take a good while to run. It will:
+The script currently takes about 45 minutes to run. It will:
 1. Generate an isolated Ubuntu container.
 2. Compile a custom version of Wine (with specific stubs required by Dorico).
 3. Initialize a Windows 10 prefix and install core dependencies.
-4. Pop up the Windows installers for MediaBay, the Download Assistant, and NotePerformer (if provided).
+4. Install MediaBay, the Download Assistant, and NotePerformer (if provided).
 5. Map the Steinberg desktop shortcuts and web-login handlers to your native Linux application menu. 
+6. Pause to prompt you to start the Download Assistant.
 
-Once complete, the Steinberg Download Assistant will launch automatically so you can sign in and download Dorico! We recommend using the "Install All" button for now, as the Steinberg Download Assistant is mostly illegible under the current build.
+Once the Download Assistant launches, you can sign in and download Dorico! We recommend using the "Install All" button for now, as the Steinberg Download Assistant is mostly illegible under the current build. After you're done installing via the Download Assistant, simply close it, and Valerio will perform the final few steps of the process.
 
 ---
 
@@ -71,7 +72,6 @@ If you are looking to understand how this system works under the hood, contribut
 *   **[Contributing Guide](CONTRIBUTING.md):** Our standard Git workflow, development guidelines, and how to safely test your changes.
 *   **[Release Manifests](docs/RELEASES.md):** The verifiable combinations of Wine versions and Steinberg app versions.
 *   **[Project Backlog](docs/BACKLOG.md):** Current tasks and active sprint items.
-*   **[Manual Playbook](docs/PLAYBOOK.md):** The step-by-step procedure the automated scripts are based on.
 *   **[AI Agent Guide](docs/AGENTS.md):** Rules and constraints for LLMs assisting with this repository.
 
 ### Repository Structure
