@@ -9,21 +9,13 @@ SEARCH_DIRS=("$VALERIO_INSTALLERS_DIR" "$HOME/Downloads" "$(pwd)")
 FOUND_INSTALLER=""
 
 # 1. Search Phase
-for DIR in "${SEARCH_DIRS[@]}"; do
-    # Skip if the directory doesn't exist
-    if [ ! -d "$DIR" ]; then
-        continue
-    fi
-    
-    # Look for the Cantai installer in this directory
-    MATCH=$(find "$DIR" -maxdepth 1 -name "Cantai-Windows-Dorico-Installer-*.exe" | head -n 1)
-    
-    if [ -n "$MATCH" ]; then
-        FOUND_INSTALLER="$MATCH"
-        echo "Found Cantai installer: $FOUND_INSTALLER"
-        break
-    fi
-done
+echo "Searching for Cantai installer..."
+# Find all matching installers across all search directories, sort them by version, and pick the highest
+FOUND_INSTALLER=$(find "${SEARCH_DIRS[@]}" -maxdepth 1 -type f -name "Cantai-Windows-Dorico-Installer-*.exe.zip" 2>/dev/null | sort -V | tail -n 1)
+
+if [ -n "$FOUND_INSTALLER" ]; then
+    echo "Found Cantai installer: $FOUND_INSTALLER"
+fi
 
 # 2. Download / Fallback Phase
 if [ -z "$FOUND_INSTALLER" ]; then
@@ -33,6 +25,33 @@ if [ -z "$FOUND_INSTALLER" ]; then
     exit 1
 fi
 
-# 3. Execution Phase
-# Passing the guaranteed absolute path ($FOUND_INSTALLER) to Wine inside the Distrobox container.
-distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$VALERIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine \"$FOUND_INSTALLER\""
+# 3. Extraction Phase
+echo "Extracting Cantai archive..."
+TMP_DIR=$(mktemp -d)
+# Ensure the temporary directory is cleaned up upon script exit or failure
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+unzip -q "$FOUND_INSTALLER" -d "$TMP_DIR"
+
+# The zip creates a directory named identically to the executable, containing the executable itself
+EXE_NAME=$(basename "$FOUND_INSTALLER" .zip)
+EXTRACTED_EXE="$TMP_DIR/$EXE_NAME/$EXE_NAME"
+
+if [ ! -f "$EXTRACTED_EXE" ]; then
+    echo "Error: Failed to find the extracted executable at $EXTRACTED_EXE"
+    exit 1
+fi
+
+# 4. Execution Phase
+if [[ "$1" == "--interactive" ]]; then
+    echo "Launching Cantai installer interactively..."
+    # Passing the guaranteed absolute path ($EXTRACTED_EXE) to Wine inside the Distrobox container.
+    distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$VALERIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine \"$EXTRACTED_EXE\"" || true
+else
+    echo "Installing Cantai silently..."
+    # TODO: Replace the active command below with the correct silent installation flag once identified.
+    # It will likely look something like this:
+    # distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$VALERIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine \"$EXTRACTED_EXE\" /S" || true
+    
+    distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$VALERIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine \"$EXTRACTED_EXE\"" || true
+fi

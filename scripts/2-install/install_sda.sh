@@ -15,20 +15,12 @@ FOUND_INSTALLER=""
 
 # 1. Search Phase
 echo "Searching for Steinberg Download Assistant installer..."
-for DIR in "${SEARCH_DIRS[@]}"; do
-    if [ ! -d "$DIR" ]; then
-        continue
-    fi
-    
-    # Use a glob pattern to handle different version numbers in the filename
-    MATCH=$(find "$DIR" -maxdepth 1 -name "Steinberg_Download_Assistant_*_Installer_win.exe" | head -n 1)
-    
-    if [ -n "$MATCH" ]; then
-        FOUND_INSTALLER="$MATCH"
-        echo "Found SDA installer: $FOUND_INSTALLER"
-        break
-    fi
-done
+# Find all matching installers across all search directories, sort them by version, and pick the highest
+FOUND_INSTALLER=$(find "${SEARCH_DIRS[@]}" -maxdepth 1 -type f -name "Steinberg_Download_Assistant_*_Installer_win.exe" 2>/dev/null | sort -V | tail -n 1)
+
+if [ -n "$FOUND_INSTALLER" ]; then
+    echo "Found SDA installer: $FOUND_INSTALLER"
+fi
 
 # 2. Download / Fallback Phase
 if [ -z "$FOUND_INSTALLER" ]; then

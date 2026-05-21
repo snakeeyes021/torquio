@@ -14,22 +14,13 @@ SEARCH_DIRS=("$VALERIO_INSTALLERS_DIR" "$HOME/Downloads" "$(pwd)")
 FOUND_INSTALLER=""
 
 # 1. Search Phase
-for DIR in "${SEARCH_DIRS[@]}"; do
-    # Skip if the directory doesn't exist
-    if [ ! -d "$DIR" ]; then
-        continue
-    fi
-    
-    # Look for the NotePerformer installer in this directory
-    # NotePerformer installers often include personalized names/IDs, so we use a loose glob.
-    MATCH=$(find "$DIR" -maxdepth 1 -name "NotePerformer-Installer-*.exe" | head -n 1)
-    
-    if [ -n "$MATCH" ]; then
-        FOUND_INSTALLER="$MATCH"
-        echo "Found NotePerformer installer: $FOUND_INSTALLER"
-        break
-    fi
-done
+echo "Searching for NotePerformer installer..."
+# Find all matching installers across all search directories, sort them by version, and pick the highest
+FOUND_INSTALLER=$(find "${SEARCH_DIRS[@]}" -maxdepth 1 -type f -name "NotePerformer-Installer-*.exe" 2>/dev/null | sort -V | tail -n 1)
+
+if [ -n "$FOUND_INSTALLER" ]; then
+    echo "Found NotePerformer installer: $FOUND_INSTALLER"
+fi
 
 # 2. Download / Fallback Phase
 if [ -z "$FOUND_INSTALLER" ]; then
