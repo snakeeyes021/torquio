@@ -121,4 +121,12 @@ if command -v gtk-update-icon-cache >/dev/null 2>&1; then
     gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor/" >/dev/null 2>&1 || true
 fi
 
+# Force the desktop environment to reload desktop entries to resolve the newly extracted icons
+echo "Refreshing desktop database and application launchers..."
+touch "$HOME/.local/share/applications" >/dev/null 2>&1 || true
+if [ -d "$HOME/.local/share/applications" ]; then
+    touch "$HOME/.local/share/applications/"*.desktop >/dev/null 2>&1 || true
+fi
+
 echo "Icon extraction complete."
+
