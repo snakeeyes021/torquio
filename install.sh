@@ -37,27 +37,11 @@ echo "Validating installers..."
 mkdir -p "$VALERIO_INSTALLERS_DIR"
 SEARCH_DIRS=("$VALERIO_INSTALLERS_DIR" "$HOME/Downloads" "$PWD")
 
-FOUND_MEDIABAY=""
-FOUND_SDA=""
-FOUND_NP=""
+# Find the highest versioned files across all search directories, matching the install scripts' logic
+FOUND_MEDIABAY=$(find "${SEARCH_DIRS[@]}" -maxdepth 1 -type f -name "MediaBay_Installer_win64*.zip" 2>/dev/null | sort -V | tail -n 1)
+FOUND_SDA=$(find "${SEARCH_DIRS[@]}" -maxdepth 1 -type f -name "Steinberg_Download_Assistant_*_Installer_win.exe" 2>/dev/null | sort -V | tail -n 1)
+FOUND_NP=$(find "${SEARCH_DIRS[@]}" -maxdepth 1 -type f -name "NotePerformer-Installer-*.exe" 2>/dev/null | sort -V | tail -n 1)
 
-for DIR in "${SEARCH_DIRS[@]}"; do
-    if [ ! -d "$DIR" ]; then continue; fi
-    
-    if [ -z "$FOUND_MEDIABAY" ] && [ -f "$DIR/MediaBay_Installer_win64.zip" ]; then
-        FOUND_MEDIABAY="$DIR/MediaBay_Installer_win64.zip"
-    fi
-    
-    if [ -z "$FOUND_SDA" ]; then
-        MATCH=$(find "$DIR" -maxdepth 1 -name "Steinberg_Download_Assistant_*_Installer_win.exe" | head -n 1)
-        if [ -n "$MATCH" ]; then FOUND_SDA="$MATCH"; fi
-    fi
-    
-    if [ -z "$FOUND_NP" ]; then
-        MATCH=$(find "$DIR" -maxdepth 1 -name "NotePerformer-Installer-*.exe" | head -n 1)
-        if [ -n "$MATCH" ]; then FOUND_NP="$MATCH"; fi
-    fi
-done
 
 MISSING_MANDATORY=false
 if [ -z "$FOUND_MEDIABAY" ]; then
