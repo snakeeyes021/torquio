@@ -138,7 +138,14 @@ distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && .
 # 7. Host Integration
 echo "Phase 5: Performing Host Integration..."
 mkdir -p "$HOME/.local/bin"
-cp "$SCRIPT_DIR/scripts/3-runtime_handlers/"*.sh "$HOME/.local/bin/"
+for handler in "$SCRIPT_DIR/scripts/3-runtime_handlers/"*.sh; do
+    base_name=$(basename "$handler")
+    if [ "$base_name" = "steinberg-sda-handler.sh" ]; then
+        sed "s|@VALERIO_REPO_DIR@|$SCRIPT_DIR|g" "$handler" > "$HOME/.local/bin/$base_name"
+    else
+        cp "$handler" "$HOME/.local/bin/"
+    fi
+done
 chmod +x "$HOME/.local/bin/"*.sh
 
 mkdir -p "$HOME/.local/share/applications"
@@ -156,34 +163,24 @@ echo ""
 echo "==========================================="
 echo "   Software Download Phase                 "
 echo "==========================================="
-echo "The Steinberg Download Assistant (SDA) must now run. From there, you'll need to:"
+echo "The Steinberg Download Assistant (SDA) is now launching in the background."
+echo "From the SDA window, you'll need to:"
 echo "1. Sign in to your Steinberg account in your browser."
-echo "2. Install Dorico and all its related components (\"Install All\")."
-echo "3. When the installation finishes, CLOSE the Download Assistant window."
+echo "2. Install Dorico and any related components."
 echo ""
+echo "Opening the Download Assistant..."
 
-if [ "$AUTO_ACCEPT" = false ]; then
-    read -p "Press [Enter] to open the Download Assistant..."
-else
-    echo "Opening the Download Assistant..."
-fi
-
-echo ""
-echo "Waiting for you to close Steinberg Download Assistant before finalizing..."
-
-# Run Steinberg Download Assistant synchronously (this often returns immediately due to single-instance handoff)
-"$HOME/.local/bin/steinberg-sda-handler.sh" || true
-
-# Polling loop to wait for detached SDA processes to terminate
-while distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "ps auxww" | grep -iE "Steinberg Download Assistant\.exe|STEI~B2R\.EXE|aria2c\.exe" > /dev/null; do
-    sleep 3
-done
-
-echo "Steinberg Download Assistant closed. Finalizing integrations..."
-# Run the extraction script a SECOND time to catch the newly installed Dorico and SAM
-distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && ./scripts/2-install/extract_icons.sh"
+# Run the handler in the background so the terminal is not blocked
+"$HOME/.local/bin/steinberg-sda-handler.sh" > /dev/null 2>&1 &
 
 echo ""
 echo "==========================================="
-echo "   Installation Complete!                 "
+echo "   Valerio Core Setup Complete!            "
 echo "==========================================="
+echo "You can close this terminal window at any time."
+echo "The background watcher is running and will automatically extract"
+echo "the Dorico desktop icons and finalize your system integration"
+echo "the exact moment Dorico finishes installing in the SDA!"
+echo "==========================================="
+echo ""
+
