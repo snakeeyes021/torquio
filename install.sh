@@ -152,7 +152,7 @@ echo ""
 echo "Opening the Download Assistant..."
 
 # Run the handler in the background so the terminal is not blocked
-"$HOME/.local/bin/steinberg-sda-handler.sh" > /dev/null 2>&1 &
+nohup "$HOME/.local/bin/steinberg-sda-handler.sh" > /dev/null 2>&1 &
 
 echo ""
 echo "==========================================="
