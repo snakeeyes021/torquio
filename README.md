@@ -48,9 +48,9 @@ The script currently takes about 45 minutes to run. It will:
 3. Initialize a Windows 10 prefix and install core dependencies.
 4. Install MediaBay, the Download Assistant, and NotePerformer (if provided).
 5. Map the Steinberg desktop shortcuts and web-login handlers to your native Linux application menu. 
-6. Pause to prompt you to start the Download Assistant.
+6. Automatically start the Download Assistant.
 
-Once the Download Assistant launches, you can sign in and download Dorico! We recommend using the "Install All" button for now, as the Steinberg Download Assistant is mostly illegible under the current build. After you're done installing via the Download Assistant, simply close it, and Valerio will perform the final few steps of the process.
+Once the Download Assistant launches, you can sign in and download Dorico! We recommend using the "Install All" button for now, as the Steinberg Download Assistant is mostly illegible under the current build. After you're done installing, simply close the Download Assistant, run the Activation Manager to activate your license, and then you should be all set to start notating!
 
 ---
 
