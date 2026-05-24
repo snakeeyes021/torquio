@@ -62,14 +62,14 @@ fi
 
 echo ""
 echo "--- Installation Manifest ---"
-echo "✅ MediaBay:                     Found ($(basename "$FOUND_MEDIABAY"))"
+echo "✅ Steinberg MediaBay:           Found ($(basename "$FOUND_MEDIABAY"))"
 echo "✅ Steinberg Download Assistant: Found ($(basename "$FOUND_SDA"))"
 if [ -n "$FOUND_NP" ]; then
     # Redact the personal user hash from the NotePerformer filename for privacy
     NP_CLEAN_NAME=$(basename "$FOUND_NP" | sed -E 's/(NotePerformer-Installer-[0-9\.]+).*\.exe/\1-[REDACTED].exe/')
-    echo "✅ NotePerformer:                Found ($NP_CLEAN_NAME)"
+    echo "✅ NotePerformer (3rd Party):    Found ($NP_CLEAN_NAME)"
 else
-    echo "⚠️ NotePerformer:                Not Found (Skipping)"
+    echo "⚠️ NotePerformer (3rd Party):    Not Found (Skipping)"
 fi
 echo "-----------------------------"
 echo ""
@@ -133,10 +133,6 @@ done
 chmod +x "$HOME/.local/bin/"*.sh
 
 mkdir -p "$HOME/.local/share/applications"
-for desktop_file in "$SCRIPT_DIR/desktop_stubs/"*.desktop; do
-    sed "s|\$HOME|$HOME|g" "$desktop_file" > "$HOME/.local/share/applications/$(basename "$desktop_file")"
-done
-update-desktop-database "$HOME/.local/share/applications/"
 
 echo "Registering MIME types..."
 mkdir -p "$HOME/.local/share/mime/packages"
@@ -162,9 +158,9 @@ echo ""
 echo "==========================================="
 echo "   Valerio Core Setup Complete!            "
 echo "==========================================="
-echo "You can close this terminal window at any time."
-echo "Once installation of the various components is complete,"
-echo "you should see the Dorico icon appear in your app grid/menu."
+echo "You can close this terminal window at any time. Once the "
+echo "various components have been installed, remember to run the"
+echo "Activation Manager to activate your license."
 echo "Happy notating!"
 echo "==========================================="
 echo ""
