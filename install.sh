@@ -37,27 +37,11 @@ echo "Validating installers..."
 mkdir -p "$VALERIO_INSTALLERS_DIR"
 SEARCH_DIRS=("$VALERIO_INSTALLERS_DIR" "$HOME/Downloads" "$PWD")
 
-FOUND_MEDIABAY=""
-FOUND_SDA=""
-FOUND_NP=""
+# Find the highest versioned files across all search directories, matching the install scripts' logic
+FOUND_MEDIABAY=$(find "${SEARCH_DIRS[@]}" -maxdepth 1 -type f -name "MediaBay_Installer_win64*.zip" 2>/dev/null | sort -V | tail -n 1)
+FOUND_SDA=$(find "${SEARCH_DIRS[@]}" -maxdepth 1 -type f -name "Steinberg_Download_Assistant_*_Installer_win.exe" 2>/dev/null | sort -V | tail -n 1)
+FOUND_NP=$(find "${SEARCH_DIRS[@]}" -maxdepth 1 -type f -name "NotePerformer-Installer-*.exe" 2>/dev/null | sort -V | tail -n 1)
 
-for DIR in "${SEARCH_DIRS[@]}"; do
-    if [ ! -d "$DIR" ]; then continue; fi
-    
-    if [ -z "$FOUND_MEDIABAY" ] && [ -f "$DIR/MediaBay_Installer_win64.zip" ]; then
-        FOUND_MEDIABAY="$DIR/MediaBay_Installer_win64.zip"
-    fi
-    
-    if [ -z "$FOUND_SDA" ]; then
-        MATCH=$(find "$DIR" -maxdepth 1 -name "Steinberg_Download_Assistant_*_Installer_win.exe" | head -n 1)
-        if [ -n "$MATCH" ]; then FOUND_SDA="$MATCH"; fi
-    fi
-    
-    if [ -z "$FOUND_NP" ]; then
-        MATCH=$(find "$DIR" -maxdepth 1 -name "NotePerformer-Installer-*.exe" | head -n 1)
-        if [ -n "$MATCH" ]; then FOUND_NP="$MATCH"; fi
-    fi
-done
 
 MISSING_MANDATORY=false
 if [ -z "$FOUND_MEDIABAY" ]; then
@@ -78,14 +62,14 @@ fi
 
 echo ""
 echo "--- Installation Manifest ---"
-echo "✅ MediaBay:                     Found ($(basename "$FOUND_MEDIABAY"))"
+echo "✅ Steinberg MediaBay:           Found ($(basename "$FOUND_MEDIABAY"))"
 echo "✅ Steinberg Download Assistant: Found ($(basename "$FOUND_SDA"))"
 if [ -n "$FOUND_NP" ]; then
     # Redact the personal user hash from the NotePerformer filename for privacy
     NP_CLEAN_NAME=$(basename "$FOUND_NP" | sed -E 's/(NotePerformer-Installer-[0-9\.]+).*\.exe/\1-[REDACTED].exe/')
-    echo "✅ NotePerformer:                Found ($NP_CLEAN_NAME)"
+    echo "✅ NotePerformer (3rd Party):    Found ($NP_CLEAN_NAME)"
 else
-    echo "⚠️ NotePerformer:                Not Found (Skipping)"
+    echo "⚠️ NotePerformer (3rd Party):    Not Found (Skipping)"
 fi
 echo "-----------------------------"
 echo ""
@@ -138,14 +122,17 @@ distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && .
 # 7. Host Integration
 echo "Phase 5: Performing Host Integration..."
 mkdir -p "$HOME/.local/bin"
-cp "$SCRIPT_DIR/scripts/3-runtime_handlers/"*.sh "$HOME/.local/bin/"
+for handler in "$SCRIPT_DIR/scripts/3-runtime_handlers/"*.sh; do
+    base_name=$(basename "$handler")
+    if [ "$base_name" = "steinberg-sda-handler.sh" ]; then
+        sed "s|@VALERIO_REPO_DIR@|$SCRIPT_DIR|g" "$handler" > "$HOME/.local/bin/$base_name"
+    else
+        cp "$handler" "$HOME/.local/bin/"
+    fi
+done
 chmod +x "$HOME/.local/bin/"*.sh
 
 mkdir -p "$HOME/.local/share/applications"
-for desktop_file in "$SCRIPT_DIR/desktop_stubs/"*.desktop; do
-    sed "s|\$HOME|$HOME|g" "$desktop_file" > "$HOME/.local/share/applications/$(basename "$desktop_file")"
-done
-update-desktop-database "$HOME/.local/share/applications/"
 
 echo "Registering MIME types..."
 mkdir -p "$HOME/.local/share/mime/packages"
@@ -156,34 +143,24 @@ echo ""
 echo "==========================================="
 echo "   Software Download Phase                 "
 echo "==========================================="
-echo "The Steinberg Download Assistant (SDA) must now run. From there, you'll need to:"
+echo "The Steinberg Download Assistant (SDA) is now launching."
+echo "You should be able to use it as normal, including the ability to:"
 echo "1. Sign in to your Steinberg account in your browser."
-echo "2. Install Dorico and all its related components (\"Install All\")."
-echo "3. When the installation finishes, CLOSE the Download Assistant window."
+echo "2. Install Dorico and any related components."
+echo "We recommend using the 'Download All' option." 
 echo ""
+echo "Opening the Download Assistant..."
 
-if [ "$AUTO_ACCEPT" = false ]; then
-    read -p "Press [Enter] to open the Download Assistant..."
-else
-    echo "Opening the Download Assistant..."
-fi
-
-echo ""
-echo "Waiting for you to close Steinberg Download Assistant before finalizing..."
-
-# Run Steinberg Download Assistant synchronously (this often returns immediately due to single-instance handoff)
-"$HOME/.local/bin/steinberg-sda-handler.sh" || true
-
-# Polling loop to wait for detached SDA processes to terminate
-while distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "ps auxww" | grep -iE "Steinberg Download Assistant\.exe|STEI~B2R\.EXE|aria2c\.exe" > /dev/null; do
-    sleep 3
-done
-
-echo "Steinberg Download Assistant closed. Finalizing integrations..."
-# Run the extraction script a SECOND time to catch the newly installed Dorico and SAM
-distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && ./scripts/2-install/extract_icons.sh"
+# Run the handler in the background so the terminal is not blocked
+"$HOME/.local/bin/steinberg-sda-handler.sh" > /dev/null 2>&1 &
 
 echo ""
 echo "==========================================="
-echo "   Installation Complete!                 "
+echo "   Valerio Core Setup Complete!            "
 echo "==========================================="
+echo "You can close this terminal window at any time. Once the "
+echo "various components have been installed, remember to run the"
+echo "Activation Manager to activate your license."
+echo "Happy notating!"
+echo "==========================================="
+echo ""

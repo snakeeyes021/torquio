@@ -4,8 +4,10 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../common.sh"
 
+# Ensure directories exist
 ICON_DIR="$HOME/.local/share/icons/hicolor/256x256/apps"
 mkdir -p "$ICON_DIR"
+mkdir -p "$HOME/.local/share/applications"
 
 extract_icon() {
     local primary_path="$1"
@@ -13,6 +15,7 @@ extract_icon() {
     local icon_name="$3"
     local extract_project="$4"
     local project_res_id="$5"
+    local desktop_name="$6"
     local exe_path=""
 
     # 1. Try the hardcoded primary path
@@ -31,6 +34,12 @@ extract_icon() {
             return
         fi
         echo "Found fallback executable at: $exe_path"
+    fi
+    
+    # --- Dynamic Desktop Launcher Registration ---
+    if [ -n "$desktop_name" ] && [ -f "$SCRIPT_DIR/../../desktop_stubs/$desktop_name" ]; then
+        echo "Registering desktop launcher: $desktop_name..."
+        sed "s|\$HOME|$HOME|g" "$SCRIPT_DIR/../../desktop_stubs/$desktop_name" > "$HOME/.local/share/applications/$desktop_name"
     fi
     
     echo "Extracting icon from $exe_path to $icon_name..."
@@ -89,7 +98,7 @@ extract_icon() {
     rm -rf "$tmp_dir"
 }
 
-echo "Extracting Steinberg icons..."
+echo "Extracting Steinberg icons and registering launchers..."
 
 # Dorico
 # Variations: dorico.exe, dorico6.exe, Dorico 6.exe
@@ -98,7 +107,8 @@ extract_icon \
     "*dorico*.exe" \
     "valerio-dorico" \
     "true" \
-    "1"
+    "1" \
+    "Dorico.desktop"
 
 # SDA
 # Variations: Steinberg Download Assistant.exe, SteinbergDownloadAssistant.exe, SDA.exe
@@ -106,7 +116,9 @@ extract_icon \
     "$VALERIO_PREFIX_DIR/drive_c/Program Files (x86)/Steinberg/Download Assistant/Steinberg Download Assistant.exe" \
     "*download*assistant*.exe" \
     "valerio-sda" \
-    "false"
+    "false" \
+    "" \
+    "steinberg-sda-handler.desktop"
 
 # SAM
 # Variations: Steinberg Activation Manager.exe, SteinbergActivationManager.exe, SAM.exe
@@ -114,11 +126,27 @@ extract_icon \
     "$VALERIO_PREFIX_DIR/drive_c/Program Files/Steinberg/Activation Manager/SteinbergActivationManager.exe" \
     "*activation*manager*.exe" \
     "valerio-sam" \
-    "false"
+    "false" \
+    "" \
+    "Steinberg Activation Manager.desktop"
 
 # Update icon cache
-if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+if command -v distrobox-host-exec >/dev/null 2>&1; then
+    distrobox-host-exec gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor/" >/dev/null 2>&1 || true
+elif command -v gtk-update-icon-cache >/dev/null 2>&1; then
     gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor/" >/dev/null 2>&1 || true
+fi
+
+# Force the desktop environment to reload desktop entries to resolve the newly extracted icons
+echo "Refreshing desktop database and application launchers..."
+if command -v distrobox-host-exec >/dev/null 2>&1; then
+    distrobox-host-exec update-desktop-database "$HOME/.local/share/applications/" >/dev/null 2>&1 || true
+elif command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database "$HOME/.local/share/applications/" >/dev/null 2>&1 || true
+fi
+touch "$HOME/.local/share/applications" >/dev/null 2>&1 || true
+if [ -d "$HOME/.local/share/applications" ]; then
+    touch "$HOME/.local/share/applications/"*.desktop >/dev/null 2>&1 || true
 fi
 
 echo "Icon extraction complete."
