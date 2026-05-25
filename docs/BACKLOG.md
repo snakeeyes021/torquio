@@ -28,10 +28,12 @@ We currently have `install_noteperformer.sh`, but we lack dedicated automation s
     *   Rename all settings inside `scripts/common.sh` from `valerio` to `torquio` (e.g. `TORQUIO_CONTAINER_NAME="torquio-env"`, XDG data/cache paths).
     *   Rename host wrapper scripts in `scripts/3-runtime_handlers/` to `torquio-dorico`, `torquio-sam`, and `torquio-sda-handler` and install them to `~/.local/bin/` as clean terminal commands.
     *   Rebrand all launchers, stubs, and icon templates to use the `torquio` namespace.
+*   [ ] **Move master install script**:
+    *   Relocate the master `install.sh` from the repository root to `scripts/install.sh`. It now lives in the same directory level as `cleanup.sh`, acting as sibling controllers called by the user-facing `torquio` CLI app.
 
 #### Subtasks: CLI App Interface & Pre-Installation Setup Prompts
 *   [ ] **The `torquio` CLI Executable**:
-    *   Replace `install.sh` in the repository root with the main `torquio` CLI utility. It must support clean ASCII art headers and flag-driven actions. -- `install.sh` can then be re-focused and moved to the scripts directory
+    *   Replace `install.sh` in the repository root with the main `torquio` CLI utility. It must support clean ASCII art headers and flag-driven actions.
     *   **Interactive Menu + Flags (Hybrid Layout)**: Running `torquio` without arguments launches an interactive text menu. Passing flags (e.g. `--install`) bypasses the menu for scripting.
     *   Supported flags:
         - `-i`, `--install`: Run clean container/prefix setup.
@@ -40,22 +42,20 @@ We currently have `install_noteperformer.sh`, but we lack dedicated automation s
         - `-g`, `--graphics`: Spawns interactive graphics/scaling configuration toggles.
         - `-s`, `--status`: Display container/prefix verification stats and active preferences in a single unified dashboard.
         - `-u`, `--update`: Update MediaBay (requires work to be completed on update_mediabay.sh)
-        - `-w`, `--winecfg`: Launch the prefixes winecfg in the container
-        - `-d`, `--map_folder`: Map a local folder into the prefix as a network drive (so that it shows up top level in file dialogs)
-        - `-k`, `--import_key_commands`: Import an key commands json
-        - `-x`, `--export_key_commands`: Export a key commands json from the current prefix
+        - `-w`, `--winecfg`: Launch the prefix's `winecfg` in the container.
+        - `-d`, `--map_folder`: Map a local folder into the prefix as a network drive.
+        - `-k`, `--import_key_commands`: Import a key commands json or zip backup.
+        - `-x`, `--export_key_commands`: Export key commands to a zip archive.
 *   [ ] **Pre-Installation Setup Prompts**:
     *   Modify the installation process to execute a quick setup interview *before* printing the manifest and installing:
         1. **Scaling Prompts**: Ask if Torquio should automatically manage display scaling and DPI. If yes, save `auto_scale_mutter=true` and `auto_dpi_detect=true` in `config.json`. If no, fall back to standard `96` (or pre-existing user DPI).
-        2. **Focus Prompts**: Ask if Torquio should automatically apply XWayland focus bug fixes. If yes, set `fix_focus_bug=true`.
 
 #### Subtasks: Profile Preferences Engine & Self-Healing Scaling Trap
 *   [ ] **Interactive Configuration Profile**:
     *   Deploy a JSON config file on the host at `~/.config/torquio/config.json` with toggles for:
-        *   `auto_scale_mutter` (boolean, default false): Dynamic scaling override. (sets the xwayland-scaling-factor to 1 via the "self-healing xwayland scaling trap" defined below)
+        *   `auto_scale_mutter` (boolean, default false): Dynamic scaling override. (sets the xwayland-scaling-factor to 1 via the "self-healing xwayland scaling trap" defined below).
         *   `auto_dpi_detect` (boolean, default true): Dynamic monitor DPI detection.
         *   `manual_dpi` (integer, default 96): Manual DPI fallback.
-        *   `fix_focus_bug` (boolean, default true): Dynamic focus bug repair. -- STILL NOT SURE WE WANT THIS AS AN OPTION! WHO WOULD WANT THIS OFF? IF THERE IS SOME POPULATION THAT MIGHT REASONABLY NOT WANT TO HAVE THIS TURNED ON, THEN MAYBE AN OPTION, BUT IF THIS IS UNIVERSALLY HELPFUL AND POTENTIALLY NECESSARY ON ALL DE'S, THEN WE DON'T NEED THIS AS AN OPTION; IT'D JUST BE A THING THAT TORQUIO IMPLEMENTS
         *   `original_scale_factor` (string/float, empty on fresh setup): Saves the host's active scaling factor before Torquio overrides it, to safely restore on uninstallation.
 *   [ ] **Self-Healing XWayland Scaling Trap**:
     *   Implement the GSettings scaling factor override inside the wrapper launchers. On startup, if `auto_scale_mutter` is active under GNOME, set `xwayland-scaling-factor` to `1.0` dynamically. Use a host-side shell `trap` to cleanly restore the user's original factor when the app shuts down.
@@ -65,14 +65,30 @@ We currently have `install_noteperformer.sh`, but we lack dedicated automation s
     *   During `torquio --uninstall`, if Torquio was configured to manage display scaling, read the `original_scale_factor` from `config.json` and prompt the user to automatically restore their host environment to its original scale.
 
 #### Subtasks: Compatibility Polish & Bug Remedies
-*   [ ] **Keyboard Focus Loss Mitigation (Modal Windows)**:
-    *   Configure the prefix registry by writing the string value `FocusOnClick="Y"` to `HKCU\Software\Wine\X11 Driver`. This forces active window focus acquisition upon mouse clicks, eliminating the GNOME Overview workaround when sub-dialogs close.
+*   [ ] **Keyboard Focus Loss Mitigation (Modal Windows - Default Baseline)**:
+    *   Always configure the prefix registry by writing the string value `FocusOnClick="Y"` to `HKCU\Software\Wine\X11 Driver` during setup. This forces active window focus acquisition upon mouse clicks, eliminating the GNOME Overview workaround when sub-dialogs close. Done automatically as a default baseline without requiring a config toggle.
 *   [ ] **CUPS Printer Discoverability**:
     *   Ensure the printing spooler bridge is functional by adding `libcups2` (64-bit) and `libcups2:i386` (32-bit WoW64 support) packages to the container package dependencies (`build_wine.sh` or automated apt installer).
 *   [ ] **Keyboard Auto-Repeat Lag Bug (Dual-Approach)**:
     *   Address rapid-fire, delayed inputs when holding keys under XWayland/Wine. Explore both pathways to find the most stable solution for Dorico:
         1. X11 Event Overrides: Setting `xset r rate` repeat rate overrides inside the container shell before launching the binaries.
         2. Wine Registry Input Tuning: Customizing key repeat delay/speed settings in `HKCU\Control Panel\Accessibility\Keyboard Response` inside the prefix registry.
+
+#### Subtasks: Advanced User Utility Integrations
+*   [ ] **Positional & Graphical Folder Mapping (`-d`, `--map_folder`)**:
+    *   **Positional Mode**: If parameters are passed (e.g. `--map_folder /path/to/folder e:`), directly create a symlink to `E:\` inside the prefix's `dosdevices/`.
+    *   **Interactive Mode**: If no path is provided:
+        1. Query host system for `zenity` (GNOME) or `kdialog` (KDE) and spawn a native graphical folder selector. Fall back to standard shell prompts if missing.
+        2. Loop through `dosdevices/` starting from `d:` to automatically identify and assign the **first available drive letter**.
+*   [ ] **Multi-Language Key Command Export/Import (`-x` / `-k`)**:
+    *   **Export (`-x`)**:
+        1. Scan the Dorico prefix AppData folder for any files matching `keycommands_*.json`.
+        2. Compress all matching profiles into a single archive on the host: `~/Downloads/torquio_keycommands_backup.zip`.
+    *   **Import (`-k`)**:
+        1. Scan `~/Downloads/` (dynamic XDG path) for matching `torquio_keycommands_backup.zip` or individual `keycommands_*.json` files.
+        2. *Single Match*: If exactly one backup exists, import it immediately (decompressing the zip if necessary).
+        3. *Multiple Matches*: Present a clean interactive prompt listing discovered items, plus a `[Browse...]` option.
+        4. *No Matches (or Manual Search)*: Fall back to host-side `zenity` / `kdialog` file select GUI to let the user browse for their backup file.
 
 ## Undefined Work (Backlog)
 This section tracks high-level goals and ideas that have not yet been broken down into concrete subtasks.
