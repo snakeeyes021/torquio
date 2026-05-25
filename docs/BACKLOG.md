@@ -20,12 +20,62 @@ We currently have `install_noteperformer.sh`, but we lack dedicated automation s
 *   [ ] **`update_mediabay.sh` (or CLI Updater Mode):**
     *   SDA attempts to update MediaBay but fails due to the `preinstall.ps1` block (Error 231). We need to refactor `install_mediabay.sh` and/or the SDA's launcher (.desktop file or shell script) to handle subsequent updates (e.g., pre-emptively manually checking for updates prior to and outside of the SDA running; if an update is found, we automatically download the installer (which may be a feature we add in the future anyways), clean it, and finally run the new installer ALL BEFORE running the SDA).
 
+### Epic: The CLI Refactor & Compatibility Polish
+**Context:** Rebrand the codebase from `valerio` to `torquio` and replace the simple installer wrapper with a full-featured CLI interface (`torquio`) backed by a user configuration profile. We will also incorporate key compatibility bug remedies (network printing, keyboard auto-repeat lag, and transient modal window focus loss) directly into our defined sprint.
+
+#### Subtasks: Core Rebranding & Re-compilation Bypass Migration
+*   [ ] **Common Variables & Renaming**:
+    *   Rename all settings inside `scripts/common.sh` from `valerio` to `torquio` (e.g. `TORQUIO_CONTAINER_NAME="torquio-env"`, XDG data/cache paths).
+    *   Rename host wrapper scripts in `scripts/3-runtime_handlers/` to `torquio-dorico`, `torquio-sam`, and `torquio-sda-handler`.
+    *   Rebrand all launchers, stubs, and icon templates to use the `torquio` namespace.
+*   [ ] **Bypass Re-compilation Migration Engine (`--migrate`)**:
+    *   Implement a fast container-to-container migration command:
+        1. Query and detect legacy `valerio` folders and the running `valerio-env` container.
+        2. Spin up the new `torquio-env` container on the host.
+        3. Stream the compiled `wine-custom` engine directly between containers using `tar` pipes (`distrobox enter valerio-env -- tar -czf - /opt/wine-custom | distrobox enter torquio-env -- tar -xzf - -C /`), bypassing the hours-long Wine compilation.
+        4. Safely migrate user directory paths: `~/.local/share/valerio` $\rightarrow$ `~/.local/share/torquio` and `~/.cache/valerio` $\rightarrow$ `~/.cache/torquio`.
+        5. Deploy the rebranded `torquio-*` host wrapper binaries to `~/.local/bin/` and clean up old `valerio` stubs.
+        6. Gracefully destroy the legacy `valerio-env` container.
+
+#### Subtasks: CLI App Interface & Profile Preferences Engine
+*   [ ] **The `torquio` CLI Executable**:
+    *   Replace `install.sh` in the repository root with the main `torquio` CLI utility. It must support clean ASCII art headers and flag-driven actions:
+        - `-i`, `--install`: Run clean container/prefix setup.
+        - `-r`, `--uninstall` ("remove"): Complete host/container environment purge.
+        - `-f`, `--fix-icons`: Rebuild and refresh host desktop icons/launchers.
+        - `-p`, `--preferences`: Spawns interactive configuration toggles. -- Not sure if this should be its own item (and whether the interactive config below item should not just be extra top-level flags that can be set)
+        - `-s`, `--status`: Display container/prefix verification stats.
+        - `-m`, `--migrate`: Conditionally active migration mode.
+        - `-u`, `--update`: Update MediaBay (requires work to be completed on update_mediabay.sh)
+        - `-w`, `--winecfg`: Launch the prefixes winecfg in the container
+        - `-d`, `--map_folder`: Map a local folder into the prefix as a network drive (so that it shows up top level in file dialogs)
+        - `-k`, `--import_key_commands`: Import an key commands json
+        - `-x`, `--export_key_commands`: Export a key commands json from the current prefix
+*   [ ] **Interactive Configuration Profile**:
+    *   Deploy a JSON config file on the host at `~/.config/torquio/config.json` with toggles for:
+        *   `auto_scale_mutter` (boolean, default false)
+        *   `auto_dpi_detect` (boolean, default true)
+        *   `manual_dpi` (integer, default 96)
+        *   `fix_focus_bug` (boolean, default true) -- not sure we need this one? ultimately preferences should be items where we CAN fix something but where the fix might require a change somewhere else on the system that might affect things outside of torquio/Dorico (and therefore a user might want to make the decision on their own); if there's an item that is universally the better choice and doesn't touch anything else, that should just be what we do. 
+*   [ ] **Self-Healing XWayland Scaling Trap**:
+    *   Implement the GSettings scaling factor override inside the wrapper launchers. On startup, if `auto_scale_mutter` is active under GNOME, set `xwayland-scaling-factor` to `1.0` dynamically. Use a host-side shell `trap` to cleanly restore the user's original factor when the app shuts down.
+*   [ ] **Auto-DPI Monitor Resolution Detection**:
+    *   If `auto_dpi_detect` is active, query display properties via host environment on boot, calculate the optimal target Wine DPI, and dynamically overwrite the prefix registry's `LogPixels` setting.
+
+#### Subtasks: Compatibility Polish & Bug Remedies
+*   [ ] **Keyboard Focus Loss Mitigation (Modal Windows)**:
+    *   Configure the prefix registry by writing the string value `FocusOnClick="Y"` to `HKCU\Software\Wine\X11 Driver`. This forces active window focus acquisition upon mouse clicks, eliminating the GNOME Overview workaround when sub-dialogs close.
+        * We will also want to dig into this further to see if we can diagnose why the main window does not automatically refocus upon exiting modals. Depending on complexity, we may not necessarily want to implement THAT fix as part of this task. If so, we'll need to make an item for future work here in this backlog. 
+*   [ ] **CUPS Printer Discoverability**:
+    *   Ensure the printing spooler bridge is functional by adding `libcups2` (64-bit) and `libcups2:i386` (32-bit WoW64 support) packages to the container package dependencies (`build_wine.sh` or automated apt installer).
+*   [ ] **Keyboard Auto-Repeat Lag Bug**:
+    *   Address rapid-fire, delayed inputs when holding keys under XWayland/Wine. Explore solutions (e.g. tweaking X11 auto-repeat rates via `xset r rate` prior to application launch or tuning the Wine registry input parameters).
+
 ## Undefined Work (Backlog)
 This section tracks high-level goals and ideas that have not yet been broken down into concrete subtasks.
 
 *   [ ] **Container Digest Pinning:** To achieve maximum reproducibility and avoid potential issues with rolling `apt` updates on the host image, investigate pinning the Distrobox container to a specific SHA256 digest (e.g., `ubuntu@sha256:...`) rather than the floating `ubuntu:24.04` tag in the automated installer. We may actually NOT want to do this, as using an LTS may already be sufficient for reproducibility and any updates that get pushed to that OS version will likely be security patches and so forth but that do not affect API or binary compatibility.
 *   [ ] **Suppression of `rundll32` Errors:** During prefix initialization and `winetricks` execution, some `rundll32` errors may occur. Investigate their cause and implement suppression (e.g., via `WINEDEBUG=-all` for specific phases) to avoid confusing users.
-*   [ ] **Keyboard Auto-Repeat Bug:** Holding a key combination results in rapid-fire, delayed inputs that continue executing after the keys are released. This is a known XWayland/Wine event-loop quirk. Investigate solutions (e.g., tweaking X11 auto-repeat rates via `xset r rate` before launch, or exploring Wine registry input tweaks).
 *   [ ] **High-DPI / 4K Scaling:** Wine isn't scaling automatically on one particular 4K 28" screen (not sure about other 4K screens). We need to investigate Wine DPI registry keys or a dynamic DPI switcher alias. ALSO, new discovery: turning off xwayland scaling sizes the app correctly, but things are blurry, so what probably needs to happen is that anytime you start the app, the launcher checks if that's off, if off, turns it on, then it checks the dpi of the monitor and sets the wine dpi settings accordingly. Closing it should set everything back. -- Extra info/context: xwayland-native-scaling being turned off seems to fix this but also seems to cause blurriness. Ideally, we could have one solution that, at application launch, checks the monitor, its actual size and/or actual/recommended DPI, and whatever else, and automatically sets some settings just for Dorico. This means if a user ferries their 1080p laptop back and forth between a 4k dock, every launch will launch at the right resolution. Additionally, if it's possible to monitor what screen Dorico is on at any given moment and adjust the DPI accordingly on the fly, that would be even better, assuming it's possible.  
     *   *Update (Active Research)*: Evaluated native Wayland drivers and determined that `winewayland.drv` introduces major window management regressions (missing titlebars, buggy snapping under GNOME). Confirmed the optimal scaling bypass is setting GNOME's `xwayland-scaling-factor` to `1` (which disables compositor overscaling and renders 1:1, a setting KDE Plasma already defaults to via "Apply scaling themselves"), and then scaling Dorico internally using Wine's DPI (e.g. 120 DPI). Investigating integrating a dynamic GSettings trap/wrapper in the launchers and an automated display DPI detection profile.
 *   [ ] **VSTAudioEngine6.exe Crash:** The audio engine crashes cleanly upon closing Dorico. This does not prevent proper function of the application; it's just ugly/annoying. Need to investigate if this is a Pipewire/ASIO routing issue or a Wine teardown bug.
@@ -39,10 +89,6 @@ This section tracks high-level goals and ideas that have not yet been broken dow
 *   [ ] **NotePerformer UI:** Fix graphical glitches in the NotePerformer VST window. (Determine if this is still an issue under the current custom Wine build).
 *   [ ] **"Edit Instrument"** Attempting to edit a VST instrument from within Play mode causes a crash/hang/failure. Investigate.
 *   [ ] **NotePerformer Splash Screen Icon (Low Priority):** When NotePerformer briefly launches its splash screen, it lacks an icon in the Wayland overview/dash. This can likely be solved via the same icon/StartupWMClass extraction we used for the main apps. We need to get the hardcoded path of the NotePerformer exe, extract the icon, and assign it to a hidden .desktop file.
-*   [ ] **Keyboard Focus Loss (Modal Windows):** Interacting with spawned modal sub-windows (e.g. Layout Options) and closing them causes a keyboard focus bug where focus does not properly return to the main window. Mouse clicks work but keyboard input is completely unresponsive. Workaround currently involves cycling the GNOME overview or clicking out and back in. Investigate solutions (e.g. registry tweaks like `FocusOnClick=Y` in `HKCU\Software\Wine\X11 Driver` to force focus re-acquisition).
-*   [ ] **Network Printer Discoverability:** Dorico inside the container cannot discover network/Wi-Fi/USB printers, leaving the print menu empty. This occurs because Wine requires CUPS runtime packages (`libcups2` and `libcups2:i386`) inside the container to dynamically bridge printing spoolers. Implement automated dependency installation.
-*   [ ] **Rebranding to Torquio & Prefix Migration:** The name `valerio` is already taken; rebrand the codebase, directories, environment variables, stubs, and container images to `torquio`. To facilitate a seamless transition for existing users, build a single-command migration option/script that renames data (`~/.local/share/valerio` $\rightarrow$ `~/.local/share/torquio`) and cache, and streams the compiled custom Wine engine directly between containers (from `valerio-env` to `torquio-env` using a `tar` pipeline) to completely bypass re-compilation.
-*   [ ] **CLI App Interface & Preferences Profile:** Replace the master `install.sh` with a dedicated `torquio` CLI app supporting clean flags (`-i`/`--install`, `-u`/`--uninstall`, `-f`/`--fix-icons`, `-m`/`--migrate`, `-p`/`--preferences`, `-s`/`--status`) and basic colors. Create a preferences JSON configuration profile at `~/.config/torquio/config.json` supporting opt-in controls for auto-scaling overrides, auto-DPI detection, manual DPI fallback, and focus bug fixes.
 
 ## Done
 *(Move completed epics and tasks here for historical record)*
@@ -89,4 +135,3 @@ This section tracks high-level goals and ideas that have not yet been broken dow
     *   Removed hardcoded `$HOME/dev/steinberg-on-linux` references in `build_wine.sh` and `setup_prefix.sh` and replaced them with dynamic workspace variables and XDG-compliant paths.
     *   Scripts now dynamically generate the Wine prefix in a user-agnostic XDG location (`~/.local/share/valerio/prefix`).
     *   Added `scripts/common.sh` for shared environment variables.
-
