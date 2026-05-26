@@ -1,0 +1,383 @@
+#!/bin/bash
+set -e
+
+# Torquio: Steinberg on Linux CLI App
+# Replaces simple install wrappers with a unified console manager.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/scripts/common.sh"
+
+print_header() {
+    echo "=========================================================="
+    echo "  ████████╗ ██████╗ ██████╗  ██████╗ ██╗   ██╗██╗ ██████╗ "
+    echo "  ╚══██╔══╝██╔═══██╗██╔══██╗██╔═══██╗██║   ██║██║██╔═══██╗"
+    echo "     ██║   ██║   ██║██████╔╝██║   ██║██║   ██║██║██║   ██║"
+    echo "     ██║   ██║   ██║██╔══██╗██║▄▄ ██║██║   ██║██║██║   ██║"
+    echo "     ██║   ╚██████╔╝██║  ██║╚██████╔╝╚██████╔╝██║╚██████╔╝"
+    echo "     ╚═╝    ╚═════╝ ╚═╝  ╚═╝ ╚══▀▀═╝  ╚═════╝ ╚═╝ ╚═════╝ "
+    echo "         Steinberg on Linux Environment Manager"
+    echo "=========================================================="
+}
+
+get_config_val() {
+    local key="$1"
+    local default="$2"
+    local config_file="$HOME/.config/torquio/config.json"
+    if [ ! -f "$config_file" ]; then
+        echo "$default"
+        return
+    fi
+    python3 -c "import json; d=json.load(open('$config_file')); print(d.get('$key', '$default'))" 2>/dev/null || echo "$default"
+}
+
+set_config_val() {
+    local key="$1"
+    local val="$2"
+    local config_file="$HOME/.config/torquio/config.json"
+    mkdir -p "$(dirname "$config_file")"
+    if [ ! -f "$config_file" ]; then
+        echo "{}" > "$config_file"
+    fi
+    python3 -c "
+import json
+f = '$config_file'
+try: d = json.load(open(f))
+except Exception: d = {}
+val = '$val'
+if val.lower() == 'true': val = True
+elif val.lower() == 'false': val = False
+elif val.isdigit(): val = int(val)
+d['$key'] = val
+json.dump(d, open(f, 'w'), indent=4)
+" 2>/dev/null || true
+}
+
+configure_graphics() {
+    echo "=== Torquio Graphics & Scaling Configuration ==="
+    echo ""
+    local cur_auto_scale=$(get_config_val "auto_scale_mutter" "false")
+    local cur_auto_dpi=$(get_config_val "auto_dpi_detect" "true")
+    local cur_manual_dpi=$(get_config_val "manual_dpi" "96")
+    
+    echo "Current settings:"
+    echo " 1) Auto-Scale XWayland (auto_scale_mutter): $cur_auto_scale"
+    echo " 2) Auto-DPI Detection (auto_dpi_detect):    $cur_auto_dpi"
+    echo " 3) Manual DPI Fallback (manual_dpi):        $cur_manual_dpi"
+    echo " 4) [Back to main menu]"
+    echo ""
+    read -p "Select an option to toggle/change (1-4): " opt
+    case "$opt" in
+        1)
+            if [ "$cur_auto_scale" = "true" ]; then
+                set_config_val "auto_scale_mutter" "false"
+            else
+                set_config_val "auto_scale_mutter" "true"
+            fi
+            echo "Toggle applied!"
+            configure_graphics
+            ;;
+        2)
+            if [ "$cur_auto_dpi" = "true" ]; then
+                set_config_val "auto_dpi_detect" "false"
+            else
+                set_config_val "auto_dpi_detect" "true"
+            fi
+            echo "Toggle applied!"
+            configure_graphics
+            ;;
+        3)
+            read -p "Enter manual DPI value (e.g. 96, 120, 144, 192): " new_dpi
+            if [[ "$new_dpi" =~ ^[0-9]+$ ]]; then
+                set_config_val "manual_dpi" "$new_dpi"
+                echo "Manual DPI updated to $new_dpi!"
+            else
+                echo "Invalid input. DPI must be an integer."
+            fi
+            configure_graphics
+            ;;
+        *)
+            return
+            ;;
+    esac
+}
+
+show_status() {
+    echo "=========================================================="
+    echo "             Torquio Environment Dashboard                "
+    echo "=========================================================="
+    echo ""
+    
+    # 1. Distrobox Container Status
+    echo "Distrobox Container Status:"
+    if distrobox list 2>/dev/null | grep -q "$TORQUIO_CONTAINER_NAME"; then
+        local cont_status=$(distrobox list 2>/dev/null | grep "$TORQUIO_CONTAINER_NAME" | awk -F'|' '{print $4}' | tr -d '[:space:]')
+        echo "  - Container: $TORQUIO_CONTAINER_NAME (Active: ${cont_status:-running})"
+    else
+        echo "  - Container: $TORQUIO_CONTAINER_NAME (❌ NOT CREATED)"
+    fi
+    echo ""
+    
+    # 2. Wine Prefix Status
+    echo "Wine Prefix Status:"
+    if [ -d "$TORQUIO_PREFIX_DIR" ]; then
+        local pref_size=$(du -sh "$TORQUIO_PREFIX_DIR" 2>/dev/null | awk '{print $1}')
+        echo "  - Wine Prefix: $TORQUIO_PREFIX_DIR (Size: $pref_size)"
+        if [ -f "$TORQUIO_PREFIX_DIR/.torquio_core_installed" ]; then
+            echo "  - Baseline Dependencies: ✅ Core Installed"
+        else
+            echo "  - Baseline Dependencies: ⚠️  INCOMPLETE SETUP"
+        fi
+    else
+        echo "  - Wine Prefix: ❌ NOT INITIALIZED"
+    fi
+    echo ""
+    
+    # 3. Active Preferences Profile
+    echo "Configuration Preferences:"
+    local auto_scale=$(get_config_val "auto_scale_mutter" "false")
+    local auto_dpi=$(get_config_val "auto_dpi_detect" "true")
+    local manual_dpi=$(get_config_val "manual_dpi" "96")
+    local orig_scale=$(get_config_val "original_scale_factor" "Not saved")
+    echo "  - auto_scale_mutter:     $auto_scale"
+    echo "  - auto_dpi_detect:        $auto_dpi"
+    echo "  - manual_dpi:            $manual_dpi"
+    echo "  - original_scale_factor: $orig_scale"
+    echo ""
+    
+    # 4. Host Info
+    echo "Host System Details:"
+    echo "  - Desktop Environment:   $XDG_CURRENT_DESKTOP"
+    if command -v gsettings >/dev/null 2>&1; then
+        local g_scale=$(gsettings get org.gnome.desktop.interface scaling-factor 2>/dev/null | awk '{print $2}')
+        local g_mutter=$(gsettings get org.gnome.mutter xwayland-scaling-factor 2>/dev/null | awk '{print $2}')
+        echo "  - GNOME Scale Factor:    ${g_scale:-Unknown}"
+        echo "  - Mutter XWayland Scale: ${g_mutter:-Unknown}"
+    fi
+    echo "=========================================================="
+    echo ""
+}
+
+map_folder() {
+    local host_folder="$1"
+    local drive_letter="$2"
+    
+    if [ -z "$host_folder" ] || [ -z "$drive_letter" ]; then
+        echo "=== Map Local Folder as Wine Drive ==="
+        if command -v zenity >/dev/null 2>&1; then
+            host_folder=$(zenity --file-selection --directory --title="Select Folder to Map" 2>/dev/null)
+        elif command -v kdialog >/dev/null 2>&1; then
+            host_folder=$(kdialog --getexistingdirectory --title="Select Folder to Map" 2>/dev/null)
+        else
+            read -p "Enter the absolute path of the local folder: " host_folder
+        fi
+        
+        if [ -z "$host_folder" ] || [ ! -d "$host_folder" ]; then
+            echo "Error: Invalid folder path. Mapping cancelled."
+            return
+        fi
+        
+        for letter in d e f g h i j k l m n o p q r s t u v w x y z; do
+            if [ ! -e "$TORQUIO_PREFIX_DIR/dosdevices/${letter}:" ]; then
+                drive_letter="${letter}:"
+                break
+            fi
+        done
+        
+        if [ -z "$drive_letter" ]; then
+            echo "Error: No available drive letters left!"
+            return
+        fi
+    fi
+    
+    local real_host_folder=$(realpath "$host_folder")
+    drive_letter=$(echo "$drive_letter" | tr '[:upper:]' '[:lower:]')
+    if [[ ! "$drive_letter" =~ :$ ]]; then
+        drive_letter="${drive_letter}:"
+    fi
+    
+    if [ ! -d "$real_host_folder" ]; then
+        echo "Error: Local folder '$real_host_folder' does not exist."
+        return
+    fi
+    
+    if [ ! -d "$TORQUIO_PREFIX_DIR/dosdevices" ]; then
+        echo "Error: Wine prefix has not been initialized. Please run setup first."
+        return
+    fi
+    
+    rm -f "$TORQUIO_PREFIX_DIR/dosdevices/$drive_letter"
+    ln -s "$real_host_folder" "$TORQUIO_PREFIX_DIR/dosdevices/$drive_letter"
+    echo "✅ Successfully mapped '$real_host_folder' to Wine drive ${drive_letter^^}\\"
+}
+
+export_keycommands() {
+    echo "=== Exporting Key Commands Backup ==="
+    local keycommands_dir=$(find "$TORQUIO_PREFIX_DIR/drive_c/users" -type d -path "*/AppData/Roaming/Steinberg/Dorico*" 2>/dev/null | head -n 1)
+    if [ -z "$keycommands_dir" ] || [ ! -d "$keycommands_dir" ]; then
+        echo "Error: Dorico AppData directory not found. Please make sure Dorico has been installed and run."
+        return
+    fi
+    
+    mapfile -t files < <(find "$keycommands_dir" -type f -name "keycommands_*.json" 2>/dev/null)
+    if [ ${#files[@]} -eq 0 ]; then
+        echo "No keycommands_*.json files found to export."
+        return
+    fi
+    
+    echo "Found files to export:"
+    for f in "${files[@]}"; do
+        echo "  - $(basename "$f")"
+    done
+    
+    local downloads_dir="${XDG_DOWNLOAD_DIR:-$HOME/Downloads}"
+    mkdir -p "$downloads_dir"
+    local zip_file="$downloads_dir/torquio_keycommands_backup.zip"
+    
+    (cd "$keycommands_dir" && zip -q "$zip_file" keycommands_*.json)
+    echo "✅ Successfully compressed and exported key commands to: $zip_file"
+}
+
+import_keycommands() {
+    echo "=== Importing Key Commands Backup ==="
+    local keycommands_dir=$(find "$TORQUIO_PREFIX_DIR/drive_c/users" -type d -path "*/AppData/Roaming/Steinberg/Dorico*" 2>/dev/null | head -n 1)
+    if [ -z "$keycommands_dir" ] || [ ! -d "$keycommands_dir" ]; then
+        echo "Error: Dorico AppData directory not found. Key commands import cancelled."
+        return
+    fi
+    
+    local downloads_dir="${XDG_DOWNLOAD_DIR:-$HOME/Downloads}"
+    mapfile -t backups < <(find "$downloads_dir" -maxdepth 1 -type f \( -name "torquio_keycommands_backup.zip" -o -name "keycommands_*.json" \) 2>/dev/null)
+    
+    local selected_backup=""
+    if [ ${#backups[@]} -eq 1 ]; then
+        selected_backup="${backups[0]}"
+        echo "Auto-detected backup file: $(basename "$selected_backup")"
+    elif [ ${#backups[@]} -gt 1 ]; then
+        echo "Multiple backup files found in $downloads_dir:"
+        for i in "${!backups[@]}"; do
+            echo "  $((i+1))) $(basename "${backups[$i]}")"
+        done
+        echo "  $(( ${#backups[@]} + 1 ))) [Browse...]"
+        read -p "Select a file to import (1-$(( ${#backups[@]} + 1 ))): " choice
+        if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#backups[@]}" ]; then
+            selected_backup="${backups[$((choice-1))]}"
+        fi
+    fi
+    
+    if [ -z "$selected_backup" ]; then
+        if command -v zenity >/dev/null 2>&1; then
+            selected_backup=$(zenity --file-selection --file-filter="Backup (*.zip *.json) | *.zip *.json" --title="Select Key Commands Backup File" 2>/dev/null)
+        elif command -v kdialog >/dev/null 2>&1; then
+            selected_backup=$(kdialog --getopenfilename "$downloads_dir" "*.zip *.json" --title="Select Key Commands Backup File" 2>/dev/null)
+        else
+            read -p "Enter path to key commands backup file (.zip or .json): " selected_backup
+        fi
+    fi
+    
+    if [ -z "$selected_backup" ] || [ ! -f "$selected_backup" ]; then
+        echo "No backup file selected. Import cancelled."
+        return
+    fi
+    
+    echo "Importing: $selected_backup"
+    if [[ "$selected_backup" =~ \.zip$ ]]; then
+        unzip -o "$selected_backup" -d "$keycommands_dir"
+    else
+        cp "$selected_backup" "$keycommands_dir/"
+    fi
+    echo "✅ Key commands successfully imported!"
+}
+
+show_menu() {
+    while true; do
+        print_header
+        echo ""
+        echo " 1) Install Torquio Environment"
+        echo " 2) Uninstall/Wipe Torquio"
+        echo " 3) Status Dashboard"
+        echo " 4) Configure Graphics & Scaling"
+        echo " 5) Fix Icons & Refresh Launchers"
+        echo " 6) Map a Folder as Wine Drive"
+        echo " 7) Export Dorico Key Commands"
+        echo " 8) Import Dorico Key Commands"
+        echo " 9) Run Custom WINE Configuration (winecfg)"
+        echo "10) Exit"
+        echo ""
+        read -p "Select an option (1-10): " choice
+        echo ""
+        case "$choice" in
+            1)  ./scripts/install.sh ;;
+            2)  ./scripts/cleanup.sh ;;
+            3)  show_status ;;
+            4)  configure_graphics ;;
+            5)  distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$TORQUIO_REPO_DIR\" && ./scripts/2-install/extract_icons.sh" ;;
+            6)  map_folder ;;
+            7)  export_keycommands ;;
+            8)  import_keycommands ;;
+            9)  distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; winecfg" ;;
+            10) exit 0 ;;
+            *)  echo "Invalid option. Please choose 1-10." ;;
+        esac
+        echo ""
+        read -p "Press [Enter] to return to the main menu..." temp
+        clear
+    done
+}
+
+# --- CLI Flag Parsing Mode ---
+if [ $# -gt 0 ]; then
+    case "$1" in
+        -i|--install)
+            shift
+            ./scripts/install.sh "$@"
+            ;;
+        -r|--uninstall)
+            shift
+            ./scripts/cleanup.sh "$@"
+            ;;
+        -f|--fix-icons)
+            distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$TORQUIO_REPO_DIR\" && ./scripts/2-install/extract_icons.sh"
+            ;;
+        -g|--graphics)
+            configure_graphics
+            ;;
+        -s|--status)
+            show_status
+            ;;
+        -u|--update)
+            ./scripts/2-install/update_mediabay.sh
+            ;;
+        -w|--winecfg)
+            distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; winecfg"
+            ;;
+        -d|--map_folder)
+            map_folder "$2" "$3"
+            ;;
+        -x|--export_key_commands)
+            export_keycommands
+            ;;
+        -k|--import_key_commands)
+            import_keycommands
+            ;;
+        *)
+            echo "Error: Unknown argument '$1'"
+            echo "Usage: ./torquio [flags]"
+            echo "Flags:"
+            echo "  -i, --install             Run clean container/prefix setup."
+            echo "  -r, --uninstall           Complete environment purge."
+            echo "  -f, --fix-icons           Refresh host desktop icons."
+            echo "  -g, --graphics            Interact with display scaling configs."
+            echo "  -s, --status              Display status dashboard."
+            echo "  -u, --update              Update MediaBay."
+            echo "  -w, --winecfg             Launch winecfg in the container prefix."
+            echo "  -d, --map_folder [p] [l]  Map folder positional/interactively."
+            echo "  -x, --export_key_commands Export key commands to zip."
+            echo "  -k, --import_key_commands Import key commands zip/json."
+            exit 1
+            ;;
+    esac
+else
+    # Interactive menu mode
+    clear
+    show_menu
+fi

@@ -1,0 +1,145 @@
+#!/bin/bash
+set -e
+
+TORQUIO_CONTAINER_NAME="torquio-env"
+TORQUIO_PREFIX_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/torquio/prefix"
+WINE_CUSTOM_BIN="/opt/wine-custom/bin"
+TORQUIO_REPO_DIR="@TORQUIO_REPO_DIR@"
+
+get_config_val() {
+    local key="$1"
+    local default="$2"
+    local config_file="$HOME/.config/torquio/config.json"
+    if [ ! -f "$config_file" ]; then
+        echo "$default"
+        return
+    fi
+    python3 -c "import json; d=json.load(open('$config_file')); print(d.get('$key', '$default'))" 2>/dev/null || echo "$default"
+}
+
+set_config_val() {
+    local key="$1"
+    local val="$2"
+    local config_file="$HOME/.config/torquio/config.json"
+    mkdir -p "$(dirname "$config_file")"
+    if [ ! -f "$config_file" ]; then
+        echo "{}" > "$config_file"
+    fi
+    python3 -c "
+import json
+f = '$config_file'
+try: d = json.load(open(f))
+except Exception: d = {}
+val = '$val'
+if val.lower() == 'true': val = True
+elif val.lower() == 'false': val = False
+elif val.isdigit(): val = int(val)
+d['$key'] = val
+json.dump(d, open(f, 'w'), indent=4)
+" 2>/dev/null || true
+}
+
+# --- Host Scale & DPI Management ---
+AUTO_SCALE_MUTTER=$(get_config_val "auto_scale_mutter" "false")
+AUTO_DPI_DETECT=$(get_config_val "auto_dpi_detect" "true")
+MANUAL_DPI=$(get_config_val "manual_dpi" "96")
+ORIGINAL_SCALE=""
+
+# 1. Self-Healing XWayland Scaling Trap (GNOME check)
+if [ "$AUTO_SCALE_MUTTER" = "true" ] && [ "$XDG_CURRENT_DESKTOP" = "GNOME" ]; then
+    CURRENT_MUTTER_SCALE=$(gsettings get org.gnome.mutter xwayland-scaling-factor 2>/dev/null | awk '{print $2}')
+    if [ -n "$CURRENT_MUTTER_SCALE" ] && [ "$CURRENT_MUTTER_SCALE" != "1" ]; then
+        ORIGINAL_SCALE="$CURRENT_MUTTER_SCALE"
+        set_config_val "original_scale_factor" "$ORIGINAL_SCALE"
+        gsettings set org.gnome.mutter xwayland-scaling-factor 1 2>/dev/null || true
+        
+        restore_scale() {
+            gsettings set org.gnome.mutter xwayland-scaling-factor "$ORIGINAL_SCALE" 2>/dev/null || true
+        }
+        trap restore_scale EXIT INT TERM
+    fi
+fi
+
+# 2. Auto-DPI Calculation and Registry update
+DPI_TO_SET="$MANUAL_DPI"
+if [ "$AUTO_DPI_DETECT" = "true" ]; then
+    HOST_SCALE=1
+    if command -v gsettings >/dev/null 2>&1; then
+        GNOME_SCALE=$(gsettings get org.gnome.desktop.interface scaling-factor 2>/dev/null | awk '{print $2}')
+        if [ -n "$GNOME_SCALE" ] && [ "$GNOME_SCALE" -gt 0 ]; then
+            HOST_SCALE="$GNOME_SCALE"
+        fi
+    fi
+    if [ "$HOST_SCALE" = "1" ] && command -v gsettings >/dev/null 2>&1; then
+        TEXT_SCALE=$(gsettings get org.gnome.desktop.interface text-scaling-factor 2>/dev/null | awk '{print $2}')
+        if [ -n "$TEXT_SCALE" ] && (( $(echo "$TEXT_SCALE > 1.0" | bc -l 2>/dev/null || echo "0") )); then
+            HOST_SCALE=$(echo "$HOST_SCALE * $TEXT_SCALE" | bc -l 2>/dev/null)
+        fi
+    fi
+    if [ "$HOST_SCALE" = "1" ] && command -v xrdb >/dev/null 2>&1; then
+        XRDB_DPI=$(xrdb -query 2>/dev/null | grep -i Xft.dpi | awk '{print $2}')
+        if [ -n "$XRDB_DPI" ]; then
+            HOST_SCALE=$(echo "scale=2; $XRDB_DPI / 96" | bc -l 2>/dev/null)
+        fi
+    fi
+    
+    DPI_TO_SET=$(echo "$HOST_SCALE * 96" | bc -l 2>/dev/null | awk '{print int($1 + 0.5)}')
+    if [ -z "$DPI_TO_SET" ] || [ "$DPI_TO_SET" -lt 96 ]; then
+        DPI_TO_SET=96
+    fi
+fi
+
+# Update LogPixels registry key
+distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine reg add \"HKCU\\Control Panel\\Desktop\" /v LogPixels /t REG_DWORD /d $DPI_TO_SET /f" >/dev/null 2>&1 || true
+
+# --- Keyboard Auto-Repeat Lag Remedy (xset) ---
+distrobox enter "$TORQUIO_CONTAINER_NAME" -- xset r rate 250 30 >/dev/null 2>&1 || true
+
+URL="$1"
+
+# Ensure log directory exists
+mkdir -p "$HOME/.local/share/torquio"
+
+# Start background watcher for Dorico installation if the icon is not yet set
+ICON_FILE="$HOME/.local/share/icons/hicolor/256x256/apps/torquio-dorico.png"
+if [ ! -f "$ICON_FILE" ]; then
+    (
+        echo "Dorico icon not detected. Starting background watcher for Dorico installation..."
+        
+        # Clean up old status files to avoid stale matches
+        find "$TORQUIO_PREFIX_DIR/drive_c/users" -path "*/AppData/Local/Temp/*" -name "*.json" -delete 2>/dev/null || true
+        
+        while true; do
+            # 1. Check if Dorico success status file has been written
+            DORICO_STATUS_FILE=$(find "$TORQUIO_PREFIX_DIR/drive_c/users" -path "*/AppData/Local/Temp/*" -name "*Dorico*Application*Installer.json" 2>/dev/null | head -n 1)
+            
+            if [ -n "$DORICO_STATUS_FILE" ] && [ -f "$DORICO_STATUS_FILE" ]; then
+                artifactId=$(grep -o '"artifactId":\s*"[^"]*"' "$DORICO_STATUS_FILE" | head -n 1 | cut -d'"' -f4)
+                success=$(grep -o '"success":\s*\(true\|false\)' "$DORICO_STATUS_FILE" | head -n 1 | cut -d':' -f2 | tr -d '[:space:]')
+                
+                if [[ "$artifactId" =~ Dorico.*Application_Installer ]] && [ "$success" = "true" ]; then
+                    echo "Dorico installation success detected! Extracting icons..."
+                    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$TORQUIO_REPO_DIR\" && ./scripts/2-install/extract_icons.sh"
+                    break
+                fi
+            fi
+            
+            # 2. Check if the SDA processes have terminated (fallback in case of exit/cancel without installing)
+            if ! distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "ps auxww" | grep -iE "Steinberg Download Assistant\.exe|STEI~B2R\.EXE|aria2c\.exe" > /dev/null; then
+                echo "SDA processes terminated. Exiting watcher."
+                break
+            fi
+            
+            sleep 4
+        done
+    ) > "$HOME/.local/share/torquio/sda_watcher.log" 2>&1 &
+fi
+
+# Now run the actual SDA in the foreground (it will block the terminal/handler)
+if [ -n "$URL" ]; then
+    # Launched by browser (link provided) - pass the URL directly without --redirect
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export WINEDLLOVERRIDES=\"winemenubuilder.exe=d\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine 'C:\\Program Files (x86)\\Steinberg\\Download Assistant\\Steinberg Download Assistant.exe' '$URL'"
+else
+    # Standard launch (no link)
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export WINEDLLOVERRIDES=\"winemenubuilder.exe=d\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine 'C:\\Program Files (x86)\\Steinberg\\Download Assistant\\Steinberg Download Assistant.exe'"
+fi

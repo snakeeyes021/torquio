@@ -1,10 +1,10 @@
 #!/bin/bash
 set -e
 
-# Valerio Master Installer
+# Torquio Master Installer
 # This script automates the entire installation process for Steinberg software on Linux.
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$SCRIPT_DIR/scripts/common.sh"
 
 AUTO_ACCEPT=false
@@ -13,7 +13,7 @@ if [[ "$1" == "-y" ]] || [[ "$1" == "--yes" ]]; then
 fi
 
 echo "==========================================="
-echo "   Valerio: Steinberg on Linux Installer   "
+echo "   Torquio: Steinberg on Linux Installer   "
 echo "==========================================="
 echo ""
 
@@ -32,16 +32,42 @@ if ! command -v docker >/dev/null 2>&1 && ! command -v podman >/dev/null 2>&1; t
     exit 1
 fi
 
-# 2. Asset Validation
+# 2. Scaling Setup Pre-Installation Prompts
+echo "=== Display Scaling Setup ==="
+if [ "$AUTO_ACCEPT" = true ]; then
+    set_config_val "auto_scale_mutter" "false"
+    set_config_val "auto_dpi_detect" "true"
+    set_config_val "manual_dpi" "96"
+    echo "Using default: auto_scale_mutter=false, auto_dpi_detect=true"
+else
+    echo "Torquio can automatically manage host display scaling and Wine DPI settings to"
+    echo "ensure that Dorico and other applications render correctly on High-DPI screens."
+    echo ""
+    read -p "Would you like Torquio to automatically manage display scaling and DPI? [Y/n]: " manage_scaling
+    if [[ ! "$manage_scaling" =~ ^[Nn]$ ]]; then
+        set_config_val "auto_scale_mutter" "true"
+        set_config_val "auto_dpi_detect" "true"
+        set_config_val "manual_dpi" "96"
+        echo "✅ Automatic display scaling and DPI management enabled."
+    else
+        set_config_val "auto_scale_mutter" "false"
+        set_config_val "auto_dpi_detect" "false"
+        set_config_val "manual_dpi" "96"
+        echo "❌ Automatic display scaling disabled. Standard 96 DPI will be used."
+    fi
+fi
+echo "============================="
+echo ""
+
+# 3. Asset Validation
 echo "Validating installers..."
-mkdir -p "$VALERIO_INSTALLERS_DIR"
-SEARCH_DIRS=("$VALERIO_INSTALLERS_DIR" "$HOME/Downloads" "$PWD")
+mkdir -p "$TORQUIO_INSTALLERS_DIR"
+SEARCH_DIRS=("$TORQUIO_INSTALLERS_DIR" "$HOME/Downloads" "$PWD")
 
 # Find the highest versioned files across all search directories, matching the install scripts' logic
 FOUND_MEDIABAY=$(find "${SEARCH_DIRS[@]}" -maxdepth 1 -type f -name "MediaBay_Installer_win64*.zip" 2>/dev/null | sort -V | tail -n 1)
 FOUND_SDA=$(find "${SEARCH_DIRS[@]}" -maxdepth 1 -type f -name "Steinberg_Download_Assistant_*_Installer_win.exe" 2>/dev/null | sort -V | tail -n 1)
 FOUND_NP=$(find "${SEARCH_DIRS[@]}" -maxdepth 1 -type f -name "NotePerformer-Installer-*.exe" 2>/dev/null | sort -V | tail -n 1)
-
 
 MISSING_MANDATORY=false
 if [ -z "$FOUND_MEDIABAY" ]; then
@@ -56,7 +82,7 @@ fi
 if [ "$MISSING_MANDATORY" = true ]; then
     echo ""
     echo "Error: Mandatory installers were not found."
-    echo "Please place them in $VALERIO_INSTALLERS_DIR or ~/Downloads and run this script again."
+    echo "Please place them in $TORQUIO_INSTALLERS_DIR or ~/Downloads and run this script again."
     exit 1
 fi
 
@@ -75,62 +101,64 @@ echo "-----------------------------"
 echo ""
 
 if [ "$AUTO_ACCEPT" = false ]; then
-    read -p "Proceed with the installation? [Y/n] " confirm
+    read -p "Proceed with the installation? [Y/n]: " confirm
     if [[ "$confirm" =~ ^[Nn]$ ]]; then
         echo "Installation cancelled."
         exit 0
     fi
 fi
 
-# 3. Container Creation
-echo "Phase 1: Creating Distrobox container ($VALERIO_CONTAINER_NAME)..."
-if distrobox list | grep -q "$VALERIO_CONTAINER_NAME"; then
-    echo "Container $VALERIO_CONTAINER_NAME already exists. Skipping creation."
+# 4. Container Creation
+echo "Phase 1: Creating Distrobox container ($TORQUIO_CONTAINER_NAME)..."
+if distrobox list | grep -q "$TORQUIO_CONTAINER_NAME"; then
+    echo "Container $TORQUIO_CONTAINER_NAME already exists. Skipping creation."
 else
-    distrobox create -i ubuntu:24.04 -n "$VALERIO_CONTAINER_NAME" --yes
+    distrobox create -i ubuntu:24.04 -n "$TORQUIO_CONTAINER_NAME" --yes
 fi
 
 # We use the absolute path to the workspace within the container. 
 # Distrobox mounts the host's current directory to the exact same path in the container.
-WORKSPACE_DIR="$(pwd)"
+WORKSPACE_DIR="$SCRIPT_DIR"
 
-# 4. Engine Compilation & Installation
+# 5. Engine Compilation & Installation
 echo "Phase 2: Compiling Wine Engine..."
-distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && ./scripts/1-build/build_wine.sh"
+distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && ./scripts/1-build/build_wine.sh"
 
-# 5. Prefix Initialization
+# 6. Prefix Initialization
 echo "Phase 3: Initializing Wine Prefix..."
-distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && ./scripts/2-install/setup_prefix.sh"
+distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && ./scripts/2-install/setup_prefix.sh"
 
-# 6. Software Component Installation
+# 7. Software Component Installation
 echo "Phase 4: Installing Steinberg Components..."
 
 echo "Installing MediaBay..."
-distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && ./scripts/2-install/install_mediabay.sh"
+distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && ./scripts/2-install/install_mediabay.sh"
 
 echo "Installing SDA..."
-distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && ./scripts/2-install/install_sda.sh"
+distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && ./scripts/2-install/install_sda.sh"
 
 if [ -n "$FOUND_NP" ]; then
     echo "Installing NotePerformer..."
-    distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && ./scripts/2-install/install_noteperformer.sh"
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && ./scripts/2-install/install_noteperformer.sh"
 fi
 
 echo "Extracting Desktop Icons..."
-distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && ./scripts/2-install/extract_icons.sh"
+distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && ./scripts/2-install/extract_icons.sh"
 
-# 7. Host Integration
+# 8. Host Integration
 echo "Phase 5: Performing Host Integration..."
 mkdir -p "$HOME/.local/bin"
-for handler in "$SCRIPT_DIR/scripts/3-runtime_handlers/"*.sh; do
+rm -f "$HOME/.local/bin/torquio-dorico" "$HOME/.local/bin/torquio-sam" "$HOME/.local/bin/torquio-sda-handler"
+
+for handler in "$SCRIPT_DIR/scripts/3-runtime_handlers/"torquio-*; do
     base_name=$(basename "$handler")
-    if [ "$base_name" = "steinberg-sda-handler.sh" ]; then
-        sed "s|@VALERIO_REPO_DIR@|$SCRIPT_DIR|g" "$handler" > "$HOME/.local/bin/$base_name"
+    if [ "$base_name" = "torquio-sda-handler" ]; then
+        sed "s|@TORQUIO_REPO_DIR@|$SCRIPT_DIR|g" "$handler" > "$HOME/.local/bin/$base_name"
     else
         cp "$handler" "$HOME/.local/bin/"
     fi
 done
-chmod +x "$HOME/.local/bin/"*.sh
+chmod +x "$HOME/.local/bin/"torquio-*
 
 mkdir -p "$HOME/.local/share/applications"
 
@@ -152,11 +180,11 @@ echo ""
 echo "Opening the Download Assistant..."
 
 # Run the handler in the background so the terminal is not blocked
-nohup "$HOME/.local/bin/steinberg-sda-handler.sh" > /dev/null 2>&1 &
+nohup "$HOME/.local/bin/torquio-sda-handler" > /dev/null 2>&1 &
 
 echo ""
 echo "==========================================="
-echo "   Valerio Core Setup Complete!            "
+echo "   Torquio Core Setup Complete!            "
 echo "==========================================="
 echo "You can close this terminal window at any time. Once the "
 echo "various components have been installed, remember to run the"

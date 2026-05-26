@@ -48,11 +48,13 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
     winetricks \
     unzip \
     cabextract \
-    icoutils
+    icoutils \
+    libcups2 libcups2:i386 \
+    x11-xserver-utils
 
 echo "Cloning zhiyi wine branch..."
-mkdir -p "$VALERIO_BUILD_DIR"
-cd "$VALERIO_BUILD_DIR"
+mkdir -p "$TORQUIO_BUILD_DIR"
+cd "$TORQUIO_BUILD_DIR"
 
 if [ ! -d "wine-source" ]; then
     git clone https://gitlab.winehq.org/zhiyi/wine wine-source

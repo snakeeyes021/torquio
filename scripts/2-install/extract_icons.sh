@@ -27,7 +27,7 @@ extract_icon() {
         
         # 2. Fallback search in Program Files and Program Files (x86)
         # Using case-insensitive matching and catching common naming variations
-        exe_path=$(find "$VALERIO_PREFIX_DIR/drive_c/Program Files" "$VALERIO_PREFIX_DIR/drive_c/Program Files (x86)" -type f -iname "$search_pattern" 2>/dev/null | head -n 1)
+        exe_path=$(find "$TORQUIO_PREFIX_DIR/drive_c/Program Files" "$TORQUIO_PREFIX_DIR/drive_c/Program Files (x86)" -type f -iname "$search_pattern" 2>/dev/null | head -n 1)
         
         if [ -z "$exe_path" ]; then
             echo "Error: Could not locate executable for $icon_name even with fallback search. Skipping."
@@ -98,14 +98,14 @@ extract_icon() {
     rm -rf "$tmp_dir"
 }
 
-echo "Extracting Steinberg icons and registering launchers..."
+echo "Extracting Torquio icons and registering launchers..."
 
 # Dorico
 # Variations: dorico.exe, dorico6.exe, Dorico 6.exe
 extract_icon \
-    "$VALERIO_PREFIX_DIR/drive_c/Program Files/Steinberg/Dorico6/Dorico6.exe" \
+    "$TORQUIO_PREFIX_DIR/drive_c/Program Files/Steinberg/Dorico6/Dorico6.exe" \
     "*dorico*.exe" \
-    "valerio-dorico" \
+    "torquio-dorico" \
     "true" \
     "1" \
     "Dorico.desktop"
@@ -113,9 +113,9 @@ extract_icon \
 # SDA
 # Variations: Steinberg Download Assistant.exe, SteinbergDownloadAssistant.exe, SDA.exe
 extract_icon \
-    "$VALERIO_PREFIX_DIR/drive_c/Program Files (x86)/Steinberg/Download Assistant/Steinberg Download Assistant.exe" \
+    "$TORQUIO_PREFIX_DIR/drive_c/Program Files (x86)/Steinberg/Download Assistant/Steinberg Download Assistant.exe" \
     "*download*assistant*.exe" \
-    "valerio-sda" \
+    "torquio-sda" \
     "false" \
     "" \
     "steinberg-sda-handler.desktop"
@@ -123,9 +123,9 @@ extract_icon \
 # SAM
 # Variations: Steinberg Activation Manager.exe, SteinbergActivationManager.exe, SAM.exe
 extract_icon \
-    "$VALERIO_PREFIX_DIR/drive_c/Program Files/Steinberg/Activation Manager/SteinbergActivationManager.exe" \
+    "$TORQUIO_PREFIX_DIR/drive_c/Program Files/Steinberg/Activation Manager/SteinbergActivationManager.exe" \
     "*activation*manager*.exe" \
-    "valerio-sam" \
+    "torquio-sam" \
     "false" \
     "" \
     "Steinberg Activation Manager.desktop"

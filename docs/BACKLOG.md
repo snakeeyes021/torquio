@@ -17,22 +17,22 @@ We currently have `install_noteperformer.sh`, but we lack dedicated automation s
     *   Move the unzip logic currently inside `setup_prefix.sh` into this dedicated script. It should look for the user-provided `.zip` inside the designated `installers/` directory rather than the repo root.
     *   After unzipping, the script must perform a **recursive cleanup** of blocked files (e.g., `preinstall.ps1`) within the extracted directory to prevent "Not Trusted" error code 231.
     *   After cleanup, navigate into the versioned subfolder and execute `wine Setup.exe`.
-*   [ ] **`update_mediabay.sh` (or CLI Updater Mode):**
+*   [x] **`update_mediabay.sh` (or CLI Updater Mode):** (Stubbed, awaiting refinement)
     *   SDA attempts to update MediaBay but fails due to the `preinstall.ps1` block (Error 231). We need to refactor `install_mediabay.sh` and/or the SDA's launcher (.desktop file or shell script) to handle subsequent updates (e.g., pre-emptively manually checking for updates prior to and outside of the SDA running; if an update is found, we automatically download the installer (which may be a feature we add in the future anyways), clean it, and finally run the new installer ALL BEFORE running the SDA).
 
 ### Epic: The CLI Refactor & Compatibility Polish
 **Context:** Rebrand the codebase from `valerio` to `torquio` and replace the simple installer wrapper with a full-featured CLI interface (`torquio`) backed by a user configuration profile. We will also incorporate key compatibility bug remedies (network printing, keyboard auto-repeat lag, and transient modal window focus loss) directly into our defined sprint.
 
 #### Subtasks: Core Rebranding & Prefix Setup
-*   [ ] **Common Variables & Renaming**:
+*   [x] **Common Variables & Renaming**:
     *   Rename all settings inside `scripts/common.sh` from `valerio` to `torquio` (e.g. `TORQUIO_CONTAINER_NAME="torquio-env"`, XDG data/cache paths).
     *   Rename host wrapper scripts in `scripts/3-runtime_handlers/` to `torquio-dorico`, `torquio-sam`, and `torquio-sda-handler` and install them to `~/.local/bin/` as clean terminal commands.
     *   Rebrand all launchers, stubs, and icon templates to use the `torquio` namespace.
-*   [ ] **Move master install script**:
+*   [x] **Move master install script**:
     *   Relocate the master `install.sh` from the repository root to `scripts/install.sh`. It now lives in the same directory level as `cleanup.sh`, acting as sibling controllers called by the user-facing `torquio` CLI app.
 
 #### Subtasks: CLI App Interface & Pre-Installation Setup Prompts
-*   [ ] **The `torquio` CLI Executable**:
+*   [x] **The `torquio` CLI Executable**:
     *   Replace `install.sh` in the repository root with the main `torquio` CLI utility. It must support clean ASCII art headers and flag-driven actions.
     *   **Interactive Menu + Flags (Hybrid Layout)**: Running `torquio` without arguments launches an interactive text menu. Passing flags (e.g. `--install`) bypasses the menu for scripting.
     *   Supported flags:
@@ -46,41 +46,41 @@ We currently have `install_noteperformer.sh`, but we lack dedicated automation s
         - `-d`, `--map_folder`: Map a local folder into the prefix as a network drive.
         - `-k`, `--import_key_commands`: Import a key commands json or zip backup.
         - `-x`, `--export_key_commands`: Export key commands to a zip archive.
-*   [ ] **Pre-Installation Setup Prompts**:
+*   [x] **Pre-Installation Setup Prompts**:
     *   Modify the installation process to execute a quick setup interview *before* printing the manifest and installing:
         1. **Scaling Prompts**: Ask if Torquio should automatically manage display scaling and DPI. If yes, save `auto_scale_mutter=true` and `auto_dpi_detect=true` in `config.json`. If no, fall back to standard `96` (or pre-existing user DPI).
 
 #### Subtasks: Profile Preferences Engine & Self-Healing Scaling Trap
-*   [ ] **Interactive Configuration Profile**:
+*   [x] **Interactive Configuration Profile**:
     *   Deploy a JSON config file on the host at `~/.config/torquio/config.json` with toggles for:
         *   `auto_scale_mutter` (boolean, default false): Dynamic scaling override. (sets the xwayland-scaling-factor to 1 via the "self-healing xwayland scaling trap" defined below).
         *   `auto_dpi_detect` (boolean, default true): Dynamic monitor DPI detection.
         *   `manual_dpi` (integer, default 96): Manual DPI fallback.
         *   `original_scale_factor` (string/float, empty on fresh setup): Saves the host's active scaling factor before Torquio overrides it, to safely restore on uninstallation.
-*   [ ] **Self-Healing XWayland Scaling Trap**:
+*   [x] **Self-Healing XWayland Scaling Trap**:
     *   Implement the GSettings scaling factor override inside the wrapper launchers. On startup, if `auto_scale_mutter` is active under GNOME, set `xwayland-scaling-factor` to `1.0` dynamically. Use a host-side shell `trap` to cleanly restore the user's original factor when the app shuts down.
-*   [ ] **Auto-DPI Monitor Resolution Detection**:
+*   [x] **Auto-DPI Monitor Resolution Detection**:
     *   If `auto_dpi_detect` is active, query display scale factor via host X11/Wayland variables on boot, calculate the optimal target Wine DPI, and dynamically overwrite the prefix registry's `LogPixels` setting.
-*   [ ] **Uninstallation Host Restore Prompt**:
+*   [x] **Uninstallation Host Restore Prompt**:
     *   During `torquio --uninstall`, if Torquio was configured to manage display scaling, read the `original_scale_factor` from `config.json` and prompt the user to automatically restore their host environment to its original scale.
 
 #### Subtasks: Compatibility Polish & Bug Remedies
-*   [ ] **Keyboard Focus Loss Mitigation (Modal Windows - Default Baseline)**:
+*   [x] **Keyboard Focus Loss Mitigation (Modal Windows - Default Baseline)**:
     *   Always configure the prefix registry by writing the string value `FocusOnClick="Y"` to `HKCU\Software\Wine\X11 Driver` during setup. This forces active window focus acquisition upon mouse clicks, eliminating the GNOME Overview workaround when sub-dialogs close. Done automatically as a default baseline without requiring a config toggle.
-*   [ ] **CUPS Printer Discoverability**:
+*   [x] **CUPS Printer Discoverability**:
     *   Ensure the printing spooler bridge is functional by adding `libcups2` (64-bit) and `libcups2:i386` (32-bit WoW64 support) packages to the container package dependencies (`build_wine.sh` or automated apt installer).
-*   [ ] **Keyboard Auto-Repeat Lag Bug (Dual-Approach)**:
+*   [x] **Keyboard Auto-Repeat Lag Bug (Dual-Approach)**:
     *   Address rapid-fire, delayed inputs when holding keys under XWayland/Wine. Explore both pathways to find the most stable solution for Dorico:
         1. X11 Event Overrides: Setting `xset r rate` repeat rate overrides inside the container shell before launching the binaries.
         2. Wine Registry Input Tuning: Customizing key repeat delay/speed settings in `HKCU\Control Panel\Accessibility\Keyboard Response` inside the prefix registry.
 
 #### Subtasks: Advanced User Utility Integrations
-*   [ ] **Positional & Graphical Folder Mapping (`-d`, `--map_folder`)**:
+*   [x] **Positional & Graphical Folder Mapping (`-d`, `--map_folder`)**:
     *   **Positional Mode**: If parameters are passed (e.g. `--map_folder /path/to/folder e:`), directly create a symlink to `E:\` inside the prefix's `dosdevices/`.
     *   **Interactive Mode**: If no path is provided:
         1. Query host system for `zenity` (GNOME) or `kdialog` (KDE) and spawn a native graphical folder selector. Fall back to standard shell prompts if missing.
         2. Loop through `dosdevices/` starting from `d:` to automatically identify and assign the **first available drive letter**.
-*   [ ] **Multi-Language Key Command Export/Import (`-x` / `-k`)**:
+*   [x] **Multi-Language Key Command Export/Import (`-x` / `-k`)**:
     *   **Export (`-x`)**:
         1. Scan the Dorico prefix AppData folder for any files matching `keycommands_*.json`.
         2. Compress all matching profiles into a single archive on the host: `~/Downloads/torquio_keycommands_backup.zip`.

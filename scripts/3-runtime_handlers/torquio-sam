@@ -1,0 +1,105 @@
+#!/bin/bash
+set -e
+
+TORQUIO_CONTAINER_NAME="torquio-env"
+TORQUIO_PREFIX_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/torquio/prefix"
+WINE_CUSTOM_BIN="/opt/wine-custom/bin"
+
+get_config_val() {
+    local key="$1"
+    local default="$2"
+    local config_file="$HOME/.config/torquio/config.json"
+    if [ ! -f "$config_file" ]; then
+        echo "$default"
+        return
+    fi
+    python3 -c "import json; d=json.load(open('$config_file')); print(d.get('$key', '$default'))" 2>/dev/null || echo "$default"
+}
+
+set_config_val() {
+    local key="$1"
+    local val="$2"
+    local config_file="$HOME/.config/torquio/config.json"
+    mkdir -p "$(dirname "$config_file")"
+    if [ ! -f "$config_file" ]; then
+        echo "{}" > "$config_file"
+    fi
+    python3 -c "
+import json
+f = '$config_file'
+try: d = json.load(open(f))
+except Exception: d = {}
+val = '$val'
+if val.lower() == 'true': val = True
+elif val.lower() == 'false': val = False
+elif val.isdigit(): val = int(val)
+d['$key'] = val
+json.dump(d, open(f, 'w'), indent=4)
+" 2>/dev/null || true
+}
+
+# --- Host Scale & DPI Management ---
+AUTO_SCALE_MUTTER=$(get_config_val "auto_scale_mutter" "false")
+AUTO_DPI_DETECT=$(get_config_val "auto_dpi_detect" "true")
+MANUAL_DPI=$(get_config_val "manual_dpi" "96")
+ORIGINAL_SCALE=""
+
+# 1. Self-Healing XWayland Scaling Trap (GNOME check)
+if [ "$AUTO_SCALE_MUTTER" = "true" ] && [ "$XDG_CURRENT_DESKTOP" = "GNOME" ]; then
+    CURRENT_MUTTER_SCALE=$(gsettings get org.gnome.mutter xwayland-scaling-factor 2>/dev/null | awk '{print $2}')
+    if [ -n "$CURRENT_MUTTER_SCALE" ] && [ "$CURRENT_MUTTER_SCALE" != "1" ]; then
+        ORIGINAL_SCALE="$CURRENT_MUTTER_SCALE"
+        set_config_val "original_scale_factor" "$ORIGINAL_SCALE"
+        gsettings set org.gnome.mutter xwayland-scaling-factor 1 2>/dev/null || true
+        
+        restore_scale() {
+            gsettings set org.gnome.mutter xwayland-scaling-factor "$ORIGINAL_SCALE" 2>/dev/null || true
+        }
+        trap restore_scale EXIT INT TERM
+    fi
+fi
+
+# 2. Auto-DPI Calculation and Registry update
+DPI_TO_SET="$MANUAL_DPI"
+if [ "$AUTO_DPI_DETECT" = "true" ]; then
+    HOST_SCALE=1
+    if command -v gsettings >/dev/null 2>&1; then
+        GNOME_SCALE=$(gsettings get org.gnome.desktop.interface scaling-factor 2>/dev/null | awk '{print $2}')
+        if [ -n "$GNOME_SCALE" ] && [ "$GNOME_SCALE" -gt 0 ]; then
+            HOST_SCALE="$GNOME_SCALE"
+        fi
+    fi
+    if [ "$HOST_SCALE" = "1" ] && command -v gsettings >/dev/null 2>&1; then
+        TEXT_SCALE=$(gsettings get org.gnome.desktop.interface text-scaling-factor 2>/dev/null | awk '{print $2}')
+        if [ -n "$TEXT_SCALE" ] && (( $(echo "$TEXT_SCALE > 1.0" | bc -l 2>/dev/null || echo "0") )); then
+            HOST_SCALE=$(echo "$HOST_SCALE * $TEXT_SCALE" | bc -l 2>/dev/null)
+        fi
+    fi
+    if [ "$HOST_SCALE" = "1" ] && command -v xrdb >/dev/null 2>&1; then
+        XRDB_DPI=$(xrdb -query 2>/dev/null | grep -i Xft.dpi | awk '{print $2}')
+        if [ -n "$XRDB_DPI" ]; then
+            HOST_SCALE=$(echo "scale=2; $XRDB_DPI / 96" | bc -l 2>/dev/null)
+        fi
+    fi
+    
+    DPI_TO_SET=$(echo "$HOST_SCALE * 96" | bc -l 2>/dev/null | awk '{print int($1 + 0.5)}')
+    if [ -z "$DPI_TO_SET" ] || [ "$DPI_TO_SET" -lt 96 ]; then
+        DPI_TO_SET=96
+    fi
+fi
+
+# Update LogPixels registry key
+distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine reg add \"HKCU\\Control Panel\\Desktop\" /v LogPixels /t REG_DWORD /d $DPI_TO_SET /f" >/dev/null 2>&1 || true
+
+# --- Keyboard Auto-Repeat Lag Remedy (xset) ---
+distrobox enter "$TORQUIO_CONTAINER_NAME" -- xset r rate 250 30 >/dev/null 2>&1 || true
+
+URL="$1"
+
+if [ -n "$URL" ]; then
+    # Launched by browser (link provided)
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export WINEDLLOVERRIDES=\"winemenubuilder.exe=d\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; cd \"$TORQUIO_PREFIX_DIR/drive_c/Program Files/Steinberg/Activation Manager\"; wine 'SteinbergActivationManager.exe' --redirect '$URL'"
+else
+    # Standard launch (no link)
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export WINEDLLOVERRIDES=\"winemenubuilder.exe=d\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; cd \"$TORQUIO_PREFIX_DIR/drive_c/Program Files/Steinberg/Activation Manager\"; wine 'SteinbergActivationManager.exe'"
+fi

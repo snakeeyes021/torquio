@@ -1,8 +1,8 @@
 [Desktop Entry]
 Name=Steinberg Activation Manager
 Comment=Manage Steinberg Licenses
-Exec=bash -c '"$HOME/.local/bin/sam.sh" "%u"'
-Icon=valerio-sam
+Exec=bash -c '"$HOME/.local/bin/torquio-sam" "%u"'
+Icon=torquio-sam
 Type=Application
 Terminal=false
 StartupWMClass=steinbergactivationmanager.exe

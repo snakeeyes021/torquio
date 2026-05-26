@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=Steinberg Download Assistant
-Exec=bash -c '"$HOME/.local/bin/steinberg-sda-handler.sh" "%u"'
-Icon=valerio-sda
+Exec=bash -c '"$HOME/.local/bin/torquio-sda-handler" "%u"'
+Icon=torquio-sda
 Type=Application
 Terminal=false
 StartupWMClass=steinberg download assistant.exe

@@ -4,13 +4,13 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../common.sh"
 
-export WINEPREFIX="$VALERIO_PREFIX_DIR"
+export WINEPREFIX="$TORQUIO_PREFIX_DIR"
 export WINE="$WINE_CUSTOM_BIN/wine"
 export WINESERVER="$WINE_CUSTOM_BIN/wineserver"
 export PATH="$WINE_CUSTOM_BIN:$PATH"
 
 # Array of directories to search. Order matters: it will stop at the first match.
-SEARCH_DIRS=("$VALERIO_INSTALLERS_DIR" "$HOME/Downloads" "$(pwd)")
+SEARCH_DIRS=("$TORQUIO_INSTALLERS_DIR" "$HOME/Downloads" "$(pwd)")
 FOUND_INSTALLER=""
 
 # 1. Search Phase
@@ -26,7 +26,7 @@ fi
 if [ -z "$FOUND_INSTALLER" ]; then
     echo "Error: NotePerformer installer not found locally."
     echo "NotePerformer must be downloaded manually from your personal link."
-    echo "Please place the installer in $VALERIO_INSTALLERS_DIR, ~/Downloads, or run this script from the directory containing it."
+    echo "Please place the installer in $TORQUIO_INSTALLERS_DIR, ~/Downloads, or run this script from the directory containing it."
     
     exit 1
 fi

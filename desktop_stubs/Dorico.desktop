@@ -1,8 +1,8 @@
 [Desktop Entry]
 Name=Dorico
 Comment=Music Notation Software
-Exec=$HOME/.local/bin/dorico.sh %F
-Icon=valerio-dorico
+Exec=$HOME/.local/bin/torquio-dorico %F
+Icon=torquio-dorico
 Type=Application
 Terminal=false
 StartupWMClass=dorico6.exe
