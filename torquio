@@ -139,7 +139,7 @@ show_status() {
         local cont_status=$(distrobox list 2>/dev/null | grep "$TORQUIO_CONTAINER_NAME" | awk -F'|' '{print $4}' | tr -d '[:space:]')
         echo "  - Container: $TORQUIO_CONTAINER_NAME (Active: ${cont_status:-running})"
     else
-        echo "  - Container: $TORQUIO_CONTAINER_NAME (❌ NOT CREATED)"
+        echo "  - Container: $TORQUIO_CONTAINER_NAME (Not Created)"
     fi
     echo ""
     
@@ -149,12 +149,12 @@ show_status() {
         local pref_size=$(du -sh "$TORQUIO_PREFIX_DIR" 2>/dev/null | awk '{print $1}')
         echo "  - Wine Prefix: $TORQUIO_PREFIX_DIR (Size: $pref_size)"
         if [ -f "$TORQUIO_PREFIX_DIR/.torquio_core_installed" ]; then
-            echo "  - Baseline Dependencies: ✅ Core Installed"
+            echo "  - Core Wine Dependencies:   Installed (dotnet48, vcrun2019, wine-icu)"
         else
-            echo "  - Baseline Dependencies: ⚠️  INCOMPLETE SETUP"
+            echo "  - Core Wine Dependencies:   Incomplete (Run installation to fix)"
         fi
     else
-        echo "  - Wine Prefix: ❌ NOT INITIALIZED"
+        echo "  - Wine Prefix: Not Initialized (Run installation to create)"
     fi
     echo ""
     
