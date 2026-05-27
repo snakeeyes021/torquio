@@ -235,7 +235,7 @@ map_folder() {
     
     rm -f "$TORQUIO_PREFIX_DIR/dosdevices/$drive_letter"
     ln -s "$real_host_folder" "$TORQUIO_PREFIX_DIR/dosdevices/$drive_letter"
-    echo "✅ Successfully mapped '$real_host_folder' to Wine drive ${drive_letter^^}\\"
+    echo "Successfully mapped '$real_host_folder' to Wine drive ${drive_letter^^}\\"
 }
 
 export_keycommands() {
@@ -262,7 +262,7 @@ export_keycommands() {
     local zip_file="$downloads_dir/torquio_keycommands_backup.zip"
     
     (cd "$keycommands_dir" && zip -q "$zip_file" keycommands_*.json)
-    echo "✅ Successfully compressed and exported key commands to: $zip_file"
+    echo "Successfully compressed and exported key commands to: $zip_file"
 }
 
 import_keycommands() {
@@ -313,7 +313,33 @@ import_keycommands() {
     else
         cp "$selected_backup" "$keycommands_dir/"
     fi
-    echo "✅ Key commands successfully imported!"
+    echo "Key commands successfully imported!"
+}
+
+manage_keycommands() {
+    while true; do
+        echo "=== Manage Dorico Key Commands ==="
+        echo ""
+        echo " 1) Export Key Commands (Backup to Zip)"
+        echo " 2) Import Key Commands (Restore from Backup)"
+        echo " 3) [Back to main menu]"
+        echo ""
+        read -p "Select an option (1-3): " opt_kc
+        case "$opt_kc" in
+            1)
+                export_keycommands
+                ;;
+            2)
+                import_keycommands
+                ;;
+            *)
+                return
+                ;;
+        esac
+        echo ""
+        read -p "Press [Enter] to continue..." temp_kc
+        clear
+    done
 }
 
 show_menu() {
@@ -334,12 +360,11 @@ show_menu() {
             echo " 4) Configure Graphics & Scaling"
             echo " 5) Fix Icons & Refresh Launchers"
             echo " 6) Map a Folder as Wine Drive"
-            echo " 7) Export Dorico Key Commands"
-            echo " 8) Import Dorico Key Commands"
-            echo " 9) Run Custom WINE Configuration (winecfg)"
-            echo "10) Exit"
+            echo " 7) Manage Dorico Key Commands"
+            echo " 8) Run Custom WINE Configuration (winecfg)"
+            echo " 9) Exit"
             echo ""
-            read -p "Select an option (1-10): " choice
+            read -p "Select an option (1-9): " choice
             echo ""
             case "$choice" in
                 1)  ./scripts/install.sh ;;
@@ -348,12 +373,11 @@ show_menu() {
                 4)  configure_graphics; clear; continue ;;
                 5)  distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$TORQUIO_REPO_DIR\" && ./scripts/2-install/extract_icons.sh" ;;
                 6)  map_folder ;;
-                7)  export_keycommands ;;
-                8)  import_keycommands ;;
-                9)  local ft_int=$(get_config_val "freetype_interpreter" "40")
+                7)  manage_keycommands; clear; continue ;;
+                8)  local ft_int=$(get_config_val "freetype_interpreter" "40")
                     distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$ft_int\"; winecfg" ;;
-                10) exit 0 ;;
-                *)  echo "Invalid option. Please choose 1-10." ;;
+                9)  exit 0 ;;
+                *)  echo "Invalid option. Please choose 1-9." ;;
             esac
         else
             echo " 1) Install Torquio Environment"
