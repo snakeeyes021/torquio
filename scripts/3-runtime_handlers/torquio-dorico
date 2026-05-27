@@ -42,6 +42,7 @@ json.dump(d, open(f, 'w'), indent=4)
 AUTO_SCALE_MUTTER=$(get_config_val "auto_scale_mutter" "false")
 AUTO_DPI_DETECT=$(get_config_val "auto_dpi_detect" "true")
 MANUAL_DPI=$(get_config_val "manual_dpi" "96")
+FREETYPE_INTERP=$(get_config_val "freetype_interpreter" "40")
 ORIGINAL_SCALE=""
 
 # 1. Self-Healing XWayland Scaling Trap (GNOME check)
@@ -89,7 +90,7 @@ if [ "$AUTO_DPI_DETECT" = "true" ]; then
 fi
 
 # Update LogPixels registry key
-distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine reg add \"HKCU\\Control Panel\\Desktop\" /v LogPixels /t REG_DWORD /d $DPI_TO_SET /f" >/dev/null 2>&1 || true
+distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$FREETYPE_INTERP\"; wine reg add \"HKCU\\Control Panel\\Desktop\" /v LogPixels /t REG_DWORD /d $DPI_TO_SET /f" >/dev/null 2>&1 || true
 
 # --- Keyboard Auto-Repeat Lag Remedy (xset) ---
 # Running xset r rate 250 30 in container to solve the repeating keys delay
@@ -101,4 +102,4 @@ if [ -n "$1" ]; then
     WIN_PATH=$(distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEDEBUG=-all; export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; winepath -w \"$1\"" | tr -d '\r')
 fi
 
-distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export WINEDLLOVERRIDES=\"winemenubuilder.exe=d\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; cd \"$TORQUIO_PREFIX_DIR/drive_c/Program Files/Steinberg/Dorico6\"; if [ -n \"\$1\" ]; then wine 'Dorico6.exe' \"\$1\"; else wine 'Dorico6.exe'; fi" _ "$WIN_PATH"
+distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export WINEDLLOVERRIDES=\"winemenubuilder.exe=d\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$FREETYPE_INTERP\"; cd \"$TORQUIO_PREFIX_DIR/drive_c/Program Files/Steinberg/Dorico6\"; if [ -n \"\$1\" ]; then wine 'Dorico6.exe' \"\$1\"; else wine 'Dorico6.exe'; fi" _ "$WIN_PATH"

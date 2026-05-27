@@ -43,6 +43,7 @@ json.dump(d, open(f, 'w'), indent=4)
 AUTO_SCALE_MUTTER=$(get_config_val "auto_scale_mutter" "false")
 AUTO_DPI_DETECT=$(get_config_val "auto_dpi_detect" "true")
 MANUAL_DPI=$(get_config_val "manual_dpi" "96")
+FREETYPE_INTERP=$(get_config_val "freetype_interpreter" "40")
 ORIGINAL_SCALE=""
 
 # 1. Self-Healing XWayland Scaling Trap (GNOME check)
@@ -90,7 +91,7 @@ if [ "$AUTO_DPI_DETECT" = "true" ]; then
 fi
 
 # Update LogPixels registry key
-distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine reg add \"HKCU\\Control Panel\\Desktop\" /v LogPixels /t REG_DWORD /d $DPI_TO_SET /f" >/dev/null 2>&1 || true
+distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$FREETYPE_INTERP\"; wine reg add \"HKCU\\Control Panel\\Desktop\" /v LogPixels /t REG_DWORD /d $DPI_TO_SET /f" >/dev/null 2>&1 || true
 
 # --- Keyboard Auto-Repeat Lag Remedy (xset) ---
 distrobox enter "$TORQUIO_CONTAINER_NAME" -- xset r rate 250 30 >/dev/null 2>&1 || true
@@ -138,8 +139,8 @@ fi
 # Now run the actual SDA in the foreground (it will block the terminal/handler)
 if [ -n "$URL" ]; then
     # Launched by browser (link provided) - pass the URL directly without --redirect
-    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export WINEDLLOVERRIDES=\"winemenubuilder.exe=d\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine 'C:\\Program Files (x86)\\Steinberg\\Download Assistant\\Steinberg Download Assistant.exe' '$URL'"
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export WINEDLLOVERRIDES=\"winemenubuilder.exe=d\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$FREETYPE_INTERP\"; wine 'C:\\Program Files (x86)\\Steinberg\\Download Assistant\\Steinberg Download Assistant.exe' '$URL'"
 else
     # Standard launch (no link)
-    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export WINEDLLOVERRIDES=\"winemenubuilder.exe=d\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine 'C:\\Program Files (x86)\\Steinberg\\Download Assistant\\Steinberg Download Assistant.exe'"
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export WINEDLLOVERRIDES=\"winemenubuilder.exe=d\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$FREETYPE_INTERP\"; wine 'C:\\Program Files (x86)\\Steinberg\\Download Assistant\\Steinberg Download Assistant.exe'"
 fi

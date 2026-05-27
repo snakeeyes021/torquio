@@ -27,6 +27,17 @@ echo "Configuring Keyboard Focus Loss Mitigation & Accessibility Registry Overri
 # FocusOnClick forces window focus acquisition upon mouse click, preventing focus loss in modals
 wine reg add "HKCU\\Software\\Wine\\X11 Driver" /v FocusOnClick /t REG_SZ /d Y /f
 
+# Force client-side font anti-aliasing and XRender overrides in Wine X11 Driver
+wine reg add "HKCU\\Software\\Wine\\X11 Driver" /v ClientSideWithRender /t REG_SZ /d Y /f
+wine reg add "HKCU\\Software\\Wine\\X11 Driver" /v ClientSideAntiAliasWithRender /t REG_SZ /d Y /f
+wine reg add "HKCU\\Software\\Wine\\X11 Driver" /v ClientSideWithCore /t REG_SZ /d Y /f
+
+# Enable Font Smoothing (ClearType) and subpixel rendering parameters
+wine reg add "HKCU\\Control Panel\\Desktop" /v FontSmoothing /t REG_SZ /d 2 /f
+wine reg add "HKCU\\Control Panel\\Desktop" /v FontSmoothingGamma /t REG_DWORD /d 1400 /f
+wine reg add "HKCU\\Control Panel\\Desktop" /v FontSmoothingOrientation /t REG_DWORD /d 1 /f
+wine reg add "HKCU\\Control Panel\\Desktop" /v FontSmoothingType /t REG_DWORD /d 2 /f
+
 # Customize key repeat speed to mitigate Auto-Repeat Lag Bug
 wine reg add "HKCU\\Control Panel\\Accessibility\\Keyboard Response" /v AutoRepeatDelay /t REG_SZ /d "250" /f
 wine reg add "HKCU\\Control Panel\\Accessibility\\Keyboard Response" /v AutoRepeatRate /t REG_SZ /d "30" /f

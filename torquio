@@ -58,14 +58,16 @@ configure_graphics() {
     local cur_auto_scale=$(get_config_val "auto_scale_mutter" "false")
     local cur_auto_dpi=$(get_config_val "auto_dpi_detect" "true")
     local cur_manual_dpi=$(get_config_val "manual_dpi" "96")
+    local cur_interpreter=$(get_config_val "freetype_interpreter" "40")
     
     echo "Current settings:"
     echo " 1) Auto-Scale XWayland (auto_scale_mutter): $cur_auto_scale"
     echo " 2) Auto-DPI Detection (auto_dpi_detect):    $cur_auto_dpi"
     echo " 3) Manual DPI Fallback (manual_dpi):        $cur_manual_dpi"
-    echo " 4) [Back to main menu]"
+    echo " 4) FreeType Hinting Interpreter (v35/v40):  v$cur_interpreter"
+    echo " 5) [Back to main menu]"
     echo ""
-    read -p "Select an option to toggle/change (1-4): " opt
+    read -p "Select an option to toggle/change (1-5): " opt
     case "$opt" in
         1)
             if [ "$cur_auto_scale" = "true" ]; then
@@ -93,6 +95,30 @@ configure_graphics() {
             else
                 echo "Invalid input. DPI must be an integer."
             fi
+            configure_graphics
+            ;;
+        4)
+            echo ""
+            echo "=== FreeType Hinting Interpreter Selection ==="
+            echo " 1) v40 (Thicker/bolder, but some fonts can look smudgey) [Default]"
+            echo " 2) v35 (Thinner/crisper, but some fonts can look anemic)"
+            echo ""
+            read -p "Select interpreter style (1-2): " choice_int
+            case "$choice_int" in
+                1)
+                    set_config_val "freetype_interpreter" "40"
+                    echo "FreeType Hinting Interpreter set to v40!"
+                    ;;
+                2)
+                    set_config_val "freetype_interpreter" "35"
+                    echo "FreeType Hinting Interpreter set to v35!"
+                    ;;
+                *)
+                    echo "Invalid selection. No changes made."
+                    ;;
+            esac
+            echo ""
+            read -p "Press [Enter] to continue..." temp_int
             configure_graphics
             ;;
         *)
@@ -137,10 +163,12 @@ show_status() {
     local auto_scale=$(get_config_val "auto_scale_mutter" "false")
     local auto_dpi=$(get_config_val "auto_dpi_detect" "true")
     local manual_dpi=$(get_config_val "manual_dpi" "96")
+    local freetype_interp=$(get_config_val "freetype_interpreter" "40")
     local orig_scale=$(get_config_val "original_scale_factor" "Not saved")
     echo "  - auto_scale_mutter:     $auto_scale"
     echo "  - auto_dpi_detect:        $auto_dpi"
     echo "  - manual_dpi:            $manual_dpi"
+    echo "  - freetype_interpreter:  v$freetype_interp"
     echo "  - original_scale_factor: $orig_scale"
     echo ""
     
@@ -314,7 +342,8 @@ show_menu() {
             6)  map_folder ;;
             7)  export_keycommands ;;
             8)  import_keycommands ;;
-            9)  distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; winecfg" ;;
+            9)  local ft_int=$(get_config_val "freetype_interpreter" "40")
+                distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$ft_int\"; winecfg" ;;
             10) exit 0 ;;
             *)  echo "Invalid option. Please choose 1-10." ;;
         esac
@@ -348,7 +377,8 @@ if [ $# -gt 0 ]; then
             ./scripts/2-install/update_mediabay.sh
             ;;
         -w|--winecfg)
-            distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; winecfg"
+            local ft_int=$(get_config_val "freetype_interpreter" "40")
+            distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$ft_int\"; winecfg"
             ;;
         -d|--map_folder)
             map_folder "$2" "$3"
