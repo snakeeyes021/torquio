@@ -168,7 +168,7 @@ fi
 distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$FREETYPE_INTERP\"; wine reg add \"HKCU\\Control Panel\\Desktop\" /v LogPixels /t REG_DWORD /d $DPI_TO_SET /f" >/dev/null 2>&1 || true
 
 # --- Keyboard Auto-Repeat Lag Remedy (xset) ---
-distrobox enter "$TORQUIO_CONTAINER_NAME" -- xset r rate 250 30 >/dev/null 2>&1 || true
+distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c 'xset r rate 500 30 && for keycode in {10..19} 23 {24..33} 36 {38..48} {52..61} 65; do xset -r $keycode; done' >/dev/null 2>&1 || true
 
 URL="$1"
 

@@ -494,10 +494,11 @@ manage_wine() {
         echo -e "  ${wine}5)${reset} Run Command Prompt (cmd)"
         echo -e "  ${wine}6)${reset} Reboot Wine Prefix (wineboot -r)"
         echo -e "  ${wine}7)${reset} Shutdown Wine Server (wineserver -k)"
-        echo -e "  ${wine}8)${reset} Run Custom Installer/Executable (.exe/.msi)"
-        echo -e "  ${wine}9)${reset} [Back to main menu]"
+        echo -e "  ${wine}8)${reset} Monitor XWayland Keyboard Events (xev)"
+        echo -e "  ${wine}9)${reset} Run Custom Installer/Executable (.exe/.msi)"
+        echo -e "  ${wine}10)${reset} [Back to main menu]"
         echo ""
-        read -p "Select an option (1-9): " opt_wine
+        read -p "Select an option (1-10): " opt_wine
         local ft_int=$(get_config_val "freetype_interpreter" "40")
         case "$opt_wine" in
             1)
@@ -526,6 +527,24 @@ manage_wine() {
                 echo "Wine server shutdown complete."
                 ;;
             8)
+                if ! distrobox enter "$TORQUIO_CONTAINER_NAME" -- command -v xev >/dev/null 2>&1; then
+                    echo "xev (X11 Event Viewer) is not installed in the container."
+                    read -p "Would you like to install it now? [Y/n]: " install_xev
+                    if [[ ! "$install_xev" =~ ^[Nn]$ ]]; then
+                        echo "Installing x11-utils..."
+                        distrobox enter "$TORQUIO_CONTAINER_NAME" -- sudo apt update
+                        distrobox enter "$TORQUIO_CONTAINER_NAME" -- sudo apt install -y x11-utils
+                    else
+                        clear
+                        continue
+                    fi
+                fi
+                echo "Launching X11 Event Viewer (xev)..."
+                echo "Focus the small white window that appears and press keys to monitor events."
+                echo "Press Ctrl+C inside this terminal to exit the monitor."
+                distrobox enter "$TORQUIO_CONTAINER_NAME" -- xev -event keyboard || true
+                ;;
+            9)
                 run_custom_exe
                 ;;
             *)
