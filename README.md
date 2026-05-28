@@ -1,4 +1,4 @@
-# Valerio 
+# Torquio
 A unified installation framework for Dorico on Linux
 
 ## The Mission
@@ -29,38 +29,58 @@ Download the following files from the Steinberg download pages for [Steinberg Do
 
 *Note: You do not need to download the Dorico installer itself. The Download Assistant will handle that once the environment is built.*
 
-## Step 2: Install Valerio
-
+## Step 2: Install & Build
 Open your terminal and run the following commands to clone the repository and start the automated build process:
 
 ```bash
-git clone https://github.com/snakeeyes021/valerio.git
-cd valerio
-./install.sh
+git clone https://github.com/snakeeyes021/torquio.git
+cd torquio
+./scripts/install.sh
 ```
 
-*(You can append `-y` to `./install.sh` to bypass the installation manifest confirmation prompt AND the final pause before opening the Download Assistant).*
+*(You can append `-y` to `install.sh` to bypass the installer manifest confirmation prompt and scale prompts for a completely silent, automated installation).*
 
 ### What happens next?
-The script currently takes about 45 minutes to run. It will:
-1. Generate an isolated Ubuntu container.
-2. Compile a custom version of Wine (with specific stubs required by Dorico).
-3. Initialize a Windows 10 prefix and install core dependencies.
-4. Install MediaBay, the Download Assistant, and NotePerformer (if provided).
-5. Map the Steinberg desktop shortcuts and web-login handlers to your native Linux application menu. 
-6. Automatically start the Download Assistant.
+The build pipeline automatically handles all the heavy lifting:
+1. Configures an isolated Ubuntu container.
+2. Compiles a custom version of Wine (with specific stubs required by Dorico).
+3. Initializes a Windows prefix, applies ClearType font configurations, and installs core dependencies.
+4. Installs MediaBay, the Download Assistant, and NotePerformer (if provided).
+5. Registers all application desktop shortcuts and web-login handlers to your native Linux application menu.
+6. Installs the globally accessible `torquio` console utility to manage your environment easily.
 
-Once the Download Assistant launches, you can sign in and download Dorico! We recommend using the "Install All" button for now, as the Steinberg Download Assistant is mostly illegible under the current build. After you're done installing, simply close the Download Assistant, run the Activation Manager to activate your license, and then you should be all set to start notating!
+After installation, the Steinberg Download Assistant will launch automatically. Once the it does, simply sign in and download Dorico as you normally would! When finished, close the Download Assistant, run the Activation Manager to activate your license, and you are ready to start notating!
+
+---
+
+## The Torquio Console Manager
+
+Torquio provides a unified, friendly console utility to manage your environment. You can run it globally from your terminal at any time simply by typing:
+
+```bash
+torquio
+```
+
+### Premium QOL Features
+
+*   **Console Dashboard**: Check the active status of your container dependencies, configuration preferences, and system details in a clean, colorized terminal screen.
+*   **High-DPI Scaling Controls**: Set Torquio to automatically manage High-DPI display scaling so that Dorico renders properly given your monitor specs and settings.
+*   **Problem Fixes**: Solves several annoying quirks of running Dorico on Linux, for instance, keyboard longpresses sending too many repeated key events, breaking scrubber functionality. 
+*   **Startup Time Validation**: Produces warnings if attempting to run Steinberg Activation Manager with an incorrect time on the system clock, which can cause really tricky-to-diagnose Steinberg licensing activation errors.
+*   **Dorico Shortcut Backups**: Easily back up or restore your custom keyboard shortcuts for convenient transport from/to other machines.
+*   **One-Click Maintenance**: Fast shortcuts to run Wine configuration, edit the registry, open a graphical file manager inside the prefix, soft-reboot the environment, or shut down the server when needed.
 
 ---
 
 ## Uninstallation / Clean Start
 
-If you ever need to completely wipe the Valerio environment (including the container, Wine prefix, and all installed software) to start fresh, simply run:
+If you ever need to completely wipe the Torquio environment (including the container, Wine prefix, configuration profiles, desktop integrations, and cache) to start fresh, simply run:
 
 ```bash
-./scripts/cleanup.sh
+torquio --uninstall
 ```
+
+*(Alternatively, run the cleanup script directly: `./scripts/cleanup.sh`)*
 
 ---
 
@@ -76,14 +96,16 @@ If you are looking to understand how this system works under the hood, contribut
 
 ### Repository Structure
 ```text
-valerio/
+torquio/
 ├── README.md                 # This file
 ├── CONTRIBUTING.md           # Guidelines for contributing and testing
 ├── LICENSE                   # GNU General Public License v3.0
-├── install.sh                # The main one-click bootstrapper script
+├── torquio                   # The main console orchestrator script
 ├── desktop_stubs/            # URI handlers, .desktop templates, and MIME XMLs
 ├── docs/                     # Architectural, task, and release documentation
 └── scripts/
+    ├── install.sh            # The main one-click installer script
+    ├── cleanup.sh            # The environment uninstaller/wipe script
     ├── common.sh             # Shared environment variables and paths
     ├── 1-build/              # Compiles the custom Wine engine
     ├── 2-install/            # Bootstraps the prefix and installs software
@@ -92,8 +114,8 @@ valerio/
 
 ## Legal & Disclaimer
 
-Valerio is an independent, community-driven open-source project. It is not affiliated, associated, authorized, endorsed by, or in any way officially connected with **Steinberg Media Technologies GmbH**, **Yamaha Corporation**, or any of their subsidiaries or affiliates.
+Torquio is an independent, community-driven open-source project. It is not affiliated, associated, authorized, endorsed by, or in any way officially connected with **Steinberg Media Technologies GmbH**, **Yamaha Corporation**, or any of their subsidiaries or affiliates.
 
 All product names, logos, copyrights, patents, and trademarks™ or registered® trademarks are the property of their respective owners. Their use in this project is for identification and interoperability purposes only and does not imply any association or endorsement.
 
-Valerio does not distribute any proprietary Steinberg assets, binaries, or code. Users must provide their own legally obtained software to use this tool.
+Torquio does not distribute any proprietary Steinberg assets, binaries, or code. Users must provide their own legally obtained software to use this tool.

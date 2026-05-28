@@ -21,7 +21,7 @@ We currently have `install_noteperformer.sh`, but we lack dedicated automation s
     *   SDA attempts to update MediaBay but fails due to the `preinstall.ps1` block (Error 231). We need to refactor `install_mediabay.sh` and/or the SDA's launcher (.desktop file or shell script) to handle subsequent updates (e.g., pre-emptively manually checking for updates prior to and outside of the SDA running; if an update is found, we automatically download the installer (which may be a feature we add in the future anyways), clean it, and finally run the new installer ALL BEFORE running the SDA).
 
 ### Epic: The CLI Refactor & Compatibility Polish
-**Context:** Rebrand the codebase from `valerio` to `torquio` and replace the simple installer wrapper with a full-featured CLI interface (`torquio`) backed by a user configuration profile. We will also incorporate key compatibility bug remedies (network printing, keyboard auto-repeat lag, and transient modal window focus loss) directly into our defined sprint.
+**Context:** The codebase has been rebranded from `valerio` to `torquio`, replacing the simple installer wrapper with a full-featured CLI interface (`torquio`) backed by a user configuration profile. We will also incorporate key compatibility bug remedies (network printing, keyboard auto-repeat lag, and transient modal window focus loss) directly into our defined sprint.
 
 #### Subtasks: Core Rebranding & Prefix Setup
 *   [x] **Common Variables & Renaming**:
@@ -103,7 +103,7 @@ This section tracks high-level goals and ideas that have not yet been broken dow
 *   [ ] **Version Manifest Generation:** Programmatically extract and record the exact version numbers of every piece of installed Steinberg software to create a reproducible manifest.
 *   [ ] **User Configuration Sync:** Create scripts to automate the backup/export and restoration of user key commands (`keycommands*.json`) and other critical preference files.
 *   [ ] **Automated 1st-Party Downloads:** Investigate and implement automated download fallbacks for 1st-party Steinberg components (SDA, MediaBay) if they are missing from the `installers/` directory.
-*   [ ] **System-Wide Logging:** Implement a structured logging framework (e.g., redirecting stdout/stderr to `~/.local/state/valerio/logs/`) to provide users with a "debug bundle" they can share when hitting issues.
+*   [ ] **System-Wide Logging:** Implement a structured logging framework (e.g., redirecting stdout/stderr to `~/.local/state/torquio/logs/`) to provide users with a "debug bundle" they can share when hitting issues.
 *   [ ] **"License Eater" Bug:** On prior attempts in Bottles, a (assumed) hardware fingerprinting issue is causing licenses to disappear. Determine if the issue exists under our current method, and, if so, figure out a strategy for maintaining hardware fingerprint (if that is the problem).
 *   [ ] **NotePerformer UI:** Fix graphical glitches in the NotePerformer VST window. (Determine if this is still an issue under the current custom Wine build).
 *   [ ] **"Edit Instrument"** Attempting to edit a VST instrument from within Play mode causes a crash/hang/failure. Investigate.
@@ -136,7 +136,7 @@ This section tracks high-level goals and ideas that have not yet been broken dow
 **Context:** Distrobox auto-exports `.desktop` files with proper icons, conflicting with our custom manual ones which handle the `net-steinberg-sam://` URI schemes. We need to merge the "Nice Icon" with the "Functional Link Handler" and establish actual scripted functionality. There may be other good stuff in the exported .desktop files that we want in ours.
 
 #### Subtasks: .desktop File Merging
-*   [x] **Suppress winemenubuilder:** Wine automatically creates `.desktop` links for Windows applications and file extensions (e.g., in `~/.local/share/applications/wine/Programs/`). This pollutes the host environment. We need to export `WINEDLLOVERRIDES="winemenubuilder.exe=d"` in our installation scripts so Wine stops spamming the host's app menu. *Note: When we write the cleanup script for these, it must be carefully targeted (e.g., only deleting Steinberg/Dorico specific files) so we don't accidentally wipe a user's desktop files from other non-Valerio Wine prefixes.*
+*   [x] **Suppress winemenubuilder:** Wine automatically creates `.desktop` links for Windows applications and file extensions (e.g., in `~/.local/share/applications/wine/Programs/`). This pollutes the host environment. We need to export `WINEDLLOVERRIDES="winemenubuilder.exe=d"` in our installation scripts so Wine stops spamming the host's app menu. *Note: When we write the cleanup script for these, it must be carefully targeted (e.g., only deleting Steinberg/Dorico specific files) so we don't accidentally wipe a user's desktop files from other non-Torquio Wine prefixes.*
 *   [x] Use the current "messy" state of the host machine as a diagnostic baseline.
 *   [x] The stubs in `desktop_stubs/` currently lack `Icon=` paths. 
 *   [x] Need a post-install script that runs `distrobox-export --app` for SDA, SAM, and Dorico. (Implemented a cleaner, Distrobox-independent solution via surgical `wrestool` extraction).
@@ -153,5 +153,5 @@ This section tracks high-level goals and ideas that have not yet been broken dow
 *   [x] **Production Path Refactoring:** Transition from isolated development paths (`~/dev/...`) to standard production paths.
 *   [x] **Production Path Refactoring:** Transition from isolated development paths (`~/dev/...`) to standard production paths.
     *   Removed hardcoded `$HOME/dev/steinberg-on-linux` references in `build_wine.sh` and `setup_prefix.sh` and replaced them with dynamic workspace variables and XDG-compliant paths.
-    *   Scripts now dynamically generate the Wine prefix in a user-agnostic XDG location (`~/.local/share/valerio/prefix`).
+    *   Scripts now dynamically generate the Wine prefix in a user-agnostic XDG location (`~/.local/share/torquio/prefix`).
     *   Added `scripts/common.sh` for shared environment variables.

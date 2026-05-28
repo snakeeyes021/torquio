@@ -51,7 +51,7 @@ else
     echo "Installing Cantai silently..."
     # TODO: Replace the active command below with the correct silent installation flag once identified.
     # It will likely look something like this:
-    # distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$VALERIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine \"$EXTRACTED_EXE\" /S" || true
+    # distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine \"$EXTRACTED_EXE\" /S" || true
     
     distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine \"$EXTRACTED_EXE\"" || true
 fi
