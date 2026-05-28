@@ -114,7 +114,7 @@ torquio/
 
 ## Alpha Status
 
-> [!NOTICE]
+> [!WARNING]
 > **Torquio is currently in an ALPHA state.** It is experimental software under active development. Standard features may change, break, or be removed without prior notice.
 >
 > **Use Torquio entirely at your own risk.** It is highly recommended to perform backups of any critical system configurations, files, or Steinberg project data before initializing or running this utility and especially if uninstalling/removing it.
