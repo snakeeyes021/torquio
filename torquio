@@ -36,17 +36,17 @@ try:
         diff = abs((srv_dt - local_dt).total_seconds())
         if diff > 180:
             print('')
-            print('System Clock Status:')
-            print(f'  WARNING: System clock is out of sync by {int(diff)} seconds!')
+            print('\033[38;5;179mSystem Clock Status:\033[0m')
+            print(f'  \033[38;5;167mWARNING: System clock is out of sync by {int(diff)} seconds!\033[0m')
             print(f'  Server Time (UTC): {srv_dt.strftime(\"%Y-%m-%d %H:%M:%S\")}')
             print(f'  System Time (UTC): {local_dt.strftime(\"%Y-%m-%d %H:%M:%S\")}')
-            print('  This is HIGHLY LIKELY to cause errors in the Steinberg Activation Manager.')
+            print('  This is \033[38;5;167mHIGHLY LIKELY\033[0m to cause errors in the Steinberg Activation Manager.')
 except Exception:
     print('')
-    print('System Clock Status:')
-    print('  WARNING: Torquio attempts to verify that your system clock is')
-    print('  accurate in order to prevent SAM licensing issues. Offline or')
-    print('  unable to contact time server. System clock could not be verified.')
+    print('\033[38;5;244mSystem Clock Status:\033[0m')
+    print('  \033[38;5;179mWARNING: Torquio attempts to verify that your system clock is\033[0m')
+    print('  \033[38;5;179maccurate in order to prevent SAM licensing issues. Offline or\033[0m')
+    print('  \033[38;5;179munable to contact time server. System clock could not be verified.\033[0m')
 "
     
 }
@@ -85,7 +85,11 @@ json.dump(d, open(f, 'w'), indent=4)
 }
 
 configure_graphics() {
-    echo "=== Torquio Graphics & Scaling Configuration ==="
+    local wine="\033[38;5;125m"
+    local reset="\033[0m"
+    local blue="\033[38;5;110m"
+
+    echo -e "${blue}=== Torquio Graphics & Scaling Configuration ===${reset}"
     echo ""
     local cur_auto_scale=$(get_config_val "auto_scale_mutter" "false")
     local cur_auto_dpi=$(get_config_val "auto_dpi_detect" "true")
@@ -93,11 +97,11 @@ configure_graphics() {
     local cur_interpreter=$(get_config_val "freetype_interpreter" "40")
     
     echo "Current settings:"
-    echo " 1) Auto-Scale XWayland (auto_scale_mutter): $cur_auto_scale"
-    echo " 2) Auto-DPI Detection (auto_dpi_detect):    $cur_auto_dpi"
-    echo " 3) Manual DPI Fallback (manual_dpi):        $cur_manual_dpi"
-    echo " 4) FreeType Hinting Interpreter (v35/v40):  v$cur_interpreter"
-    echo " 5) [Back to main menu]"
+    echo -e "  ${wine}1)${reset} Auto-Scale XWayland (auto_scale_mutter): $cur_auto_scale"
+    echo -e "  ${wine}2)${reset} Auto-DPI Detection (auto_dpi_detect):    $cur_auto_dpi"
+    echo -e "  ${wine}3)${reset} Manual DPI Fallback (manual_dpi):        $cur_manual_dpi"
+    echo -e "  ${wine}4)${reset} FreeType Hinting Interpreter (v35/v40):  v$cur_interpreter"
+    echo -e "  ${wine}5)${reset} [Back to main menu]"
     echo ""
     read -p "Select an option to toggle/change (1-5): " opt
     case "$opt" in
@@ -131,9 +135,9 @@ configure_graphics() {
             ;;
         4)
             echo ""
-            echo "=== FreeType Hinting Interpreter Selection ==="
-            echo " 1) v40 (Thicker/bolder, but some fonts can look smudgey) [Default]"
-            echo " 2) v35 (Thinner/crisper, but some fonts can look anemic)"
+            echo -e "${blue}=== FreeType Hinting Interpreter Selection ===${reset}"
+            echo -e "  ${wine}1)${reset} v40 (Thicker/bolder, but some fonts can look smudgey) [Default]"
+            echo -e "  ${wine}2)${reset} v35 (Thinner/crisper, but some fonts can look anemic)"
             echo ""
             read -p "Select interpreter style (1-2): " choice_int
             case "$choice_int" in
@@ -160,60 +164,70 @@ configure_graphics() {
 }
 
 show_status() {
-    echo "=========================================================="
-    echo "             Torquio Environment Dashboard                "
-    echo "=========================================================="
+    local wine="\033[38;5;125m"
+    local gray="\033[38;5;244m"
+    local dark_gray="\033[38;5;240m"
+    local green="\033[38;5;108m"
+    local red="\033[38;5;167m"
+    local blue="\033[38;5;110m"
+    local reset="\033[0m"
+
+    echo -e "${gray}================================================================${reset}"
+    echo -e "             ${wine}Torquio Environment Dashboard${reset}                "
+    echo -e "${gray}================================================================${reset}"
     echo ""
     
     # 1. Distrobox Container Status
-    echo "Distrobox Container Status:"
+    echo -e "${blue}Distrobox Container Status:${reset}"
     if distrobox list 2>/dev/null | grep -q "$TORQUIO_CONTAINER_NAME"; then
         local cont_status=$(distrobox list 2>/dev/null | grep "$TORQUIO_CONTAINER_NAME" | awk -F'|' '{print $4}' | tr -d '[:space:]')
-        echo "  - Container: $TORQUIO_CONTAINER_NAME (Active: ${cont_status:-running})"
+        echo -e "  - Container: ${dark_gray}$TORQUIO_CONTAINER_NAME${reset} (Active: ${green}${cont_status:-running}${reset})"
     else
-        echo "  - Container: $TORQUIO_CONTAINER_NAME (Not Created)"
+        echo -e "  - Container: ${dark_gray}$TORQUIO_CONTAINER_NAME${reset} (${red}Not Created${reset})"
     fi
     echo ""
     
     # 2. Wine Prefix Status
-    echo "Wine Prefix Status:"
+    echo -e "${blue}Wine Prefix Status:${reset}"
     if [ -d "$TORQUIO_PREFIX_DIR" ]; then
         local pref_size=$(du -sh "$TORQUIO_PREFIX_DIR" 2>/dev/null | awk '{print $1}')
-        echo "  - Wine Prefix: $TORQUIO_PREFIX_DIR (Size: $pref_size)"
+        echo -e "  - Wine Prefix: ${dark_gray}$TORQUIO_PREFIX_DIR${reset} (Size: ${wine}$pref_size${reset})"
         if [ -f "$TORQUIO_PREFIX_DIR/.torquio_core_installed" ]; then
-            echo "  - Core Wine Dependencies:   Installed (dotnet48, vcrun2019, wine-icu)"
+            echo -e "  - Core Wine Dependencies:   ${green}Installed${reset} (dotnet48, vcrun2019, wine-icu)"
         else
-            echo "  - Core Wine Dependencies:   Incomplete (Run installation to fix)"
+            echo -e "  - Core Wine Dependencies:   ${red}Incomplete${reset} (Run installation to fix)"
         fi
     else
-        echo "  - Wine Prefix: Not Initialized (Run installation to create)"
+        echo -e "  - Wine Prefix: ${red}Not Initialized${reset} (Run installation to create)"
     fi
     echo ""
     
     # 3. Active Preferences Profile
-    echo "Configuration Preferences:"
+    echo -e "${blue}Configuration Preferences:${reset}"
     local auto_scale=$(get_config_val "auto_scale_mutter" "false")
     local auto_dpi=$(get_config_val "auto_dpi_detect" "true")
     local manual_dpi=$(get_config_val "manual_dpi" "96")
     local freetype_interp=$(get_config_val "freetype_interpreter" "40")
     local orig_scale=$(get_config_val "original_scale_factor" "Not saved")
-    echo "  - auto_scale_mutter:     $auto_scale"
-    echo "  - auto_dpi_detect:        $auto_dpi"
-    echo "  - manual_dpi:            $manual_dpi"
-    echo "  - freetype_interpreter:  v$freetype_interp"
-    echo "  - original_scale_factor: $orig_scale"
+    echo -e "  - auto_scale_mutter:     ${wine}$auto_scale${reset}"
+    echo -e "  - auto_dpi_detect:       ${wine}$auto_dpi${reset}"
+    echo -e "  - manual_dpi:            ${wine}$manual_dpi${reset}"
+    echo -e "  - freetype_interpreter:  ${wine}v$freetype_interp${reset}"
+    if [ "$auto_scale" = "true" ]; then
+        echo -e "  - original_scale_factor: ${wine}$orig_scale${reset}"
+    fi
     echo ""
     
     # 4. Host Info
-    echo "Host System Details:"
-    echo "  - Desktop Environment:   $XDG_CURRENT_DESKTOP"
+    echo -e "${blue}Host System Details:${reset}"
+    echo -e "  - Desktop Environment:   ${wine}$XDG_CURRENT_DESKTOP${reset}"
     if command -v gsettings >/dev/null 2>&1; then
         local g_scale=$(gsettings get org.gnome.desktop.interface scaling-factor 2>/dev/null | awk '{print $2}')
         local g_mutter=$(gsettings get org.gnome.mutter xwayland-scaling-factor 2>/dev/null | awk '{print $2}')
-        echo "  - GNOME Scale Factor:    ${g_scale:-Unknown}"
-        echo "  - Mutter XWayland Scale: ${g_mutter:-Unknown}"
+        echo -e "  - GNOME Scale Factor:    ${wine}${g_scale:-Unknown}${reset}"
+        echo -e "  - Mutter XWayland Scale: ${wine}${g_mutter:-Unknown}${reset}"
     fi
-    echo "=========================================================="
+    echo -e "${gray}================================================================${reset}"
     echo ""
 }
 
@@ -349,12 +363,16 @@ import_keycommands() {
 }
 
 manage_keycommands() {
+    local wine="\033[38;5;125m"
+    local reset="\033[0m"
+    local blue="\033[38;5;110m"
+
     while true; do
-        echo "=== Manage Dorico Key Commands ==="
+        echo -e "${blue}=== Manage Dorico Key Commands ===${reset}"
         echo ""
-        echo " 1) Export Key Commands (Backup to Zip)"
-        echo " 2) Import Key Commands (Restore from Backup)"
-        echo " 3) [Back to main menu]"
+        echo -e "  ${wine}1)${reset} Export Key Commands (Backup to Zip)"
+        echo -e "  ${wine}2)${reset} Import Key Commands (Restore from Backup)"
+        echo -e "  ${wine}3)${reset} [Back to main menu]"
         echo ""
         read -p "Select an option (1-3): " opt_kc
         case "$opt_kc" in
@@ -408,18 +426,22 @@ run_custom_exe() {
 }
 
 manage_wine() {
+    local wine="\033[38;5;125m"
+    local reset="\033[0m"
+    local blue="\033[38;5;110m"
+
     while true; do
-        echo "=== Wine Tools & Maintenance ==="
+        echo -e "${blue}=== Wine Tools & Maintenance ===${reset}"
         echo ""
-        echo " 1) Run Wine Configuration (winecfg)"
-        echo " 2) Run Registry Editor (regedit)"
-        echo " 3) Run Control Panel (control)"
-        echo " 4) Run File Manager (explorer)"
-        echo " 5) Run Command Prompt (cmd)"
-        echo " 6) Reboot Wine Prefix (wineboot -r)"
-        echo " 7) Shutdown Wine Server (wineserver -k)"
-        echo " 8) Run Custom Installer/Executable (.exe/.msi)"
-        echo " 9) [Back to main menu]"
+        echo -e "  ${wine}1)${reset} Run Wine Configuration (winecfg)"
+        echo -e "  ${wine}2)${reset} Run Registry Editor (regedit)"
+        echo -e "  ${wine}3)${reset} Run Control Panel (control)"
+        echo -e "  ${wine}4)${reset} Run File Manager (explorer)"
+        echo -e "  ${wine}5)${reset} Run Command Prompt (cmd)"
+        echo -e "  ${wine}6)${reset} Reboot Wine Prefix (wineboot -r)"
+        echo -e "  ${wine}7)${reset} Shutdown Wine Server (wineserver -k)"
+        echo -e "  ${wine}8)${reset} Run Custom Installer/Executable (.exe/.msi)"
+        echo -e "  ${wine}9)${reset} [Back to main menu]"
         echo ""
         read -p "Select an option (1-9): " opt_wine
         local ft_int=$(get_config_val "freetype_interpreter" "40")
@@ -473,16 +495,19 @@ show_menu() {
             env_active=true
         fi
         
+        local wine="\033[38;5;125m"
+        local reset="\033[0m"
+        
         if [ "$env_active" = "true" ]; then
-            echo " 1) Reinstall/Update Torquio Environment"
-            echo " 2) Uninstall/Wipe Torquio"
-            echo " 3) Status Dashboard"
-            echo " 4) Configure Graphics & Scaling"
-            echo " 5) Fix Icons & Refresh Launchers"
-            echo " 6) Map a Folder as Wine Drive"
-            echo " 7) Manage Dorico Key Commands"
-            echo " 8) Wine Tools & Maintenance"
-            echo " 9) Exit"
+            echo -e "  ${wine}1)${reset} Reinstall/Update Torquio Environment"
+            echo -e "  ${wine}2)${reset} Uninstall/Wipe Torquio"
+            echo -e "  ${wine}3)${reset} Status Dashboard"
+            echo -e "  ${wine}4)${reset} Configure Graphics & Scaling"
+            echo -e "  ${wine}5)${reset} Fix Icons & Refresh Launchers"
+            echo -e "  ${wine}6)${reset} Map a Folder as Wine Drive"
+            echo -e "  ${wine}7)${reset} Manage Dorico Key Commands"
+            echo -e "  ${wine}8)${reset} Wine Tools & Maintenance"
+            echo -e "  ${wine}9)${reset} Exit"
             echo ""
             read -p "Select an option (1-9): " choice
             echo ""
@@ -499,10 +524,10 @@ show_menu() {
                 *)  echo "Invalid option. Please choose 1-9." ;;
             esac
         else
-            echo " 1) Install Torquio Environment"
-            echo " 2) Clean/Remove Torquio"
-            echo " 3) Status Dashboard"
-            echo " 4) Exit"
+            echo -e "  ${wine}1)${reset} Install Torquio Environment"
+            echo -e "  ${wine}2)${reset} Clean/Remove Torquio"
+            echo -e "  ${wine}3)${reset} Status Dashboard"
+            echo -e "  ${wine}4)${reset} Exit"
             echo ""
             read -p "Select an option (1-4): " choice
             echo ""

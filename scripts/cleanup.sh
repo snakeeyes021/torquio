@@ -5,16 +5,25 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
 
+wine="\033[38;5;125m"
+gray="\033[38;5;244m"
+green="\033[38;5;108m"
+red="\033[38;5;167m"
+yellow="\033[38;5;179m"
+reset="\033[0m"
+
 echo ""
-echo "WARNING:"
+echo -e "${red}### W A R N I N G ###${reset}"
 echo ""
-echo "⚠️  If you have not deactivated your license(s), you will PERMANENTLY lose access!"
-echo "⚠️  If you store your Dorico projects inside the data directory, you will PERMANENTLY lose access!"
+echo -e "⚠️  ${red}If you have not already deactivated your license(s), you will PERMANENTLY lose access!${reset}"
+echo ""
+echo -e "⚠️  ${red}If you store your Dorico projects inside the data directory (as opposed to somewhere in your user folder) and have not already backed them up, you will PERMANENTLY lose access!${reset}"
+echo ""
 echo ""
 echo "This operation will permanently delete the following:"
-echo " - Distrobox container: $TORQUIO_CONTAINER_NAME"
-echo " - Data directory: $TORQUIO_DATA_DIR (includes Wine prefix)"
-echo " - Cache directory: $TORQUIO_CACHE_DIR (includes Wine source code and compilation artifacts)"
+echo -e " - Distrobox container: ${wine}$TORQUIO_CONTAINER_NAME${reset}"
+echo -e " - Data directory:      ${gray}$TORQUIO_DATA_DIR${reset} (includes Wine prefix)"
+echo -e " - Cache directory:     ${gray}$TORQUIO_CACHE_DIR${reset} (includes Wine source code and compilation artifacts)"
 echo " - Host integration scripts and .desktop files"
 echo " - Extracted desktop icons"
 echo ""
@@ -42,14 +51,14 @@ ORIG_SCALE=$(get_config_val "original_scale_factor" "")
 AUTO_SCALE=$(get_config_val "auto_scale_mutter" "false")
 if [ -n "$ORIG_SCALE" ] && [ "$AUTO_SCALE" = "true" ]; then
     echo ""
-    echo "Torquio detected that host display scaling was modified from $ORIG_SCALE to 1.0."
+    echo -e "Torquio detected that host display scaling was modified from ${wine}$ORIG_SCALE${reset} to ${wine}1.0${reset}."
     read -p "Would you like to restore your host display scale to $ORIG_SCALE? [Y/n]: " restore_confirm
     if [[ ! "$restore_confirm" =~ ^[Nn]$ ]]; then
         if command -v gsettings >/dev/null 2>&1; then
             gsettings set org.gnome.mutter xwayland-scaling-factor "$ORIG_SCALE" 2>/dev/null || true
-            echo "✅ Host display scale restored to $ORIG_SCALE."
+            echo -e "  [${green}SUCCESS${reset}] Host display scale restored to $ORIG_SCALE."
         else
-            echo "Warning: gsettings not found. Manual scale restore required."
+            echo -e "  [${yellow}WARNING${reset}] gsettings not found. Manual scale restore required."
         fi
     fi
 fi
@@ -91,4 +100,4 @@ if command -v gtk-update-icon-cache >/dev/null 2>&1; then
     gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor/" || true
 fi
 
-echo "Cleanup complete! The Torquio environment has been wiped."
+echo -e "${green}Cleanup complete! The Torquio environment has been wiped.${reset}"

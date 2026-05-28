@@ -12,33 +12,40 @@ if [[ "$1" == "-y" ]] || [[ "$1" == "--yes" ]]; then
     AUTO_ACCEPT=true
 fi
 
-echo "==========================================="
-echo "   Torquio: Steinberg on Linux Installer   "
-echo "==========================================="
+wine="\033[38;5;125m"
+gray="\033[38;5;244m"
+green="\033[38;5;108m"
+red="\033[38;5;167m"
+yellow="\033[38;5;179m"
+reset="\033[0m"
+
+echo -e "${gray}===========================================${reset}"
+echo -e "   ${wine}Torquio: Steinberg on Linux Installer${reset}   "
+echo -e "${gray}===========================================${reset}"
 echo ""
 
 # 1. Prerequisite Checks
 echo "Checking prerequisites..."
 if ! command -v distrobox >/dev/null 2>&1; then
-    echo "Error: distrobox is not installed."
+    echo -e "${red}Error: distrobox is not installed.${reset}"
     echo "Please install distrobox and either docker or podman."
     exit 1
 fi
 
 # Check for docker or podman
 if ! command -v docker >/dev/null 2>&1 && ! command -v podman >/dev/null 2>&1; then
-    echo "Error: Neither docker nor podman was found."
+    echo -e "${red}Error: Neither docker nor podman was found.${reset}"
     echo "Please install one of them to use with distrobox."
     exit 1
 fi
 
 # 2. Scaling Setup Pre-Installation Prompts
-echo "=== Display Scaling Setup ==="
+echo -e "${wine}=== Display Scaling Setup ===${reset}"
 if [ "$AUTO_ACCEPT" = true ]; then
     set_config_val "auto_scale_mutter" "false"
     set_config_val "auto_dpi_detect" "true"
     set_config_val "manual_dpi" "96"
-    echo "Using default: auto_scale_mutter=false, auto_dpi_detect=true"
+    echo -e "Using default: auto_scale_mutter=${wine}false${reset}, auto_dpi_detect=${wine}true${reset}"
 else
     echo "Torquio can automatically manage host display scaling and Wine DPI settings to"
     echo "ensure that Dorico and other applications render correctly on High-DPI screens."
@@ -48,15 +55,15 @@ else
         set_config_val "auto_scale_mutter" "true"
         set_config_val "auto_dpi_detect" "true"
         set_config_val "manual_dpi" "96"
-        echo "✅ Automatic display scaling and DPI management enabled."
+        echo -e "  [${green}ENABLED${reset}] Automatic display scaling and DPI management enabled."
     else
         set_config_val "auto_scale_mutter" "false"
         set_config_val "auto_dpi_detect" "false"
         set_config_val "manual_dpi" "96"
-        echo "❌ Automatic display scaling disabled. Standard 96 DPI will be used."
+        echo -e "  [${red}DISABLED${reset}] Automatic display scaling disabled. Standard 96 DPI will be used."
     fi
 fi
-echo "============================="
+echo -e "${wine}=============================${reset}"
 echo ""
 
 # 3. Asset Validation
@@ -71,33 +78,33 @@ FOUND_NP=$(find "${SEARCH_DIRS[@]}" -maxdepth 1 -type f -name "NotePerformer-Ins
 
 MISSING_MANDATORY=false
 if [ -z "$FOUND_MEDIABAY" ]; then
-    echo "❌ Missing Mandatory: MediaBay_Installer_win64.zip"
+    echo -e "  [${red}MISSING${reset}] Mandatory: MediaBay_Installer_win64.zip"
     MISSING_MANDATORY=true
 fi
 if [ -z "$FOUND_SDA" ]; then
-    echo "❌ Missing Mandatory: Steinberg_Download_Assistant_*_Installer_win.exe"
+    echo -e "  [${red}MISSING${reset}] Mandatory: Steinberg_Download_Assistant_*_Installer_win.exe"
     MISSING_MANDATORY=true
 fi
 
 if [ "$MISSING_MANDATORY" = true ]; then
     echo ""
-    echo "Error: Mandatory installers were not found."
+    echo -e "${red}Error: Mandatory installers were not found.${reset}"
     echo "Please place them in $TORQUIO_INSTALLERS_DIR or ~/Downloads and run this script again."
     exit 1
 fi
 
 echo ""
-echo "--- Installation Manifest ---"
-echo "✅ Steinberg MediaBay:           Found ($(basename "$FOUND_MEDIABAY"))"
-echo "✅ Steinberg Download Assistant: Found ($(basename "$FOUND_SDA"))"
+echo -e "${gray}--- Installation Manifest ---${reset}"
+echo -e "  [${green}FOUND${reset}] Steinberg MediaBay:           ($(basename "$FOUND_MEDIABAY"))"
+echo -e "  [${green}FOUND${reset}] Steinberg Download Assistant: ($(basename "$FOUND_SDA"))"
 if [ -n "$FOUND_NP" ]; then
     # Redact the personal user hash from the NotePerformer filename for privacy
     NP_CLEAN_NAME=$(basename "$FOUND_NP" | sed -E 's/(NotePerformer-Installer-[0-9\.]+).*\.exe/\1-[REDACTED].exe/')
-    echo "✅ NotePerformer (3rd Party):    Found ($NP_CLEAN_NAME)"
+    echo -e "  [${green}FOUND${reset}] NotePerformer (3rd Party):    ($NP_CLEAN_NAME)"
 else
-    echo "⚠️ NotePerformer (3rd Party):    Not Found (Skipping)"
+    echo -e "  [${yellow}SKIP${reset}]  NotePerformer (3rd Party):    Not Found (Skipping)"
 fi
-echo "-----------------------------"
+echo -e "${gray}-----------------------------${reset}"
 echo ""
 
 if [ "$AUTO_ACCEPT" = false ]; then
