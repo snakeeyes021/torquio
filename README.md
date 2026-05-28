@@ -112,6 +112,13 @@ torquio/
     └── 3-runtime_handlers/   # Wrappers to launch the apps and handle web-logins
 ```
 
+## Alpha Status
+
+> [!NOTICE]
+> **Torquio is currently in an ALPHA state.** It is experimental software under active development. Standard features may change, break, or be removed without prior notice.
+>
+> **Use Torquio entirely at your own risk.** It is highly recommended to perform backups of any critical system configurations, files, or Steinberg project data before initializing or running this utility and especially if uninstalling/removing it.
+
 ## Legal & Disclaimer
 
 Torquio is an independent, community-driven open-source project. It is not affiliated, associated, authorized, endorsed by, or in any way officially connected with **Steinberg Media Technologies GmbH**, **Yamaha Corporation**, or any of their subsidiaries or affiliates.

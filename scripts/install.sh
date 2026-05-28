@@ -20,7 +20,7 @@ yellow="\033[38;5;179m"
 reset="\033[0m"
 
 echo -e "${gray}===========================================${reset}"
-echo -e "   ${wine}Torquio: Steinberg on Linux Installer${reset}   "
+echo -e "   ${wine}Torquio: Dorico on Linux Installer${reset}   "
 echo -e "${gray}===========================================${reset}"
 echo ""
 
@@ -110,7 +110,7 @@ echo ""
 if [ "$AUTO_ACCEPT" = false ]; then
     read -p "Proceed with the installation? [Y/n]: " confirm
     if [[ "$confirm" =~ ^[Nn]$ ]]; then
-        echo "Installation cancelled."
+        echo -e "${red}Installation cancelled.${reset}"
         exit 0
     fi
 fi
