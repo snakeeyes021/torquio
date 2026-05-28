@@ -38,6 +38,81 @@ json.dump(d, open(f, 'w'), indent=4)
 " 2>/dev/null || true
 }
 
+# --- System Clock Verification & Safeguard ---
+check_system_clock() {
+    (
+        set +e
+        local is_desynced=false
+        if [ "$TORQUIO_TEST_CLOCK_DESYNC" = "true" ]; then
+            is_desynced=true
+        else
+            if ! python3 -c "
+import urllib.request, time, datetime, sys
+try:
+    req = urllib.request.Request('https://www.google.com', method='HEAD')
+    with urllib.request.urlopen(req, timeout=3) as response:
+        srv_date_str = response.headers.get('Date')
+    if srv_date_str:
+        srv_time = time.strptime(srv_date_str, '%a, %d %b %Y %H:%M:%S GMT')
+        srv_dt = datetime.datetime(*srv_time[:6], tzinfo=datetime.timezone.utc)
+        local_dt = datetime.datetime.now(datetime.timezone.utc)
+        diff = abs((srv_dt - local_dt).total_seconds())
+        if diff > 180:
+            sys.exit(1)
+except Exception:
+    pass
+sys.exit(0)
+" 2>/dev/null; then
+                is_desynced=true
+            fi
+        fi
+
+        if [ "$is_desynced" = "true" ]; then
+            # Clock is out of sync!
+            local current_de=$(echo "$XDG_CURRENT_DESKTOP" | tr '[:upper:]' '[:lower:]')
+            if [ "$TORQUIO_FORCE_TERMINAL" = "true" ]; then
+                current_de="other"
+            fi
+            
+            if [[ "$current_de" =~ gnome || "$current_de" =~ kde || "$current_de" =~ unity || "$current_de" =~ plasma ]]; then
+                # Show native graphical dialog on GNOME/KDE
+                local msg="WARNING: Your system clock is out of sync!\n\nThis is highly likely to cause Steinberg Activation Manager (SAM) licensing errors and deactivations.\n\nPlease synchronize your system clock to prevent licensing issues."
+                if [[ "$current_de" =~ kde || "$current_de" =~ plasma ]] && command -v kdialog >/dev/null 2>&1; then
+                    kdialog --warningcontinuecancel "$msg" --title="Torquio Time Sync Warning" 2>/dev/null &
+                elif command -v zenity >/dev/null 2>&1; then
+                    zenity --warning --text="$msg" --title="Torquio Time Sync Warning" --width=400 2>/dev/null &
+                fi
+            else
+                # Fallback: Launch Torquio in a terminal window for other DEs
+                local cmd="$HOME/.local/bin/torquio"
+                if command -v xdg-terminal-exec >/dev/null 2>&1; then
+                    xdg-terminal-exec -- "$cmd"
+                elif command -v gnome-terminal >/dev/null 2>&1; then
+                    gnome-terminal -- "$cmd"
+                elif command -v ptyxis >/dev/null 2>&1; then
+                    ptyxis -- "$cmd"
+                elif command -v tilix >/dev/null 2>&1; then
+                    tilix -e "$cmd"
+                elif command -v konsole >/dev/null 2>&1; then
+                    konsole -e "$cmd"
+                elif command -v xfce4-terminal >/dev/null 2>&1; then
+                    xfce4-terminal -e "$cmd"
+                elif command -v alacritty >/dev/null 2>&1; then
+                    alacritty -e "$cmd"
+                elif command -v kitty >/dev/null 2>&1; then
+                    kitty "$cmd"
+                elif command -v xterm >/dev/null 2>&1; then
+                    xterm -e "$cmd"
+                fi
+            fi
+        fi
+        exit 0
+    ) &
+}
+
+# Run the system clock check asynchronously
+check_system_clock
+
 # --- Host Scale & DPI Management ---
 AUTO_SCALE_MUTTER=$(get_config_val "auto_scale_mutter" "false")
 AUTO_DPI_DETECT=$(get_config_val "auto_dpi_detect" "true")
