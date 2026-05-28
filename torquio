@@ -84,6 +84,55 @@ json.dump(d, open(f, 'w'), indent=4)
 " 2>/dev/null || true
 }
 
+apply_graphics_settings() {
+    # Check if container is created and prefix is initialized first
+    if ! distrobox list 2>/dev/null | grep -q "$TORQUIO_CONTAINER_NAME" || [ ! -d "$TORQUIO_PREFIX_DIR" ]; then
+        return
+    fi
+
+    echo "Applying graphics settings to Wine prefix..."
+    
+    local auto_dpi=$(get_config_val "auto_dpi_detect" "true")
+    local manual_dpi=$(get_config_val "manual_dpi" "96")
+    local ft_int=$(get_config_val "freetype_interpreter" "40")
+    local dpi_to_set="$manual_dpi"
+
+    if [ "$auto_dpi" = "true" ]; then
+        local host_scale=1
+        if command -v gsettings >/dev/null 2>&1; then
+            local g_scale=$(gsettings get org.gnome.desktop.interface scaling-factor 2>/dev/null | awk '{print $2}')
+            if [ -n "$g_scale" ] && [ "$g_scale" -gt 0 ]; then
+                host_scale="$g_scale"
+            fi
+        fi
+        if [ "$host_scale" = "1" ] && command -v gsettings >/dev/null 2>&1; then
+            local text_scale=$(gsettings get org.gnome.desktop.interface text-scaling-factor 2>/dev/null | awk '{print $2}')
+            if [ -n "$text_scale" ] && (( $(echo "$text_scale > 1.0" | bc -l 2>/dev/null || echo "0") )); then
+                host_scale=$(echo "$host_scale * $text_scale" | bc -l 2>/dev/null)
+            fi
+        fi
+        if [ "$host_scale" = "1" ] && command -v xrdb >/dev/null 2>&1; then
+            local xrdb_dpi=$(xrdb -query 2>/dev/null | grep -i Xft.dpi | awk '{print $2}')
+            if [ -n "$xrdb_dpi" ]; then
+                host_scale=$(echo "scale=2; $xrdb_dpi / 96" | bc -l 2>/dev/null)
+            fi
+        fi
+        
+        dpi_to_set=$(echo "$host_scale * 96" | bc -l 2>/dev/null | awk '{print int($1 + 0.5)}')
+        if [ -z "$dpi_to_set" ] || [ "$dpi_to_set" -lt 96 ]; then
+            dpi_to_set=96
+        fi
+    fi
+
+    # Write registry value inside container
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$ft_int\"; wine reg add \"HKCU\\Control Panel\\Desktop\" /v LogPixels /t REG_DWORD /d $dpi_to_set /f" >/dev/null 2>&1 || true
+
+    # Kill wine server to apply changes immediately
+    echo "Restarting Wine server to load changes..."
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wineserver -k" >/dev/null 2>&1 || true
+    echo "Graphics settings successfully applied."
+}
+
 configure_graphics() {
     local wine="\033[38;5;125m"
     local reset="\033[0m"
@@ -112,6 +161,7 @@ configure_graphics() {
                 set_config_val "auto_scale_mutter" "true"
             fi
             echo "Toggle applied!"
+            apply_graphics_settings
             configure_graphics
             ;;
         2)
@@ -121,6 +171,7 @@ configure_graphics() {
                 set_config_val "auto_dpi_detect" "true"
             fi
             echo "Toggle applied!"
+            apply_graphics_settings
             configure_graphics
             ;;
         3)
@@ -128,6 +179,7 @@ configure_graphics() {
             if [[ "$new_dpi" =~ ^[0-9]+$ ]]; then
                 set_config_val "manual_dpi" "$new_dpi"
                 echo "Manual DPI updated to $new_dpi!"
+                apply_graphics_settings
             else
                 echo "Invalid input. DPI must be an integer."
             fi
@@ -144,10 +196,12 @@ configure_graphics() {
                 1)
                     set_config_val "freetype_interpreter" "40"
                     echo "FreeType Hinting Interpreter set to v40!"
+                    apply_graphics_settings
                     ;;
                 2)
                     set_config_val "freetype_interpreter" "35"
                     echo "FreeType Hinting Interpreter set to v35!"
+                    apply_graphics_settings
                     ;;
                 *)
                     echo "Invalid selection. No changes made."
