@@ -190,8 +190,9 @@ configure_graphics() {
             echo -e "${blue}=== FreeType Hinting Interpreter Selection ===${reset}"
             echo -e "  ${wine}1)${reset} v40 (Thicker/bolder, but some fonts can look smudgey) [Default]"
             echo -e "  ${wine}2)${reset} v35 (Thinner/crisper, but some fonts can look anemic)"
+            echo -e "  ${wine}3)${reset} [Back to graphics menu]"
             echo ""
-            read -p "Select interpreter style (1-2): " choice_int
+            read -p "Select interpreter style (1-3): " choice_int
             case "$choice_int" in
                 1)
                     set_config_val "freetype_interpreter" "40"
@@ -202,6 +203,9 @@ configure_graphics() {
                     set_config_val "freetype_interpreter" "35"
                     echo "FreeType Hinting Interpreter set to v35!"
                     apply_graphics_settings
+                    ;;
+                3)
+                    echo "Cancelled. No changes made."
                     ;;
                 *)
                     echo "Invalid selection. No changes made."
