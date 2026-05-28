@@ -61,7 +61,7 @@ Torquio provides a unified, friendly console utility to manage your environment.
 torquio
 ```
 
-### Premium QOL Features
+### Quality of Life Features
 
 *   **Console Dashboard**: Check the active status of your container dependencies, configuration preferences, and system details in a clean, colorized terminal screen.
 *   **High-DPI Scaling Controls**: Set Torquio to automatically manage High-DPI display scaling so that Dorico renders properly given your monitor specs and settings.
