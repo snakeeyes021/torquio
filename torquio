@@ -198,21 +198,20 @@ configure_graphics() {
                     set_config_val "freetype_interpreter" "40"
                     echo "FreeType Hinting Interpreter set to v40!"
                     apply_graphics_settings
+                    echo ""
+                    read -p "Press [Enter] to continue..." temp_int
                     ;;
                 2)
                     set_config_val "freetype_interpreter" "35"
                     echo "FreeType Hinting Interpreter set to v35!"
                     apply_graphics_settings
-                    ;;
-                3)
-                    echo "Cancelled. No changes made."
+                    echo ""
+                    read -p "Press [Enter] to continue..." temp_int
                     ;;
                 *)
-                    echo "Invalid selection. No changes made."
+                    # Return immediately when choosing back or invalid entry
                     ;;
             esac
-            echo ""
-            read -p "Press [Enter] to continue..." temp_int
             configure_graphics
             ;;
         *)
