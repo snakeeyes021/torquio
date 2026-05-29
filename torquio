@@ -175,6 +175,7 @@ configure_graphics() {
             configure_graphics
             ;;
         3)
+            echo "Standard default DPI is 96."
             read -p "Enter manual DPI value (e.g. 96, 120, 144, 192): " new_dpi
             if [[ "$new_dpi" =~ ^[0-9]+$ ]]; then
                 set_config_val "manual_dpi" "$new_dpi"
