@@ -4,6 +4,7 @@ set -e
 TORQUIO_CONTAINER_NAME="torquio-env"
 TORQUIO_PREFIX_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/torquio/prefix"
 WINE_CUSTOM_BIN="/opt/wine-custom/bin"
+export DBUS_SYSTEM_BUS_ADDRESS="unix:path=/run/host/run/dbus/system_bus_socket"
 
 get_config_val() {
     local key="$1"
@@ -174,8 +175,8 @@ URL="$1"
 
 if [ -n "$URL" ]; then
     # Launched by browser (link provided)
-    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export WINEDLLOVERRIDES=\"winemenubuilder.exe=d\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$FREETYPE_INTERP\"; cd \"$TORQUIO_PREFIX_DIR/drive_c/Program Files/Steinberg/Activation Manager\"; wine 'SteinbergActivationManager.exe' --redirect '$URL'"
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export DBUS_SYSTEM_BUS_ADDRESS=\"unix:path=/run/host/run/dbus/system_bus_socket\"; export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export WINEDLLOVERRIDES=\"winemenubuilder.exe=d\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$FREETYPE_INTERP\"; cd \"$TORQUIO_PREFIX_DIR/drive_c/Program Files/Steinberg/Activation Manager\"; wine 'SteinbergActivationManager.exe' --redirect '$URL'"
 else
     # Standard launch (no link)
-    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export WINEDLLOVERRIDES=\"winemenubuilder.exe=d\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$FREETYPE_INTERP\"; cd \"$TORQUIO_PREFIX_DIR/drive_c/Program Files/Steinberg/Activation Manager\"; wine 'SteinbergActivationManager.exe'"
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export DBUS_SYSTEM_BUS_ADDRESS=\"unix:path=/run/host/run/dbus/system_bus_socket\"; export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export WINEDLLOVERRIDES=\"winemenubuilder.exe=d\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$FREETYPE_INTERP\"; cd \"$TORQUIO_PREFIX_DIR/drive_c/Program Files/Steinberg/Activation Manager\"; wine 'SteinbergActivationManager.exe'"
 fi

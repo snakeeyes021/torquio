@@ -4,6 +4,7 @@ set -e
 TORQUIO_CONTAINER_NAME="torquio-env"
 TORQUIO_PREFIX_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/torquio/prefix"
 WINE_CUSTOM_BIN="/opt/wine-custom/bin"
+export DBUS_SYSTEM_BUS_ADDRESS="unix:path=/run/host/run/dbus/system_bus_socket"
 TORQUIO_REPO_DIR="@TORQUIO_REPO_DIR@"
 
 get_config_val() {
@@ -139,8 +140,8 @@ fi
 # Now run the actual SDA in the foreground (it will block the terminal/handler)
 if [ -n "$URL" ]; then
     # Launched by browser (link provided) - pass the URL directly without --redirect
-    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export WINEDLLOVERRIDES=\"winemenubuilder.exe=d\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$FREETYPE_INTERP\"; wine 'C:\\Program Files (x86)\\Steinberg\\Download Assistant\\Steinberg Download Assistant.exe' '$URL'"
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export DBUS_SYSTEM_BUS_ADDRESS=\"unix:path=/run/host/run/dbus/system_bus_socket\"; export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export WINEDLLOVERRIDES=\"winemenubuilder.exe=d\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$FREETYPE_INTERP\"; wine 'C:\\Program Files (x86)\\Steinberg\\Download Assistant\\Steinberg Download Assistant.exe' '$URL'"
 else
     # Standard launch (no link)
-    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export WINEDLLOVERRIDES=\"winemenubuilder.exe=d\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$FREETYPE_INTERP\"; wine 'C:\\Program Files (x86)\\Steinberg\\Download Assistant\\Steinberg Download Assistant.exe'"
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export DBUS_SYSTEM_BUS_ADDRESS=\"unix:path=/run/host/run/dbus/system_bus_socket\"; export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export WINEDLLOVERRIDES=\"winemenubuilder.exe=d\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$FREETYPE_INTERP\"; wine 'C:\\Program Files (x86)\\Steinberg\\Download Assistant\\Steinberg Download Assistant.exe'"
 fi
