@@ -296,9 +296,9 @@ map_folder() {
     if [ -z "$host_folder" ] || [ -z "$drive_letter" ]; then
         echo "=== Map Local Folder as Wine Drive ==="
         if command -v zenity >/dev/null 2>&1; then
-            host_folder=$(zenity --file-selection --directory --title="Select Folder to Map" 2>/dev/null)
+            host_folder=$(zenity --file-selection --directory --title="Select Folder to Map" 2>/dev/null) || true
         elif command -v kdialog >/dev/null 2>&1; then
-            host_folder=$(kdialog --getexistingdirectory --title="Select Folder to Map" 2>/dev/null)
+            host_folder=$(kdialog --getexistingdirectory --title="Select Folder to Map" 2>/dev/null) || true
         else
             read -p "Enter the absolute path of the local folder: " host_folder
         fi
@@ -398,9 +398,9 @@ import_keycommands() {
     
     if [ -z "$selected_backup" ]; then
         if command -v zenity >/dev/null 2>&1; then
-            selected_backup=$(zenity --file-selection --file-filter="Backup (*.zip *.json) | *.zip *.json" --title="Select Key Commands Backup File" 2>/dev/null)
+            selected_backup=$(zenity --file-selection --file-filter="Backup (*.zip *.json) | *.zip *.json" --title="Select Key Commands Backup File" 2>/dev/null) || true
         elif command -v kdialog >/dev/null 2>&1; then
-            selected_backup=$(kdialog --getopenfilename "$downloads_dir" "*.zip *.json" --title="Select Key Commands Backup File" 2>/dev/null)
+            selected_backup=$(kdialog --getopenfilename "$downloads_dir" "*.zip *.json" --title="Select Key Commands Backup File" 2>/dev/null) || true
         else
             read -p "Enter path to key commands backup file (.zip or .json): " selected_backup
         fi
@@ -456,9 +456,9 @@ run_custom_exe() {
     
     if [ -z "$selected_exe" ]; then
         if command -v zenity >/dev/null 2>&1; then
-            selected_exe=$(zenity --file-selection --file-filter="Executables (*.exe *.msi) | *.exe *.msi" --title="Select Executable to Run" 2>/dev/null)
+            selected_exe=$(zenity --file-selection --file-filter="Executables (*.exe *.msi) | *.exe *.msi" --title="Select Executable to Run" 2>/dev/null) || true
         elif command -v kdialog >/dev/null 2>&1; then
-            selected_exe=$(kdialog --getopenfilename "$HOME" "*.exe *.msi" --title="Select Executable to Run" 2>/dev/null)
+            selected_exe=$(kdialog --getopenfilename "$HOME" "*.exe *.msi" --title="Select Executable to Run" 2>/dev/null) || true
         else
             read -p "Enter the absolute path to the .exe or .msi file: " selected_exe
         fi
