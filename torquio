@@ -126,6 +126,7 @@ apply_graphics_settings() {
 
     # Write registry value inside container
     distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$ft_int\"; wine reg add \"HKCU\\Control Panel\\Desktop\" /v LogPixels /t REG_DWORD /d $dpi_to_set /f" >/dev/null 2>&1 || true
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine reg add \"HKCU\\Software\\Wine\\X11 Driver\" /v FocusOnClick /t REG_SZ /d Y /f && wine reg add \"HKCU\\Software\\Wine\\X11 Driver\" /v UseTakeFocus /t REG_SZ /d N /f" >/dev/null 2>&1 || true
 
     # Kill wine server to apply changes immediately
     echo "Restarting Wine server to load changes..."

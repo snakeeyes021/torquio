@@ -26,6 +26,7 @@ winetricks -q d3dx9 msls31 allfonts d3dcompiler_43 d3dcompiler_47 vcrun2019 dotn
 echo "Configuring Keyboard Focus Loss Mitigation & Accessibility Registry Overrides..."
 # FocusOnClick forces window focus acquisition upon mouse click, preventing focus loss in modals
 wine reg add "HKCU\\Software\\Wine\\X11 Driver" /v FocusOnClick /t REG_SZ /d Y /f
+wine reg add "HKCU\\Software\\Wine\\X11 Driver" /v UseTakeFocus /t REG_SZ /d N /f
 
 # Force client-side font anti-aliasing and XRender overrides in Wine X11 Driver
 wine reg add "HKCU\\Software\\Wine\\X11 Driver" /v ClientSideWithRender /t REG_SZ /d Y /f
