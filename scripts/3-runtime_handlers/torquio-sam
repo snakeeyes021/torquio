@@ -173,10 +173,37 @@ distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c 'xset r rate 500 30 && for 
 
 URL="$1"
 
-if [ -n "$URL" ]; then
-    # Launched by browser (link provided)
-    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export DBUS_SYSTEM_BUS_ADDRESS=\"unix:path=/run/host/run/dbus/system_bus_socket\"; export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export WINEDLLOVERRIDES=\"winemenubuilder.exe=d\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$FREETYPE_INTERP\"; cd \"$TORQUIO_PREFIX_DIR/drive_c/Program Files/Steinberg/Activation Manager\"; wine 'SteinbergActivationManager.exe' --redirect '$URL'"
-else
-    # Standard launch (no link)
-    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export DBUS_SYSTEM_BUS_ADDRESS=\"unix:path=/run/host/run/dbus/system_bus_socket\"; export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export WINEDLLOVERRIDES=\"winemenubuilder.exe=d\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$FREETYPE_INTERP\"; cd \"$TORQUIO_PREFIX_DIR/drive_c/Program Files/Steinberg/Activation Manager\"; wine 'SteinbergActivationManager.exe'"
+# --- Dynamic Runner Script Generation (Space & Quoting Safeguard) ---
+RUNNER_SCRIPT="$HOME/.local/share/torquio/run-sam.sh"
+mkdir -p "$(dirname "$RUNNER_SCRIPT")"
+cat << EOF > "$RUNNER_SCRIPT"
+#!/bin/bash
+export DBUS_SYSTEM_BUS_ADDRESS="unix:path=/run/host/run/dbus/system_bus_socket"
+export WINEPREFIX="$TORQUIO_PREFIX_DIR"
+export WINEDLLOVERRIDES="winemenubuilder.exe=d"
+export PATH="$WINE_CUSTOM_BIN:\$PATH"
+export FREETYPE_PROPERTIES="truetype:interpreter-version=$FREETYPE_INTERP"
+
+URL_FILE="\$HOME/.local/share/torquio/sam_url.txt"
+URL=""
+if [ -f "\$URL_FILE" ]; then
+    URL=\$(cat "\$URL_FILE")
+    rm -f "\$URL_FILE"
 fi
+
+cd "\$WINEPREFIX/drive_c/Program Files/Steinberg/Activation Manager"
+if [ -n "\$URL" ]; then
+    wine 'SteinbergActivationManager.exe' --redirect "\$URL"
+else
+    wine 'SteinbergActivationManager.exe'
+fi
+EOF
+chmod +x "$RUNNER_SCRIPT"
+
+if [ -n "$URL" ]; then
+    echo "$URL" > "$HOME/.local/share/torquio/sam_url.txt"
+else
+    rm -f "$HOME/.local/share/torquio/sam_url.txt"
+fi
+
+distrobox enter "$TORQUIO_CONTAINER_NAME" -- "$RUNNER_SCRIPT"

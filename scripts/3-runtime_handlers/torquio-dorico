@@ -97,10 +97,40 @@ distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQU
 # Surgically disable auto-repeat for character inputs (prone to runaway loops) while keeping it active for navigation/editing (arrows, backspace, delete)
 distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c 'xset r rate 500 30 && for keycode in {10..19} 23 {24..33} 36 {38..48} {52..61} 65; do xset -r $keycode; done' >/dev/null 2>&1 || true
 
-# --- File Launch Translation & Execution ---
+# --- Dynamic Runner Script Generation (Space & Quoting Safeguard) ---
+RUNNER_SCRIPT="$HOME/.local/share/torquio/run-dorico.sh"
+mkdir -p "$(dirname "$RUNNER_SCRIPT")"
+cat << EOF > "$RUNNER_SCRIPT"
+#!/bin/bash
+export DBUS_SYSTEM_BUS_ADDRESS="unix:path=/run/host/run/dbus/system_bus_socket"
+export WINEPREFIX="$TORQUIO_PREFIX_DIR"
+export WINEDLLOVERRIDES="winemenubuilder.exe=d"
+export PATH="$WINE_CUSTOM_BIN:\$PATH"
+export FREETYPE_PROPERTIES="truetype:interpreter-version=$FREETYPE_INTERP"
+
+LAUNCH_PATH_FILE="\$HOME/.local/share/torquio/launch_path.txt"
 WIN_PATH=""
-if [ -n "$1" ]; then
-    WIN_PATH=$(distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export DBUS_SYSTEM_BUS_ADDRESS=\"unix:path=/run/host/run/dbus/system_bus_socket\"; export WINEDEBUG=-all; export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; winepath -w \"$1\"" | tr -d '\r')
+if [ -f "\$LAUNCH_PATH_FILE" ]; then
+    HOST_PATH=\$(cat "\$LAUNCH_PATH_FILE")
+    rm -f "\$LAUNCH_PATH_FILE"
+    if [ -n "\$HOST_PATH" ]; then
+        WIN_PATH=\$(export WINEDEBUG=-all; winepath -w "\$HOST_PATH" | tr -d '\r')
+    fi
 fi
 
-distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export DBUS_SYSTEM_BUS_ADDRESS=\"unix:path=/run/host/run/dbus/system_bus_socket\"; export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export WINEDLLOVERRIDES=\"winemenubuilder.exe=d\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$FREETYPE_INTERP\"; cd \"$TORQUIO_PREFIX_DIR/drive_c/Program Files/Steinberg/Dorico6\"; if [ -n \"\$1\" ]; then wine 'Dorico6.exe' \"\$1\"; else wine 'Dorico6.exe'; fi" _ "$WIN_PATH"
+cd "\$WINEPREFIX/drive_c/Program Files/Steinberg/Dorico6"
+if [ -n "\$WIN_PATH" ]; then
+    wine 'Dorico6.exe' "\$WIN_PATH"
+else
+    wine 'Dorico6.exe'
+fi
+EOF
+chmod +x "$RUNNER_SCRIPT"
+
+if [ -n "$1" ]; then
+    echo "$1" > "$HOME/.local/share/torquio/launch_path.txt"
+else
+    rm -f "$HOME/.local/share/torquio/launch_path.txt"
+fi
+
+distrobox enter "$TORQUIO_CONTAINER_NAME" -- "$RUNNER_SCRIPT"

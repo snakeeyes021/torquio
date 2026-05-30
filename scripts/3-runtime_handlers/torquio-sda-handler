@@ -137,11 +137,36 @@ if [ ! -f "$ICON_FILE" ]; then
     ) > "$HOME/.local/share/torquio/sda_watcher.log" 2>&1 &
 fi
 
-# Now run the actual SDA in the foreground (it will block the terminal/handler)
-if [ -n "$URL" ]; then
-    # Launched by browser (link provided) - pass the URL directly without --redirect
-    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export DBUS_SYSTEM_BUS_ADDRESS=\"unix:path=/run/host/run/dbus/system_bus_socket\"; export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export WINEDLLOVERRIDES=\"winemenubuilder.exe=d\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$FREETYPE_INTERP\"; wine 'C:\\Program Files (x86)\\Steinberg\\Download Assistant\\Steinberg Download Assistant.exe' '$URL'"
-else
-    # Standard launch (no link)
-    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export DBUS_SYSTEM_BUS_ADDRESS=\"unix:path=/run/host/run/dbus/system_bus_socket\"; export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export WINEDLLOVERRIDES=\"winemenubuilder.exe=d\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$FREETYPE_INTERP\"; wine 'C:\\Program Files (x86)\\Steinberg\\Download Assistant\\Steinberg Download Assistant.exe'"
+# --- Dynamic Runner Script Generation (Space & Quoting Safeguard) ---
+RUNNER_SCRIPT="$HOME/.local/share/torquio/run-sda.sh"
+mkdir -p "$(dirname "$RUNNER_SCRIPT")"
+cat << EOF > "$RUNNER_SCRIPT"
+#!/bin/bash
+export DBUS_SYSTEM_BUS_ADDRESS="unix:path=/run/host/run/dbus/system_bus_socket"
+export WINEPREFIX="$TORQUIO_PREFIX_DIR"
+export WINEDLLOVERRIDES="winemenubuilder.exe=d"
+export PATH="$WINE_CUSTOM_BIN:\$PATH"
+export FREETYPE_PROPERTIES="truetype:interpreter-version=$FREETYPE_INTERP"
+
+URL_FILE="\$HOME/.local/share/torquio/sda_url.txt"
+URL=""
+if [ -f "\$URL_FILE" ]; then
+    URL=\$(cat "\$URL_FILE")
+    rm -f "\$URL_FILE"
 fi
+
+if [ -n "\$URL" ]; then
+    wine 'C:\Program Files (x86)\Steinberg\Download Assistant\Steinberg Download Assistant.exe' "\$URL"
+else
+    wine 'C:\Program Files (x86)\Steinberg\Download Assistant\Steinberg Download Assistant.exe'
+fi
+EOF
+chmod +x "$RUNNER_SCRIPT"
+
+if [ -n "$URL" ]; then
+    echo "$URL" > "$HOME/.local/share/torquio/sda_url.txt"
+else
+    rm -f "$HOME/.local/share/torquio/sda_url.txt"
+fi
+
+distrobox enter "$TORQUIO_CONTAINER_NAME" -- "$RUNNER_SCRIPT"
