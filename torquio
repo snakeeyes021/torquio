@@ -85,42 +85,22 @@ json.dump(d, open(f, 'w'), indent=4)
 }
 
 apply_graphics_settings() {
-    # Check if container is created and prefix is initialized first
     if ! distrobox list 2>/dev/null | grep -q "$TORQUIO_CONTAINER_NAME" || [ ! -d "$TORQUIO_PREFIX_DIR" ]; then
         return
     fi
 
     echo "Applying graphics settings to Wine prefix..."
     
-    local auto_dpi=$(get_config_val "auto_dpi_detect" "true")
+    local manage_graphics=$(get_config_val "manage_graphics" "false")
     local manual_dpi=$(get_config_val "manual_dpi" "96")
     local ft_int=$(get_config_val "freetype_interpreter" "40")
     local dpi_to_set="$manual_dpi"
 
-    if [ "$auto_dpi" = "true" ]; then
-        local host_scale=1
-        if command -v gsettings >/dev/null 2>&1; then
-            local g_scale=$(gsettings get org.gnome.desktop.interface scaling-factor 2>/dev/null | awk '{print $2}')
-            if [ -n "$g_scale" ] && [ "$g_scale" -gt 0 ]; then
-                host_scale="$g_scale"
-            fi
-        fi
-        if [ "$host_scale" = "1" ] && command -v gsettings >/dev/null 2>&1; then
-            local text_scale=$(gsettings get org.gnome.desktop.interface text-scaling-factor 2>/dev/null | awk '{print $2}')
-            if [ -n "$text_scale" ] && (( $(echo "$text_scale > 1.0" | bc -l 2>/dev/null || echo "0") )); then
-                host_scale=$(echo "$host_scale * $text_scale" | bc -l 2>/dev/null)
-            fi
-        fi
-        if [ "$host_scale" = "1" ] && command -v xrdb >/dev/null 2>&1; then
-            local xrdb_dpi=$(xrdb -query 2>/dev/null | grep -i Xft.dpi | awk '{print $2}')
-            if [ -n "$xrdb_dpi" ]; then
-                host_scale=$(echo "scale=2; $xrdb_dpi / 96" | bc -l 2>/dev/null)
-            fi
-        fi
-        
-        dpi_to_set=$(echo "$host_scale * 96" | bc -l 2>/dev/null | awk '{print int($1 + 0.5)}')
-        if [ -z "$dpi_to_set" ] || [ "$dpi_to_set" -lt 96 ]; then
-            dpi_to_set=96
+    if [ "$manage_graphics" = "true" ]; then
+        local graphics_json=$(python3 "$SCRIPT_DIR/scripts/3-runtime_handlers/torquio_graphics.py")
+        local target_dpi=$(echo "$graphics_json" | grep -o '"target_wine_dpi": [0-9]*' | cut -d' ' -f2)
+        if [ -n "$target_dpi" ] && [ "$target_dpi" -gt 0 ]; then
+            dpi_to_set="$target_dpi"
         fi
     fi
 
@@ -138,44 +118,52 @@ configure_graphics() {
     local wine="\033[38;5;125m"
     local reset="\033[0m"
     local blue="\033[38;5;110m"
+    local dark_gray="\033[38;5;240m"
 
     echo -e "${blue}=== Torquio Graphics & Scaling Configuration ===${reset}"
     echo ""
-    local cur_auto_scale=$(get_config_val "auto_scale_mutter" "false")
-    local cur_auto_dpi=$(get_config_val "auto_dpi_detect" "true")
+    local cur_manage=$(get_config_val "manage_graphics" "false")
     local cur_manual_dpi=$(get_config_val "manual_dpi" "96")
     local cur_interpreter=$(get_config_val "freetype_interpreter" "40")
     
     echo "Current settings:"
-    echo -e "  ${wine}1)${reset} Auto-Scale XWayland (auto_scale_mutter): $cur_auto_scale"
-    echo -e "  ${wine}2)${reset} Auto-DPI Detection (auto_dpi_detect):    $cur_auto_dpi"
-    echo -e "  ${wine}3)${reset} Manual DPI Fallback (manual_dpi):        $cur_manual_dpi"
-    echo -e "  ${wine}4)${reset} FreeType Hinting Interpreter (v35/v40):  v$cur_interpreter"
-    echo -e "  ${wine}5)${reset} [Back to main menu]"
+    echo -e "  ${wine}1)${reset} Auto Manage Graphics (manage_graphics):  $cur_manage"
+    echo -e "  ${wine}2)${reset} Manual DPI Fallback (manual_dpi):        $cur_manual_dpi"
+    echo -e "  ${wine}3)${reset} FreeType Hinting Interpreter (v35/v40):  v$cur_interpreter"
+    echo -e "  ${wine}4)${reset} [Back to main menu]"
     echo ""
-    read -p "Select an option to toggle/change (1-5): " opt
+    
+    # Live check support
+    local graphics_json=$(python3 "$SCRIPT_DIR/scripts/3-runtime_handlers/torquio_graphics.py")
+    local supported=$(echo "$graphics_json" | grep -o '"supported": true')
+    if [ -z "$supported" ]; then
+        local de=$(echo "$graphics_json" | grep -o '"de": "[^"]*' | cut -d'"' -f4)
+        echo -e "${dark_gray}Notice: Your Desktop Environment ($de) is not supported for Auto Mode.${reset}"
+        echo -e "${dark_gray}You must remain in Manual Mode and set your system scaling manually.${reset}"
+        echo ""
+    fi
+
+    read -p "Select an option to toggle/change (1-4): " opt
     case "$opt" in
         1)
-            if [ "$cur_auto_scale" = "true" ]; then
-                set_config_val "auto_scale_mutter" "false"
-            else
-                set_config_val "auto_scale_mutter" "true"
+            if [ -z "$supported" ]; then
+                echo "Automated XWayland Management is not supported on your Desktop Environment (missing programmatic API). Please remain in Manual Mode and configure your display scaling via your System Settings."
+                echo ""
+                read -p "Press [Enter] to continue..." temp
+                configure_graphics
+                return
             fi
-            echo "Toggle applied!"
+            if [ "$cur_manage" = "true" ]; then
+                set_config_val "manage_graphics" "false"
+                echo "Switched to Manual Mode."
+            else
+                set_config_val "manage_graphics" "true"
+                echo "Switched to Automated Management Mode."
+            fi
             apply_graphics_settings
             configure_graphics
             ;;
         2)
-            if [ "$cur_auto_dpi" = "true" ]; then
-                set_config_val "auto_dpi_detect" "false"
-            else
-                set_config_val "auto_dpi_detect" "true"
-            fi
-            echo "Toggle applied!"
-            apply_graphics_settings
-            configure_graphics
-            ;;
-        3)
             echo "Standard default DPI is 96."
             read -p "Enter manual DPI value (e.g. 96, 120, 144, 192): " new_dpi
             if [[ "$new_dpi" =~ ^[0-9]+$ ]]; then
@@ -187,7 +175,7 @@ configure_graphics() {
             fi
             configure_graphics
             ;;
-        4)
+        3)
             echo ""
             echo -e "${blue}=== FreeType Hinting Interpreter Selection ===${reset}"
             echo -e "  ${wine}1)${reset} v40 (Thicker/bolder, but some fonts can look smudgey) [Default]"
@@ -211,7 +199,6 @@ configure_graphics() {
                     read -p "Press [Enter] to continue..." temp_int
                     ;;
                 *)
-                    # Return immediately when choosing back or invalid entry
                     ;;
             esac
             configure_graphics
@@ -263,28 +250,29 @@ show_status() {
     
     # 3. Active Preferences Profile
     echo -e "${blue}Configuration Preferences:${reset}"
-    local auto_scale=$(get_config_val "auto_scale_mutter" "false")
-    local auto_dpi=$(get_config_val "auto_dpi_detect" "true")
+    local manage_graphics=$(get_config_val "manage_graphics" "false")
     local manual_dpi=$(get_config_val "manual_dpi" "96")
     local freetype_interp=$(get_config_val "freetype_interpreter" "40")
-    local orig_scale=$(get_config_val "original_scale_factor" "Not saved")
-    echo -e "  - auto_scale_mutter:     ${wine}$auto_scale${reset}"
-    echo -e "  - auto_dpi_detect:       ${wine}$auto_dpi${reset}"
+    echo -e "  - manage_graphics:       ${wine}$manage_graphics${reset}"
     echo -e "  - manual_dpi:            ${wine}$manual_dpi${reset}"
     echo -e "  - freetype_interpreter:  ${wine}v$freetype_interp${reset}"
-    if [ "$auto_scale" = "true" ]; then
-        echo -e "  - original_scale_factor: ${wine}$orig_scale${reset}"
-    fi
     echo ""
     
-    # 4. Host Info
+    # 4. Host Info (Live Query)
     echo -e "${blue}Host System Details:${reset}"
-    echo -e "  - Desktop Environment:   ${wine}$XDG_CURRENT_DESKTOP${reset}"
-    if command -v gsettings >/dev/null 2>&1; then
-        local g_scale=$(gsettings get org.gnome.desktop.interface scaling-factor 2>/dev/null | awk '{print $2}')
-        local g_mutter=$(gsettings get org.gnome.mutter xwayland-scaling-factor 2>/dev/null | awk '{print $2}')
-        echo -e "  - GNOME Scale Factor:    ${wine}${g_scale:-Unknown}${reset}"
-        echo -e "  - Mutter XWayland Scale: ${wine}${g_mutter:-Unknown}${reset}"
+    local graphics_json=$(python3 "$SCRIPT_DIR/scripts/3-runtime_handlers/torquio_graphics.py" 2>/dev/null)
+    local de=$(echo "$graphics_json" | grep -o '"de": "[^"]*' | cut -d'"' -f4)
+    local supported=$(echo "$graphics_json" | grep -o '"supported": true')
+    local phys_dpi=$(echo "$graphics_json" | grep -o '"physical_dpi": [0-9]*' | cut -d' ' -f2)
+    local target_dpi=$(echo "$graphics_json" | grep -o '"target_wine_dpi": [0-9]*' | cut -d' ' -f2)
+    local policy=$(echo "$graphics_json" | grep -o '"ideal_xwayland_policy": "[^"]*' | cut -d'"' -f4)
+
+    echo -e "  - Desktop Environment:   ${wine}${de:-Unknown}${reset}"
+    if [ -n "$supported" ]; then
+        echo -e "  - Ideal Wine DPI:        ${wine}${target_dpi:-Unknown} (Physical: $phys_dpi)${reset}"
+        echo -e "  - Ideal XWayland Policy: ${wine}${policy:-Unknown}${reset}"
+    else
+        echo -e "  - Graphics Automation:   ${red}Unsupported DE${reset}"
     fi
     echo -e "${gray}================================================================${reset}"
     echo ""
