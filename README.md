@@ -2,7 +2,7 @@
 A unified installation framework for Dorico on Linux
 
 ## The Mission
-This project aims to simplify the process of installing Steinberg's Dorico on Linux via WINE. Steinberg software has historically been difficult to run on Linux due in large part to installer complexity, account logins/license validation, and web-to-app token handoffs. Typically, if a user could get past these pain points, the software itself would run decently. 
+This project aims to simplify the process of installing Steinberg's Dorico on Linux via WINE. Steinberg software has historically been difficult to run on Linux due in large part to installer complexity, account logins/license validation, including web-to-app token handoffs, and the like. Typically, if a user could get past these pain points, the software itself would run decently. 
 
 To that end, our goal is to provide a **reproducible, automated, and user-friendly** deployment system.
 
@@ -13,9 +13,26 @@ To that end, our goal is to provide a **reproducible, automated, and user-friend
 Before running the installer, ensure your host system has the following installed:
 
 1.  **Distrobox** (available in most standard repos) 
-    - Alternatively **Distroshelf** (a graphical frontend for managing Distrobox containers, available via Flathub)
+    - Optional addition: **Distroshelf** (a graphical frontend for managing Distrobox containers, available via Flathub)
 2.  **Docker** or **Podman**
-    - If you don't know which one to get, go with Podman. It's in the major repos and is therefore easier to install, and for most people they're functionally identical (the only people for whom the differences are material are people who already know which one they need).
+    - If you don't know which one to get, go with Podman. It's in the major repos and is therefore easier to install, and for most people they're functionally identical (the only people for whom the differences are material are people who already know which one they need).  
+
+On many immutable distros, the above are included by default, so you're good to go. That includes:
+
+* **The Universal Blue family** (Bazzite, Bluefin, Aurora, and most, if not all, custom downstream images)
+* **SteamOS**
+* **openSUSE Aeon / Kalpa**  
+
+> [!TIP]
+> On the upstream Fedora Atomic family (Silverblue, Kinoite, etc.), by default Podman is available, but Distrobox is not, in favor of Toolbox. To install Distrobox, we recommend the sudo-free install to your user's local binary folder:
+>
+>```
+>curl https://raw.githubusercontent.com/89luca89/distrobox/main/install | sh -s -- -p ~/.local/bin/
+>```
+>
+>as suggested here: [https://fedoramagazine.org/run-distrobox-on-fedora-linux/](https://fedoramagazine.org/run-distrobox-on-fedora-linux/). This is the "custom directory" install detailed on Distrobox's [installation page](https://github.com/89luca89/distrobox#installation).
+
+
 
 ## Step 1: Download Installers
 
@@ -72,6 +89,19 @@ torquio
 
 ---
 
+## Display Scaling & Performance
+
+Because Dorico runs via Wine (which currently operates on legacy X11 protocols via XWayland), high-resolution monitors can cause scaling headaches on modern Wayland desktop environments. Torquio's **Auto Graphics Mode** attempts to solve this by managing the desktop's XWayland scaling protocol (which is a global setting, so if you have other XWayland apps that you use other than games—the mode that tends to be best for Dorico is the mode that tends to be preferred by most gamers—consider sticking with manual graphics mode) as well as the WINE prefix's DPI setting. The DPI setting is calculated with the following:
+
+`Target Wine DPI = (Monitor Physical DPI) / (XWayland App Scale Factor)`
+
+> [!TIP]
+> **Performance Recommendation**
+> At 4K+ resolutions, regardless of scaling, we have noticed some performance degradation/lagginess even on decent hardware. If you experience unacceptable lag, cconsider manually bumping your system desktop resolution down to 1440p or 1080p before you launch Dorico.
+
+
+---
+
 ## Uninstallation / Clean Start
 
 If you ever need to completely wipe the Torquio environment (including the container, Wine prefix, configuration profiles, desktop integrations, and cache) to start fresh, simply run:
@@ -117,7 +147,7 @@ torquio/
 > [!WARNING]
 > **Torquio is currently in an ALPHA state.** It is experimental software under active development. Standard features may change, break, or be removed without prior notice.
 >
-> **Use Torquio entirely at your own risk.** It is highly recommended to perform backups of any critical system configurations, files, or Steinberg project data before initializing or running this utility and especially if uninstalling/removing it.
+> **Use Torquio entirely at your own risk.** It is highly recommended to perform backups of any critical system configurations, files, or Steinberg project data before using this utility and especially when uninstalling/removing it. 
 
 ## Legal & Disclaimer
 
