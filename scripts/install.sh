@@ -54,6 +54,8 @@ else
         set_config_val "manage_graphics" "true"
         set_config_val "manual_dpi" "96"
         echo -e "  [${green}ENABLED${reset}] Automatic display scaling and DPI management enabled."
+        echo "  (Torquio will back up your current display scaling settings before"
+        echo "   making any changes so they can be easily restored later.)"
     else
         set_config_val "manage_graphics" "false"
         set_config_val "manual_dpi" "96"

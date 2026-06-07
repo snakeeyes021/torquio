@@ -99,9 +99,20 @@ def query_gnome():
             "scale": scale,
             "physical_dpi": phys_dpi,
             "ideal_xwayland_policy": "N/A (X11 session)",
-            "target_wine_dpi": phys_dpi
+            "target_wine_dpi": max(96, phys_dpi),
+            "target_xwayland_factor": 1
         }
         
+    is_integer_scale = (scale == round(scale))
+    if is_integer_scale:
+        target_dpi = max(96, phys_dpi)
+        target_factor = int(scale)
+        ideal_policy = f"[GNOME] Native Integer Scaling (xwayland-scaling-factor={target_factor} or unset)" if scale > 1.0 else "N/A (desktop not scaled)"
+    else:
+        target_dpi = max(96, int(round(phys_dpi / scale)))
+        target_factor = 1
+        ideal_policy = "[GNOME] Framebuffer Upscale (xwayland-scaling-factor=1)" if scale > 1.0 else "N/A (desktop not scaled)"
+
     return {
         "de": "GNOME",
         "supported": True,
@@ -110,8 +121,9 @@ def query_gnome():
         "height": h_px,
         "scale": scale,
         "physical_dpi": phys_dpi,
-        "ideal_xwayland_policy": "Framebuffer Upscale" if scale > 1.0 else "N/A (desktop not scaled)",
-        "target_wine_dpi": int(round(phys_dpi / scale))
+        "ideal_xwayland_policy": ideal_policy,
+        "target_wine_dpi": target_dpi,
+        "target_xwayland_factor": target_factor
     }
 
 def query_kde():
@@ -160,7 +172,7 @@ def query_kde():
                     "scale": scale,
                     "physical_dpi": phys_dpi,
                     "ideal_xwayland_policy": "Apply scaling themselves" if scale > 1.0 else "N/A (desktop not scaled)",
-                    "target_wine_dpi": phys_dpi
+                    "target_wine_dpi": max(96, phys_dpi)
                 }
     return None
 
@@ -201,7 +213,7 @@ def query_cosmic():
                     "scale": scale,
                     "physical_dpi": phys_dpi,
                     "ideal_xwayland_policy": "Optimize for gaming" if scale > 1.0 else "N/A (desktop not scaled)",
-                    "target_wine_dpi": phys_dpi
+                    "target_wine_dpi": max(96, phys_dpi)
                 }
     return None
 
@@ -258,7 +270,7 @@ def query_x11():
         "scale": 1.0,
         "physical_dpi": phys_dpi,
         "ideal_xwayland_policy": "N/A (native X11)",
-        "target_wine_dpi": phys_dpi
+        "target_wine_dpi": max(96, phys_dpi)
     }
 
 def main():

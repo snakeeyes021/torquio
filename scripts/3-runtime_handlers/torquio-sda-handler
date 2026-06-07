@@ -15,7 +15,7 @@ get_config_val() {
         echo "$default"
         return
     fi
-    python3 -c "import json; d=json.load(open('$config_file')); print(d.get('$key', '$default'))" 2>/dev/null || echo "$default"
+    python3 -c "import json; d=json.load(open('$config_file')); v=d.get('$key', '$default'); print(str(v).lower() if isinstance(v, bool) else v)" 2>/dev/null || echo "$default"
 }
 
 set_config_val() {
@@ -59,6 +59,7 @@ if [ "$MANAGE_GRAPHICS" = "true" ]; then
     if [ -n "$SUPPORTED" ]; then
         DE=$(echo "$GRAPHICS_JSON" | grep -o '"de": "[^"]*' | cut -d'"' -f4)
         TARGET_DPI=$(echo "$GRAPHICS_JSON" | grep -o '"target_wine_dpi": [0-9]*' | cut -d' ' -f2)
+        TARGET_FACTOR=$(echo "$GRAPHICS_JSON" | grep -o '"target_xwayland_factor": [0-9]*' | cut -d' ' -f2)
         
         if [ -n "$TARGET_DPI" ] && [ "$TARGET_DPI" -gt 0 ]; then
             DPI_TO_SET="$TARGET_DPI"
@@ -67,24 +68,32 @@ if [ "$MANAGE_GRAPHICS" = "true" ]; then
         WARN_DISMISSED=$(get_config_val "warn_xwayland_change" "false")
         
         if [ "$DE" = "GNOME" ]; then
-            CURRENT_POLICY=$(gsettings get org.gnome.mutter.wayland xwayland-scaling-factor 2>/dev/null | tr -cd '0-9')
+            CURRENT_POLICY=$(gsettings get org.gnome.mutter.wayland xwayland-scaling-factor 2>/dev/null | awk '{print $NF}')
             if [ -z "$CURRENT_POLICY" ]; then
-                CURRENT_POLICY=$(gsettings get org.gnome.mutter xwayland-scaling-factor 2>/dev/null | tr -cd '0-9')
+                CURRENT_POLICY=$(gsettings get org.gnome.mutter xwayland-scaling-factor 2>/dev/null | awk '{print $NF}')
             fi
-            if [ "$CURRENT_POLICY" != "1" ]; then
+            CURRENT_POLICY=$(echo "$CURRENT_POLICY" | tr -d ' ' | cut -d'.' -f1 | tr -cd '0-9')
+            
+            DESIRED_POLICY="$TARGET_FACTOR"
+            if [ "$TARGET_FACTOR" -gt 1 ] && { [ "$CURRENT_POLICY" = "0" ] || [ -z "$CURRENT_POLICY" ]; }; then
+                DESIRED_POLICY="$CURRENT_POLICY"
+            fi
+            
+            if [ -n "$DESIRED_POLICY" ] && [ "$CURRENT_POLICY" != "$DESIRED_POLICY" ]; then
                 if [ "$WARN_DISMISSED" != "true" ]; then
+                    local warn_msg="Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This is a persistent system setting change (not temporary) and may affect the size/rendering of other XWayland applications going forward. You may also want to restart any currently running XWayland applications after enabling this mode.\n\nTorquio will back up your current settings first so they can be easily restored later.\n\nAllow Torquio to manage this?"
                     if command -v zenity >/dev/null 2>&1; then
-                        zenity --question --title="Torquio Graphics Management" --text="Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This will instantly change the size of any other legacy (X11) apps currently running until they are restarted.\n\nAllow Torquio to manage this?" || exit 1
+                        zenity --question --title="Torquio Graphics Management" --text="$warn_msg" || exit 1
                     elif command -v kdialog >/dev/null 2>&1; then
-                        kdialog --yesno "Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This will instantly change the size of any other legacy (X11) apps currently running until they are restarted.\n\nAllow Torquio to manage this?" --title "Torquio Graphics Management" || exit 1
+                        kdialog --yesno "$warn_msg" --title "Torquio Graphics Management" || exit 1
                     fi
                     set_config_val "warn_xwayland_change" "true"
                 fi
-                set_config_val "original_scale_factor" "${CURRENT_POLICY:-2}"
+                set_config_val "original_scale_factor" "${CURRENT_POLICY:-0}"
                 if gsettings list-schemas | grep -q org.gnome.mutter.wayland; then
-                    gsettings set org.gnome.mutter.wayland xwayland-scaling-factor 1 2>/dev/null || true
+                    gsettings set org.gnome.mutter.wayland xwayland-scaling-factor "$DESIRED_POLICY" 2>/dev/null || true
                 else
-                    gsettings set org.gnome.mutter xwayland-scaling-factor 1 2>/dev/null || true
+                    gsettings set org.gnome.mutter xwayland-scaling-factor "$DESIRED_POLICY" 2>/dev/null || true
                 fi
             fi
         elif [ "$DE" = "KDE" ]; then
@@ -94,10 +103,11 @@ if [ "$MANAGE_GRAPHICS" = "true" ]; then
             fi
             if [ "$CURRENT_POLICY" != "true" ]; then
                 if [ "$WARN_DISMISSED" != "true" ]; then
+                    local warn_msg="Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This is a persistent system setting change (not temporary) and may affect the size/rendering of other XWayland applications going forward. You may also want to restart any currently running XWayland applications after enabling this mode.\n\nTorquio will back up your current settings first so they can be easily restored later.\n\nAllow Torquio to manage this?"
                     if command -v zenity >/dev/null 2>&1; then
-                        zenity --question --title="Torquio Graphics Management" --text="Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This will instantly change the size of any other legacy (X11) apps currently running until they are restarted.\n\nAllow Torquio to manage this?" || exit 1
+                        zenity --question --title="Torquio Graphics Management" --text="$warn_msg" || exit 1
                     elif command -v kdialog >/dev/null 2>&1; then
-                        kdialog --yesno "Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This will instantly change the size of any other legacy (X11) apps currently running until they are restarted.\n\nAllow Torquio to manage this?" --title "Torquio Graphics Management" || exit 1
+                        kdialog --yesno "$warn_msg" --title "Torquio Graphics Management" || exit 1
                     fi
                     set_config_val "warn_xwayland_change" "true"
                 fi
@@ -110,10 +120,11 @@ if [ "$MANAGE_GRAPHICS" = "true" ]; then
             CURRENT_POLICY=$(cat ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null)
             if [ "$CURRENT_POLICY" != "fractional" ]; then
                 if [ "$WARN_DISMISSED" != "true" ]; then
+                    local warn_msg="Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This is a persistent system setting change (not temporary) and may affect the size/rendering of other XWayland applications going forward. You may also want to restart any currently running XWayland applications after enabling this mode.\n\nTorquio will back up your current settings first so they can be easily restored later.\n\nAllow Torquio to manage this?"
                     if command -v zenity >/dev/null 2>&1; then
-                        zenity --question --title="Torquio Graphics Management" --text="Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This will instantly change the size of any other legacy (X11) apps currently running until they are restarted.\n\nAllow Torquio to manage this?" || exit 1
+                        zenity --question --title="Torquio Graphics Management" --text="$warn_msg" || exit 1
                     elif command -v kdialog >/dev/null 2>&1; then
-                        kdialog --yesno "Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This will instantly change the size of any other legacy (X11) apps currently running until they are restarted.\n\nAllow Torquio to manage this?" --title "Torquio Graphics Management" || exit 1
+                        kdialog --yesno "$warn_msg" --title "Torquio Graphics Management" || exit 1
                     fi
                     set_config_val "warn_xwayland_change" "true"
                 fi
@@ -123,13 +134,13 @@ if [ "$MANAGE_GRAPHICS" = "true" ]; then
             fi
         fi
     fi
+
+    # Update LogPixels registry key
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$FREETYPE_INTERP\"; wine reg add \"HKCU\\Control Panel\\Desktop\" /v LogPixels /t REG_DWORD /d $DPI_TO_SET /f" >/dev/null 2>&1 || true
+
+    # Restart wineserver to ensure DPI change takes effect before SDA launches
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wineserver -k && wineserver -w" >/dev/null 2>&1 || true
 fi
-
-# Update LogPixels registry key
-distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$FREETYPE_INTERP\"; wine reg add \"HKCU\\Control Panel\\Desktop\" /v LogPixels /t REG_DWORD /d $DPI_TO_SET /f" >/dev/null 2>&1 || true
-
-# Restart wineserver to ensure DPI change takes effect before SDA launches
-distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wineserver -k && wineserver -w" >/dev/null 2>&1 || true
 
 # --- Keyboard Auto-Repeat Lag Remedy (xset) ---
 distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c 'xset r rate 500 30 && for keycode in {10..19} 23 {24..33} 36 {38..48} {52..61} 65; do xset -r $keycode; done' >/dev/null 2>&1 || true
