@@ -226,12 +226,16 @@ SET_MANUAL_DPI="$CUR_MANUAL_DPI"
 SET_MATCH_PHYS="$CUR_MATCH_PHYS"
 SET_FREETYPE="$CUR_FREETYPE"
 MAPPED_FOLDER_PATH=""
+MAPPED_FOLDER_TYPE="drive"
 IMPORT_SHORTCUTS_PATH=""
 
 if [ "$AUTO_ACCEPT" = false ]; then
     # Step 1: Graphics & Display scaling
     print_wizard_banner
     echo -e "${blue}[Step 1 of 4] Display Scaling & Graphics Management${reset}"
+    echo "--------------------------------------------------"
+    echo -e "${gray}Note: You can change all configuration settings later at any time${reset}"
+    echo -e "${gray}by re-running the configuration wizard or via the Torquio menus.${reset}"
     echo "--------------------------------------------------"
     if [ "$XDG_SESSION_TYPE" = "x11" ]; then
         echo "X11 session detected. Automated scaling management is Wayland-Only."
@@ -356,7 +360,7 @@ if [ "$AUTO_ACCEPT" = false ]; then
             fi
         fi
     fi
-    
+
     # Step 2: Font Hinting Style
     print_wizard_banner
     echo -e "${blue}[Step 2 of 4] FreeType Font Hinting Interpreter${reset}"
@@ -382,8 +386,8 @@ if [ "$AUTO_ACCEPT" = false ]; then
     print_wizard_banner
     echo -e "${blue}[Step 3 of 4] User Project Folder Mapping${reset}"
     echo "--------------------------------------------------"
-    echo "You can map a directory on your host machine (like your music or project folder)"
-    echo "so that it appears as a network drive (e.g., D:\\, E:\\) inside the Wine prefix."
+    echo "You can map a directory on your host machine (like your music or project folder) so that it"
+    echo "appears as a network drive (e.g., D:\\, E:\\) or in the desktop shortcuts inside the Wine prefix."
     echo ""
     read -p "Would you like to map a local folder to WINE? [Y/n]: " map_confirm
     if [[ -z "$map_confirm" ]] || [[ "$map_confirm" =~ ^[Yy]$ ]]; then
@@ -401,7 +405,20 @@ if [ "$AUTO_ACCEPT" = false ]; then
         
         if [ -d "$map_path" ]; then
             MAPPED_FOLDER_PATH="$map_path"
-            echo -e "  [${green}SUCCESS${reset}] Folder path is valid. Will map during integration phase."
+            echo -e "  [${green}SUCCESS${reset}] Folder path is valid."
+            echo ""
+            echo "Select how you would like to map this folder in Wine:"
+            echo -e "  ${wine}1)${reset} As a Mapped Network Drive (e.g., D:\\, E:\\) [Default]"
+            echo -e "  ${wine}2)${reset} As a Shortcut inside your Desktop folder (auto-expanded in file pickers)"
+            echo ""
+            read -p "Select choice (1-2): " choice_type
+            if [ "$choice_type" = "2" ]; then
+                MAPPED_FOLDER_TYPE="desktop"
+                echo "Will map as a Desktop shortcut during integration."
+            else
+                MAPPED_FOLDER_TYPE="drive"
+                echo "Will map as a network drive during integration."
+            fi
         else
             echo -e "  [${red}ERROR${reset}] Path does not exist or is not a folder. Skipping mapping."
         fi
@@ -492,7 +509,11 @@ echo -e "  - Target Wine DPI:          ${wine}$SET_MANUAL_DPI DPI${reset}"
 echo -e "  - Match Physical DPI:       ${wine}$SET_MATCH_PHYS${reset}"
 echo -e "  - FreeType Interpreter:     ${wine}v$SET_FREETYPE${reset}"
 if [ -n "$MAPPED_FOLDER_PATH" ]; then
-    echo -e "  - Map Local Folder:         ${wine}$MAPPED_FOLDER_PATH${reset}"
+    type_str="Network Drive"
+    if [ "$MAPPED_FOLDER_TYPE" = "desktop" ]; then
+        type_str="Desktop Shortcut"
+    fi
+    echo -e "  - Map Local Folder:         ${wine}$MAPPED_FOLDER_PATH${reset} (as $type_str)"
 fi
 if [ -n "$IMPORT_SHORTCUTS_PATH" ]; then
     echo -e "  - Import Shortcuts:         ${wine}$(basename "$IMPORT_SHORTCUTS_PATH")${reset}"
@@ -601,16 +622,38 @@ fi
 # Apply Mapped Folders if configured
 if [ -n "$MAPPED_FOLDER_PATH" ] && [ -d "$TORQUIO_PREFIX_DIR/dosdevices" ]; then
     real_map_path=$(realpath "$MAPPED_FOLDER_PATH")
-    drive_letter=""
-    for letter in d e f g h i j k l m n o p q r s t u v w x y z; do
-        if [ ! -e "$TORQUIO_PREFIX_DIR/dosdevices/${letter}:" ]; then
-            drive_letter="${letter}:"
-            break
+    if [ "$MAPPED_FOLDER_TYPE" = "desktop" ]; then
+        desktop_dir="${XDG_DESKTOP_DIR:-$HOME/Desktop}"
+        if [ -f "$HOME/.config/user-dirs.dirs" ]; then
+            source "$HOME/.config/user-dirs.dirs" 2>/dev/null || true
+            desktop_dir="${XDG_DESKTOP_DIR:-$HOME/Desktop}"
         fi
-    done
-    if [ -n "$drive_letter" ]; then
-        ln -sf "$real_map_path" "$TORQUIO_PREFIX_DIR/dosdevices/$drive_letter"
-        echo "Mapped '$real_map_path' to Wine drive ${drive_letter^^}\\"
+        mkdir -p "$desktop_dir"
+        folder_name=$(basename "$real_map_path")
+        dest_link="$desktop_dir/$folder_name"
+        
+        if [ -e "$dest_link" ] && [ ! -L "$dest_link" ]; then
+            read -p "A physical file/folder named '$folder_name' already exists on your Desktop. Enter a custom shortcut name: " custom_name
+            if [ -z "$custom_name" ]; then
+                custom_name="${folder_name}-shortcut"
+            fi
+            dest_link="$desktop_dir/$custom_name"
+        fi
+        rm -f "$dest_link"
+        ln -sf "$real_map_path" "$dest_link"
+        echo "Mapped '$real_map_path' to Desktop shortcut: $(basename "$dest_link")"
+    else
+        drive_letter=""
+        for letter in d e f g h i j k l m n o p q r s t u v w x y z; do
+            if [ ! -e "$TORQUIO_PREFIX_DIR/dosdevices/${letter}:" ]; then
+                drive_letter="${letter}:"
+                break
+            fi
+        done
+        if [ -n "$drive_letter" ]; then
+            ln -sf "$real_map_path" "$TORQUIO_PREFIX_DIR/dosdevices/$drive_letter"
+            echo "Mapped '$real_map_path' to Wine drive ${drive_letter^^}\\"
+        fi
     fi
 fi
 
