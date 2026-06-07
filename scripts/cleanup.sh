@@ -46,19 +46,62 @@ if [[ "$confirm" != "yes, permanently delete everything" ]]; then
     exit 0
 fi
 
-# Scaling Restore Prompt
+# Scaling Restore Prompts
 ORIG_SCALE=$(get_config_val "original_scale_factor" "")
+ORIG_KDE=$(get_config_val "original_kde_policy" "")
+ORIG_COSMIC=$(get_config_val "original_cosmic_policy" "")
 MANAGE_GRAPHICS=$(get_config_val "manage_graphics" "false")
-if [ -n "$ORIG_SCALE" ] && ( [ "$MANAGE_GRAPHICS" = "true" ] || [ "$(get_config_val "auto_scale_mutter" "false")" = "true" ] ); then
-    echo ""
-    echo -e "Torquio detected that host display scaling was modified from ${wine}$ORIG_SCALE${reset} to ${wine}1.0${reset}."
-    read -p "Would you like to restore your host display scale to $ORIG_SCALE? [Y/n]: " restore_confirm
-    if [[ ! "$restore_confirm" =~ ^[Nn]$ ]]; then
-        if command -v gsettings >/dev/null 2>&1; then
-            gsettings set org.gnome.mutter xwayland-scaling-factor "$ORIG_SCALE" 2>/dev/null || true
-            echo -e "  [${green}SUCCESS${reset}] Host display scale restored to $ORIG_SCALE."
-        else
-            echo -e "  [${yellow}WARNING${reset}] gsettings not found. Manual scale restore required."
+
+if [ "$MANAGE_GRAPHICS" = "true" ] || [ "$(get_config_val "auto_scale_mutter" "false")" = "true" ]; then
+    # 1. GNOME Scaling Restore
+    if [ -n "$ORIG_SCALE" ]; then
+        echo ""
+        echo -e "Torquio detected that host GNOME XWayland scaling was modified from ${wine}$ORIG_SCALE${reset} to ${wine}1${reset}."
+        read -p "Would you like to restore your host display scale to $ORIG_SCALE? [Y/n]: " restore_confirm
+        if [[ ! "$restore_confirm" =~ ^[Nn]$ ]]; then
+            if command -v gsettings >/dev/null 2>&1; then
+                if gsettings list-schemas | grep -q org.gnome.mutter.wayland; then
+                    gsettings set org.gnome.mutter.wayland xwayland-scaling-factor "$ORIG_SCALE" 2>/dev/null || true
+                else
+                    gsettings set org.gnome.mutter xwayland-scaling-factor "$ORIG_SCALE" 2>/dev/null || true
+                fi
+                echo -e "  [${green}SUCCESS${reset}] Host display scale restored to $ORIG_SCALE."
+            else
+                echo -e "  [${yellow}WARNING${reset}] gsettings not found. Manual scale restore required."
+            fi
+        fi
+    fi
+
+    # 2. KDE Scaling Restore
+    if [ -n "$ORIG_KDE" ]; then
+        echo ""
+        echo -e "Torquio detected that host KDE XWayland policy was modified from ${wine}$ORIG_KDE${reset} to ${wine}true${reset}."
+        read -p "Would you like to restore your KDE XWayland clients scale policy to $ORIG_KDE? [Y/n]: " restore_confirm
+        if [[ ! "$restore_confirm" =~ ^[Nn]$ ]]; then
+            if command -v kwriteconfig6 >/dev/null 2>&1; then
+                kwriteconfig6 --file kdeglobals --group KScreen --key XwaylandClientsScale "$ORIG_KDE" 2>/dev/null || true
+                kwriteconfig6 --file kdeglobals --group KScreen --key XwaylandClientScale "$ORIG_KDE" 2>/dev/null || true
+                dbus-send --session --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure 2>/dev/null || true
+                echo -e "  [${green}SUCCESS${reset}] Host KDE XWayland policy restored to $ORIG_KDE."
+            else
+                echo -e "  [${yellow}WARNING${reset}] kwriteconfig6 not found. Manual scale restore required."
+            fi
+        fi
+    fi
+
+    # 3. COSMIC Scaling Restore
+    if [ -n "$ORIG_COSMIC" ]; then
+        echo ""
+        echo -e "Torquio detected that host COSMIC XWayland policy was modified from ${wine}$ORIG_COSMIC${reset} to ${wine}fractional${reset}."
+        read -p "Would you like to restore your COSMIC XWayland clients scale policy to $ORIG_COSMIC? [Y/n]: " restore_confirm
+        if [[ ! "$restore_confirm" =~ ^[Nn]$ ]]; then
+            mkdir -p ~/.config/cosmic/com.system76.CosmicComp/v1
+            if [ "$ORIG_COSMIC" = "none" ] || [ -z "$ORIG_COSMIC" ]; then
+                rm -f ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland
+            else
+                echo "$ORIG_COSMIC" > ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null || true
+            fi
+            echo -e "  [${green}SUCCESS${reset}] Host COSMIC XWayland policy restored to $ORIG_COSMIC."
         fi
     fi
 fi
@@ -77,6 +120,7 @@ rm -f "$HOME/.local/bin/torquio"
 rm -f "$HOME/.local/bin/torquio-dorico"
 rm -f "$HOME/.local/bin/torquio-sam"
 rm -f "$HOME/.local/bin/torquio-sda-handler"
+rm -f "$HOME/.local/bin/torquio_graphics.py"
 
 # Removing .desktop files
 rm -f "$HOME/.local/share/applications/Dorico.desktop"

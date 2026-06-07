@@ -110,7 +110,7 @@ apply_graphics_settings() {
 
     # Kill wine server to apply changes immediately
     echo "Restarting Wine server to load changes..."
-    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wineserver -k" >/dev/null 2>&1 || true
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wineserver -k && wineserver -w" >/dev/null 2>&1 || true
     echo "Graphics settings successfully applied."
 }
 
@@ -239,7 +239,7 @@ show_graphics_diagnostics() {
     fi
     echo ""
 
-    if [ -n "$w_px" ] && ( [ "$w_px" -ge 3840 ] || [ "$h_px" -ge 2160 ] ); then
+    if [ -n "$w_px" ] && [ -n "$h_px" ] && ( [ "$w_px" -ge 3840 ] || [ "$h_px" -ge 2160 ] ); then
         echo -e "  ${yellow}[!] Performance Warning: At 4K+ resolutions, we have noticed some performance${reset}"
         echo -e "      ${yellow}degradation/lagginess even on decent hardware. If you experience unacceptable${reset}"
         echo -e "      ${yellow}lag, consider manually bumping your system desktop resolution down to 1440p or${reset}"
@@ -312,7 +312,7 @@ configure_graphics() {
             echo "Switched to Manual Mode."
         else
             # 4K warning notice check upon selection
-            if [ -n "$w_px" ] && ( [ "$w_px" -ge 3840 ] || [ "$h_px" -ge 2160 ] ); then
+            if [ -n "$w_px" ] && [ -n "$h_px" ] && ( [ "$w_px" -ge 3840 ] || [ "$h_px" -ge 2160 ] ); then
                 echo -e "${yellow}================================================================${reset}"
                 echo -e "${yellow}WARNING: At 4K+ resolutions, we have noticed some performance${reset}"
                 echo -e "${yellow}degradation/lagginess even on decent hardware. If you experience${reset}"
@@ -904,7 +904,7 @@ manage_wine() {
                 ;;
             7)
                 echo "Shutting down Wine server..."
-                distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wineserver -k" || true
+                distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wineserver -k && wineserver -w" || true
                 echo "Wine server shutdown complete."
                 ;;
             8)
@@ -981,7 +981,7 @@ show_menu() {
                 2)  "$SCRIPT_DIR/scripts/cleanup.sh" ;;
                 3)  show_status ;;
                 4)  configure_graphics; clear; continue ;;
-                5)  distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$TORQUIO_REPO_DIR\" && ./scripts/2-install/extract_icons.sh" ;;
+                5)  distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$SCRIPT_DIR\" && ./scripts/2-install/extract_icons.sh" ;;
                 6)  manage_folder_mappings; clear; continue ;;
                 7)  manage_keycommands; clear; continue ;;
                 8)  manage_wine; clear; continue ;;
@@ -1023,7 +1023,7 @@ if [ $# -gt 0 ]; then
             "$SCRIPT_DIR/scripts/cleanup.sh" "$@"
             ;;
         -f|--fix-icons)
-            distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$TORQUIO_REPO_DIR\" && ./scripts/2-install/extract_icons.sh"
+            distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$SCRIPT_DIR\" && ./scripts/2-install/extract_icons.sh"
             ;;
         -g|--graphics)
             configure_graphics
@@ -1049,7 +1049,7 @@ if [ $# -gt 0 ]; then
             ;;
         -k|--kill_wine)
             echo "Shutting down Wine server..."
-            distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wineserver -k" || true
+            distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wineserver -k && wineserver -w" || true
             echo "Wine server shutdown complete."
             ;;
         -b|--reboot)

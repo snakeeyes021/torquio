@@ -80,6 +80,7 @@ if [ "$MANAGE_GRAPHICS" = "true" ]; then
                     fi
                     set_config_val "warn_xwayland_change" "true"
                 fi
+                set_config_val "original_scale_factor" "${CURRENT_POLICY:-2}"
                 if gsettings list-schemas | grep -q org.gnome.mutter.wayland; then
                     gsettings set org.gnome.mutter.wayland xwayland-scaling-factor 1 2>/dev/null || true
                 else
@@ -100,6 +101,7 @@ if [ "$MANAGE_GRAPHICS" = "true" ]; then
                     fi
                     set_config_val "warn_xwayland_change" "true"
                 fi
+                set_config_val "original_kde_policy" "${CURRENT_POLICY:-false}"
                 kwriteconfig6 --file kdeglobals --group KScreen --key XwaylandClientsScale true 2>/dev/null || true
                 kwriteconfig6 --file kdeglobals --group KScreen --key XwaylandClientScale true 2>/dev/null || true
                 dbus-send --session --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure 2>/dev/null || true
@@ -115,6 +117,7 @@ if [ "$MANAGE_GRAPHICS" = "true" ]; then
                     fi
                     set_config_val "warn_xwayland_change" "true"
                 fi
+                set_config_val "original_cosmic_policy" "${CURRENT_POLICY:-none}"
                 mkdir -p ~/.config/cosmic/com.system76.CosmicComp/v1
                 echo "fractional" > ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null || true
             fi
@@ -126,7 +129,7 @@ fi
 distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$FREETYPE_INTERP\"; wine reg add \"HKCU\\Control Panel\\Desktop\" /v LogPixels /t REG_DWORD /d $DPI_TO_SET /f" >/dev/null 2>&1 || true
 
 # Restart wineserver to ensure DPI change takes effect before SDA launches
-distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wineserver -k" >/dev/null 2>&1 || true
+distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wineserver -k && wineserver -w" >/dev/null 2>&1 || true
 
 # --- Keyboard Auto-Repeat Lag Remedy (xset) ---
 distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c 'xset r rate 500 30 && for keycode in {10..19} 23 {24..33} 36 {38..48} {52..61} 65; do xset -r $keycode; done' >/dev/null 2>&1 || true

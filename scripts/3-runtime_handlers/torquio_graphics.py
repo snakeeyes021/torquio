@@ -20,31 +20,34 @@ def get_edid_dpi(connector, w_px, h_px):
         return 96
     
     for d in os.listdir(base_dir):
-        if d.endswith(f"-{connector}"):
-            edid_path = os.path.join(base_dir, d, "edid")
-            if os.path.isfile(edid_path):
-                try:
-                    with open(edid_path, "rb") as f:
-                        edid = f.read()
-                        
-                        # 1. Try millimeter precision from Detailed Timing Descriptor #1 (byte 54+)
-                        if len(edid) >= 128 and (edid[54] != 0 or edid[55] != 0):
-                            w_mm = ((edid[68] & 0xF0) << 4) | edid[66]
-                            if w_mm > 0:
-                                return int(round(w_px / (w_mm / 25.4)))
-                                
-                        # 2. Fall back to centimeter-level diagonal calculation from basic parameters
-                        if len(edid) > 22:
-                            width_cm = edid[21]
-                            height_cm = edid[22]
-                            if width_cm > 0 and height_cm > 0:
-                                w_inch = width_cm * 0.393701
-                                h_inch = height_cm * 0.393701
-                                diag_inch = math.sqrt(w_inch**2 + h_inch**2)
-                                diag_px = math.sqrt(w_px**2 + h_px**2)
-                                return int(round(diag_px / diag_inch))
-                except Exception:
-                    pass
+        if "-" in d:
+            parts = d.split("-", 1)
+            conn_name = parts[1]
+            if conn_name == connector or conn_name.startswith(f"{connector}-") or connector.startswith(f"{conn_name}-"):
+                edid_path = os.path.join(base_dir, d, "edid")
+                if os.path.isfile(edid_path):
+                    try:
+                        with open(edid_path, "rb") as f:
+                            edid = f.read()
+                            
+                            # 1. Try millimeter precision from Detailed Timing Descriptor #1 (byte 54+)
+                            if len(edid) >= 128 and (edid[54] != 0 or edid[55] != 0):
+                                w_mm = ((edid[68] & 0xF0) << 4) | edid[66]
+                                if w_mm > 0:
+                                    return int(round(w_px / (w_mm / 25.4)))
+                                    
+                            # 2. Fall back to centimeter-level diagonal calculation from basic parameters
+                            if len(edid) > 22:
+                                width_cm = edid[21]
+                                height_cm = edid[22]
+                                if width_cm > 0 and height_cm > 0:
+                                    w_inch = width_cm * 0.393701
+                                    h_inch = height_cm * 0.393701
+                                    diag_inch = math.sqrt(w_inch**2 + h_inch**2)
+                                    diag_px = math.sqrt(w_px**2 + h_px**2)
+                                    return int(round(diag_px / diag_inch))
+                    except Exception:
+                        pass
     return 96
 
 def query_gnome():
@@ -85,6 +88,20 @@ def query_gnome():
         return None
         
     phys_dpi = get_edid_dpi(connector, w_px, h_px)
+    session_type = os.environ.get("XDG_SESSION_TYPE", "").lower()
+    if session_type == "x11":
+        return {
+            "de": "GNOME",
+            "supported": True,
+            "connector": connector,
+            "width": w_px,
+            "height": h_px,
+            "scale": scale,
+            "physical_dpi": phys_dpi,
+            "ideal_xwayland_policy": "N/A (X11 session)",
+            "target_wine_dpi": phys_dpi
+        }
+        
     return {
         "de": "GNOME",
         "supported": True,
@@ -107,7 +124,9 @@ def query_kde():
     for block in blocks[1:]:
         if "priority 1" in block or "priority: 1" in block or "primary" in block: # Fallback just in case
             lines = block.split("\n")
-            connector = lines[0].split()[1] if len(lines[0].split()) > 1 else "Unknown"
+            tokens = lines[0].split()
+            connector1 = tokens[1] if len(tokens) > 1 else "Unknown"
+            connector2 = tokens[-1] if len(tokens) > 0 else "Unknown"
             
             scale = 1.0
             w_px = 0
@@ -127,11 +146,15 @@ def query_kde():
                         h_px = int(res_match.group(2))
             
             if w_px > 0:
-                phys_dpi = get_edid_dpi(connector, w_px, h_px)
+                phys_dpi = get_edid_dpi(connector1, w_px, h_px)
+                used_connector = connector1
+                if phys_dpi == 96 and connector2 != "Unknown" and connector2 != connector1:
+                    phys_dpi = get_edid_dpi(connector2, w_px, h_px)
+                    used_connector = connector2
                 return {
                     "de": "KDE",
                     "supported": True,
-                    "connector": connector,
+                    "connector": used_connector,
                     "width": w_px,
                     "height": h_px,
                     "scale": scale,
@@ -150,7 +173,8 @@ def query_cosmic():
     for block in blocks:
         if "Xwayland primary: true" in block:
             lines = block.split("\n")
-            connector = lines[0].strip(': ')
+            tokens = lines[0].split()
+            connector = tokens[0].strip(':') if len(tokens) > 0 else "Unknown"
             scale = 1.0
             w_px = 0
             h_px = 0
