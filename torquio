@@ -1278,6 +1278,8 @@ show_menu() {
                     else
                         local rc=$?
                         if [ $rc -eq 10 ]; then
+                            echo ""
+                            read -p "Press [Enter] to return to the main menu..." temp
                             clear
                             continue
                         else
@@ -1292,6 +1294,8 @@ show_menu() {
                     else
                         local rc=$?
                         if [ $rc -eq 10 ]; then
+                            echo ""
+                            read -p "Press [Enter] to return to the main menu..." temp
                             clear
                             continue
                         else
@@ -1323,6 +1327,8 @@ show_menu() {
                     else
                         local rc=$?
                         if [ $rc -eq 10 ]; then
+                            echo ""
+                            read -p "Press [Enter] to return to the main menu..." temp
                             clear
                             continue
                         else
@@ -1337,6 +1343,8 @@ show_menu() {
                     else
                         local rc=$?
                         if [ $rc -eq 10 ]; then
+                            echo ""
+                            read -p "Press [Enter] to return to the main menu..." temp
                             clear
                             continue
                         else

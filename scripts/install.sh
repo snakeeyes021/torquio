@@ -115,7 +115,7 @@ if [ "$AUTO_ACCEPT" = false ] && { [ "$CONTAINER_EXISTS" = true ] || [ "$PREFIX_
                 fi
                 ;;
             *)
-                echo "Installation cancelled."
+                echo "Invalid selection. Installation cancelled."
                 exit 10
                 ;;
         esac
@@ -153,7 +153,7 @@ if [ "$AUTO_ACCEPT" = false ] && { [ "$CONTAINER_EXISTS" = true ] || [ "$PREFIX_
                 fi
                 ;;
             *)
-                echo "Installation cancelled."
+                echo "Invalid selection. Installation cancelled."
                 exit 10
                 ;;
         esac
