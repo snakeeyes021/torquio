@@ -157,7 +157,7 @@ rm -f "$HOME/.local/bin/torquio" "$HOME/.local/bin/torquio-dorico" "$HOME/.local
 echo "Installing torquio orchestrator to ~/.local/bin/torquio..."
 ln -s "$SCRIPT_DIR/torquio" "$HOME/.local/bin/torquio"
 
-for handler in "$SCRIPT_DIR/scripts/3-runtime_handlers/"torquio-*; do
+for handler in "$SCRIPT_DIR/scripts/3-runtime_handlers/"torquio*; do
     base_name=$(basename "$handler")
     if [ "$base_name" = "torquio-sda-handler" ]; then
         sed "s|@TORQUIO_REPO_DIR@|$SCRIPT_DIR|g" "$handler" > "$HOME/.local/bin/$base_name"

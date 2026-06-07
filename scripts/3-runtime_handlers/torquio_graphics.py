@@ -26,16 +26,23 @@ def get_edid_dpi(connector, w_px, h_px):
                 try:
                     with open(edid_path, "rb") as f:
                         edid = f.read()
+                        
+                        # 1. Try millimeter precision from Detailed Timing Descriptor #1 (byte 54+)
+                        if len(edid) >= 128 and (edid[54] != 0 or edid[55] != 0):
+                            w_mm = ((edid[68] & 0xF0) << 4) | edid[66]
+                            if w_mm > 0:
+                                return int(round(w_px / (w_mm / 25.4)))
+                                
+                        # 2. Fall back to centimeter-level diagonal calculation from basic parameters
                         if len(edid) > 22:
-                            # EDID version 1.3/1.4 physical size is at bytes 21 and 22 in centimeters
                             width_cm = edid[21]
                             height_cm = edid[22]
-                        if width_cm > 0 and height_cm > 0:
-                            w_inch = width_cm * 0.393701
-                            h_inch = height_cm * 0.393701
-                            diag_inch = math.sqrt(w_inch**2 + h_inch**2)
-                            diag_px = math.sqrt(w_px**2 + h_px**2)
-                            return int(round(diag_px / diag_inch))
+                            if width_cm > 0 and height_cm > 0:
+                                w_inch = width_cm * 0.393701
+                                h_inch = height_cm * 0.393701
+                                diag_inch = math.sqrt(w_inch**2 + h_inch**2)
+                                diag_px = math.sqrt(w_px**2 + h_px**2)
+                                return int(round(diag_px / diag_inch))
                 except Exception:
                     pass
     return 96
