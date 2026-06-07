@@ -96,7 +96,7 @@ Because Dorico runs via WINE (which currently operates on legacy X11 protocols v
 
 If you use anything that is 1440p or below and you don't use desktop environment fractional scaling, you should be in the clear and don't really need to worry about this. However, if you use anything that's 4K or above, have a high DPI screen that requires fractional scaling, or you use Dorico on a laptop that sometimes gets plugged into a dock/monitor with a different DPI or desktop scaling factor from your laptop's screen, you may want to read on.
 
-Torquio's **Auto Graphics Mode** attempts to solve these various scenarios by managing the desktop's XWayland scaling protocol as well as the WINE prefix's DPI setting. Auto Graphics Mode is currently available on at least the current versions of **GNOME**, **KDE Plasma**, and **Cosmic**, which should cover a pretty reasonable majority of users. 
+Torquio's **Auto Graphics Mode** attempts to solve these various scenarios by managing the desktop's XWayland scaling protocol as well as the WINE prefix's DPI setting. Auto Graphics Mode is available on all **X11 sessions** (where it detects the monitor's physical DPI and sets WINE to match it), and on recent Wayland versions of **GNOME**, **KDE Plasma**, and **Cosmic** (where it handles DPI *and* coordinates compositor scaling policies), which should cover a pretty reasonable majority of users.
 
 If your use case *does* fall into one of the above categories but you're not on a supported desktop environment (and could benefit from some direction on how to manage things) or you just want to know what's going on under the hood, here's a useful graph:
 
@@ -110,12 +110,12 @@ graph TD
     
     Fork -->|No| LowRes["Good to go!<br/>(Fine to leave in Manual Mode; no scaling changes needed)"]:::normal
     
-    Fork -->|Yes| DE{"What Desktop Environment?"}:::normal
+    Fork -->|Yes| DE{"What Desktop Session/Environment?"}:::normal
     
     DE -->|KDE Plasma / COSMIC| KDEPath["Auto & Manual Modes Available"]:::auto
     DE -->|GNOME| GnomePath["Auto & Manual Modes Available"]:::auto
+    DE -->|Any X11 Desktop| X11Path["Auto & Manual Modes Available"]:::auto
     DE -->|Other Wayland Desktops| OtherWayland["Manual Mode Only"]:::manual
-    DE -->|X11 Desktops| X11Path["Manual Mode Only"]:::manual
 
     KDEPath --> KDEAction["1. Set XWayland apps to scale themselves<br/>(Called 'Optimize for Games' on COSMIC; default on KDE)<br/>2. Set WINE DPI to match ideal monitor DPI"]:::auto
     
@@ -125,21 +125,21 @@ graph TD
     
     OtherWayland --> OtherAction["Depends on XWayland policy controls:<br/>- Prefer KDE/COSMIC method if available<br/>- If standard Framebuffer Upscale is the only option, follow the GNOME method"]:::manual
     
-    X11Path --> X11Action["Set WINE DPI to match monitor ideal DPI"]:::manual
+    X11Path --> X11Action["Set WINE DPI to match monitor ideal DPI (compositor scaling not applicable on X11)"]:::auto
 ```
 
 ### Under the Hood: The Formulas
 
 Depending on how your Desktop Environment scales legacy X11/XWayland applications, the target WINE DPI is calculated differently:
 
-*   **For GNOME (or other Mutter-based environments using Framebuffer Upscaling)**: 
+*   **For GNOME (or other Mutter-based environments using Framebuffer Upscaling on Wayland)**: 
     Disabling native XWayland scaling (`xwayland-scaling-factor=1`) forces the app to render at 100% and lets the compositor upscale the window. To prevent text from appearing too large when scaled up, the internal WINE DPI is scaled down proportionally to compensate:  
       
     $$\text{Target WINE DPI} = \frac{\text{Monitor Physical DPI}}{\text{Desktop Environment Scale Factor}}$$  
       
     *(e.g., 144 physical ideal DPI / 1.50x desktop scale = 96 target DPI)*
 
-*   **For KDE Plasma / COSMIC (or other environments supporting Native Application Scaling)**:
+*   **For KDE Plasma / COSMIC on Wayland (or other environments supporting Native Application Scaling)**:
     Allowing applications to scale themselves bypasses compositor upscaling. The window renders native 1:1, and WINE scales its own UI elements directly:  
       
     $$\text{Target WINE DPI} = \text{Monitor Physical DPI}$$  
@@ -150,7 +150,7 @@ Depending on how your Desktop Environment scales legacy X11/XWayland application
 
 If your environment is not supported by Torquio's Auto Graphics Mode, you can configure display scaling manually:
 *   **Other Wayland Desktops (e.g., Sway, Hyprland, Wayfire)**: Check if your compositor exposes XWayland scaling policies. If you can configure XWayland clients to scale themselves, enable this and set your WINE DPI to match your monitor's physical density. If standard compositor/framebuffer upscaling is the only option, follow the GNOME method (turn on framebuffer upscaling if you can and adjust your WINE DPI accordingly).
-*   **X11 Desktops (e.g., XFCE, Cinnamon X11, MATE)**: Because apps render natively on X11 without XWayland translation layers, no compositor upscaling is involved. Set your WINE Prefix DPI directly to your monitor's ideal physical DPI (e.g., `120`, `144`, or `192`) via `winecfg` or the Torquio configuration menu to match your desktop's scale factor.
+*   **X11 Desktops (e.g., XFCE, Cinnamon, MATE)**: Because apps render natively on X11 without XWayland translation layers, no compositor upscaling is involved. You can use Auto Graphics Mode to automatically configure your WINE prefix DPI to match your monitor's ideal physical DPI, or set it manually (e.g., `120`, `144`, or `192`) via `winecfg` or the Torquio configuration menu to match your desktop's scale factor.
 
 > [!CAUTION]
 > **XWayland Note:** As mentioned, Auto Graphics Mode manages a global desktop setting (your desktop environment's XWayland scaling policy). If you actively use other legacy X11/XWayland applications on your desktop alongside Dorico (excluding games, which typically prefer the same unscaled mode Dorico uses), consider sticking to **Manual Graphics Mode** instead. See the graphics configuration menu to determine whether your current XWayland scaling method differs from the Torquio-recommended setting.

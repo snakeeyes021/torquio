@@ -181,7 +181,9 @@ show_graphics_diagnostics() {
     echo -e "  ${blue}[Current System Values]${reset}"
     
     local sys_policy="Unknown"
-    if [ "$de" = "GNOME" ]; then
+    if [[ "$de" =~ X11 ]]; then
+        sys_policy="N/A (Native X11 Session)"
+    elif [ "$de" = "GNOME" ]; then
         local gp=$(gsettings get org.gnome.mutter.wayland xwayland-scaling-factor 2>/dev/null | tr -cd '0-9')
         if [ -z "$gp" ]; then
             gp=$(gsettings get org.gnome.mutter xwayland-scaling-factor 2>/dev/null | tr -cd '0-9')
@@ -221,7 +223,10 @@ show_graphics_diagnostics() {
     if [ -n "$supported" ]; then
         local rec_policy="Unknown"
         local rec_formula="No formula"
-        if [ "$de" = "GNOME" ]; then
+        if [[ "$de" =~ X11 ]]; then
+            rec_policy="N/A (Native X11 Session)"
+            rec_formula="Formula: WINE DPI matches physical ideal DPI (${phys_dpi} DPI)"
+        elif [ "$de" = "GNOME" ]; then
             rec_policy="[GNOME] Framebuffer Upscale (xwayland-scaling-factor=1)"
             rec_formula="Formula: ${phys_dpi} physical ideal DPI / ${scale}x GNOME upscale = ${target_dpi} target DPI"
         elif [ "$de" = "KDE" ]; then

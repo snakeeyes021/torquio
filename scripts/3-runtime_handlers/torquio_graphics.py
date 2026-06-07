@@ -205,17 +205,85 @@ def query_cosmic():
                 }
     return None
 
+def query_x11():
+    out = run_cmd("xrandr --current")
+    if not out:
+        return None
+        
+    connector = ""
+    w_px = 0
+    h_px = 0
+    
+    # 1. Look for the primary connected output first
+    lines = out.split("\n")
+    for line in lines:
+        if " connected " in line and "primary" in line:
+            parts = line.split()
+            connector = parts[0]
+            for p in parts:
+                if "x" in p and "+" in p:
+                    res_match = re.match(r'(\d+)x(\d+)\+', p)
+                    if res_match:
+                        w_px = int(res_match.group(1))
+                        h_px = int(res_match.group(2))
+                        break
+            break
+            
+    # 2. Fall back to any connected output if no primary is specified
+    if not connector or w_px == 0:
+        for line in lines:
+            if " connected " in line:
+                parts = line.split()
+                connector = parts[0]
+                for p in parts:
+                    if "x" in p and "+" in p:
+                        res_match = re.match(r'(\d+)x(\d+)\+', p)
+                        if res_match:
+                            w_px = int(res_match.group(1))
+                            h_px = int(res_match.group(2))
+                            break
+                if w_px > 0:
+                    break
+                    
+    if w_px == 0:
+        return None
+        
+    phys_dpi = get_edid_dpi(connector, w_px, h_px)
+    return {
+        "de": "X11 (Generic)",
+        "supported": True,
+        "connector": connector,
+        "width": w_px,
+        "height": h_px,
+        "scale": 1.0,
+        "physical_dpi": phys_dpi,
+        "ideal_xwayland_policy": "N/A (native X11)",
+        "target_wine_dpi": phys_dpi
+    }
+
 def main():
+    session_type = os.environ.get("XDG_SESSION_TYPE", "").lower()
     de = os.environ.get("XDG_CURRENT_DESKTOP", "").upper()
     
     result = None
-    if "GNOME" in de:
-        result = query_gnome()
-    elif "KDE" in de:
-        result = query_kde()
-    elif "COSMIC" in de:
-        result = query_cosmic()
-        
+    if session_type == "x11":
+        result = query_x11()
+        if result:
+            result["de"] = f"{de} (X11)" if de else "X11 (Generic)"
+    else:
+        if "GNOME" in de:
+            result = query_gnome()
+        elif "KDE" in de:
+            result = query_kde()
+        elif "COSMIC" in de:
+            result = query_cosmic()
+            
+    if not result:
+        # Fallback to query_x11 if Wayland check failed or unsupported DE
+        result = query_x11()
+        if result:
+            result["de"] = f"{de} (X11 Fallback)" if de else "X11 Fallback"
+            
     if not result:
         # Fallback or unsupported
         result = {
