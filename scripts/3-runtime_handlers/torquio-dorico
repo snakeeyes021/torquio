@@ -60,9 +60,9 @@ if [ "$MANAGE_GRAPHICS" = "true" ]; then
         WARN_DISMISSED=$(get_config_val "warn_xwayland_change" "false")
         
         if [ "$DE" = "GNOME" ]; then
-            CURRENT_POLICY=$(gsettings get org.gnome.mutter.wayland xwayland-scaling-factor 2>/dev/null | awk '{print $2}')
+            CURRENT_POLICY=$(gsettings get org.gnome.mutter.wayland xwayland-scaling-factor 2>/dev/null | tr -cd '0-9')
             if [ -z "$CURRENT_POLICY" ]; then
-                CURRENT_POLICY=$(gsettings get org.gnome.mutter xwayland-scaling-factor 2>/dev/null | awk '{print $2}')
+                CURRENT_POLICY=$(gsettings get org.gnome.mutter xwayland-scaling-factor 2>/dev/null | tr -cd '0-9')
             fi
             if [ "$CURRENT_POLICY" != "1" ]; then
                 if [ "$WARN_DISMISSED" != "true" ]; then
@@ -80,7 +80,10 @@ if [ "$MANAGE_GRAPHICS" = "true" ]; then
                 fi
             fi
         elif [ "$DE" = "KDE" ]; then
-            CURRENT_POLICY=$(kreadconfig6 --file kdeglobals --group KScreen --key XwaylandClientScale 2>/dev/null)
+            CURRENT_POLICY=$(kreadconfig6 --file kdeglobals --group KScreen --key XwaylandClientsScale 2>/dev/null)
+            if [ -z "$CURRENT_POLICY" ]; then
+                CURRENT_POLICY=$(kreadconfig6 --file kdeglobals --group KScreen --key XwaylandClientScale 2>/dev/null)
+            fi
             if [ "$CURRENT_POLICY" != "true" ]; then
                 if [ "$WARN_DISMISSED" != "true" ]; then
                     if command -v zenity >/dev/null 2>&1; then
@@ -90,6 +93,7 @@ if [ "$MANAGE_GRAPHICS" = "true" ]; then
                     fi
                     set_config_val "warn_xwayland_change" "true"
                 fi
+                kwriteconfig6 --file kdeglobals --group KScreen --key XwaylandClientsScale true 2>/dev/null || true
                 kwriteconfig6 --file kdeglobals --group KScreen --key XwaylandClientScale true 2>/dev/null || true
                 dbus-send --session --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure 2>/dev/null || true
             fi

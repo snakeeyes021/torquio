@@ -20,15 +20,16 @@ def get_edid_dpi(connector, w_px, h_px):
         return 96
     
     for d in os.listdir(base_dir):
-        if d.endswith(f"-{connector}") or connector in d:
+        if d.endswith(f"-{connector}"):
             edid_path = os.path.join(base_dir, d, "edid")
-            if os.path.isfile(edid_path) and os.path.getsize(edid_path) > 20:
+            if os.path.isfile(edid_path):
                 try:
                     with open(edid_path, "rb") as f:
                         edid = f.read()
-                        # EDID version 1.3/1.4 physical size is at bytes 21 and 22 in centimeters
-                        width_cm = edid[21]
-                        height_cm = edid[22]
+                        if len(edid) > 22:
+                            # EDID version 1.3/1.4 physical size is at bytes 21 and 22 in centimeters
+                            width_cm = edid[21]
+                            height_cm = edid[22]
                         if width_cm > 0 and height_cm > 0:
                             w_inch = width_cm * 0.393701
                             h_inch = height_cm * 0.393701
@@ -61,13 +62,10 @@ def query_gnome():
         
     if connector:
         # Find physical monitor modes for this connector
-        # A bit hacky: find the connector string, then find the mode where is-current is true
-        parts = out.split(f'string "{connector}"')
-        if len(parts) > 1:
-            block = parts[1]
-            modes_block = block.split('array [')[1]
-            # split by struct
-            structs = modes_block.split('struct {')
+        idx = out.find(f'string "{connector}"')
+        if idx != -1:
+            sub_out = out[idx:]
+            structs = sub_out.split('struct {')
             for s in structs:
                 if 'string "is-current"' in s and 'boolean true' in s:
                     res_match = re.search(r'int32\s+(\d+)\s+int32\s+(\d+)', s)
@@ -88,7 +86,7 @@ def query_gnome():
         "height": h_px,
         "scale": scale,
         "physical_dpi": phys_dpi,
-        "ideal_xwayland_policy": "Partially Scaled",
+        "ideal_xwayland_policy": "Framebuffer Upscale" if scale > 1.0 else "N/A (desktop not scaled)",
         "target_wine_dpi": int(round(phys_dpi / scale))
     }
 
@@ -131,7 +129,7 @@ def query_kde():
                     "height": h_px,
                     "scale": scale,
                     "physical_dpi": phys_dpi,
-                    "ideal_xwayland_policy": "Apply scaling themselves",
+                    "ideal_xwayland_policy": "Apply scaling themselves" if scale > 1.0 else "N/A (desktop not scaled)",
                     "target_wine_dpi": phys_dpi
                 }
     return None
@@ -171,7 +169,7 @@ def query_cosmic():
                     "height": h_px,
                     "scale": scale,
                     "physical_dpi": phys_dpi,
-                    "ideal_xwayland_policy": "Optimize for gaming",
+                    "ideal_xwayland_policy": "Optimize for gaming" if scale > 1.0 else "N/A (desktop not scaled)",
                     "target_wine_dpi": phys_dpi
                 }
     return None

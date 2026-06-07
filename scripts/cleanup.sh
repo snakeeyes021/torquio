@@ -48,8 +48,8 @@ fi
 
 # Scaling Restore Prompt
 ORIG_SCALE=$(get_config_val "original_scale_factor" "")
-AUTO_SCALE=$(get_config_val "auto_scale_mutter" "false")
-if [ -n "$ORIG_SCALE" ] && [ "$AUTO_SCALE" = "true" ]; then
+MANAGE_GRAPHICS=$(get_config_val "manage_graphics" "false")
+if [ -n "$ORIG_SCALE" ] && ( [ "$MANAGE_GRAPHICS" = "true" ] || [ "$(get_config_val "auto_scale_mutter" "false")" = "true" ] ); then
     echo ""
     echo -e "Torquio detected that host display scaling was modified from ${wine}$ORIG_SCALE${reset} to ${wine}1.0${reset}."
     read -p "Would you like to restore your host display scale to $ORIG_SCALE? [Y/n]: " restore_confirm

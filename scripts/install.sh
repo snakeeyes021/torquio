@@ -42,23 +42,20 @@ fi
 # 2. Scaling Setup Pre-Installation Prompts
 echo -e "${wine}=== Display Scaling Setup ===${reset}"
 if [ "$AUTO_ACCEPT" = true ]; then
-    set_config_val "auto_scale_mutter" "false"
-    set_config_val "auto_dpi_detect" "true"
+    set_config_val "manage_graphics" "false"
     set_config_val "manual_dpi" "96"
-    echo -e "Using default: auto_scale_mutter=${wine}false${reset}, auto_dpi_detect=${wine}true${reset}"
+    echo -e "Using default: manage_graphics=${wine}false${reset}, manual_dpi=${wine}96${reset}"
 else
     echo "Torquio can automatically manage host display scaling and Wine DPI settings to"
     echo "ensure that Dorico and other applications render correctly on High-DPI screens."
     echo ""
     read -p "Would you like Torquio to automatically manage display scaling and DPI? [Y/n]: " manage_scaling
     if [[ ! "$manage_scaling" =~ ^[Nn]$ ]]; then
-        set_config_val "auto_scale_mutter" "true"
-        set_config_val "auto_dpi_detect" "true"
+        set_config_val "manage_graphics" "true"
         set_config_val "manual_dpi" "96"
         echo -e "  [${green}ENABLED${reset}] Automatic display scaling and DPI management enabled."
     else
-        set_config_val "auto_scale_mutter" "false"
-        set_config_val "auto_dpi_detect" "false"
+        set_config_val "manage_graphics" "false"
         set_config_val "manual_dpi" "96"
         echo -e "  [${red}DISABLED${reset}] Automatic display scaling disabled. Standard 96 DPI will be used."
     fi
