@@ -144,7 +144,6 @@ if [ "$AUTO_ACCEPT" = false ] && { [ "$CONTAINER_EXISTS" = true ] || [ "$PREFIX_
                 else
                     rc=$?
                     if [ $rc -eq 10 ]; then
-                        echo "Cancelled."
                         exit 10
                     else
                         exit $rc
