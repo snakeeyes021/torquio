@@ -1279,7 +1279,19 @@ show_menu() {
             read -p "Select an option (1-9): " choice
             echo ""
             case "$choice" in
-                1)  "$SCRIPT_DIR/scripts/install.sh" ;;
+                1)
+                    if "$SCRIPT_DIR/scripts/install.sh"; then
+                        :
+                    else
+                        local rc=$?
+                        if [ $rc -eq 10 ]; then
+                            clear
+                            continue
+                        else
+                            exit $rc
+                        fi
+                    fi
+                    ;;
                 2)  "$SCRIPT_DIR/scripts/cleanup.sh" ;;
                 3)  show_status ;;
                 4)  configure_graphics; clear; continue ;;
@@ -1299,7 +1311,19 @@ show_menu() {
             read -p "Select an option (1-4): " choice
             echo ""
             case "$choice" in
-                1)  "$SCRIPT_DIR/scripts/install.sh" ;;
+                1)
+                    if "$SCRIPT_DIR/scripts/install.sh"; then
+                        :
+                    else
+                        local rc=$?
+                        if [ $rc -eq 10 ]; then
+                            clear
+                            continue
+                        else
+                            exit $rc
+                        fi
+                    fi
+                    ;;
                 2)  "$SCRIPT_DIR/scripts/cleanup.sh" ;;
                 3)  show_status ;;
                 4)  exit 0 ;;

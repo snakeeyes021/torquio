@@ -116,12 +116,12 @@ if [ "$AUTO_ACCEPT" = false ] && { [ "$CONTAINER_EXISTS" = true ] || [ "$PREFIX_
                     rm -rf "$TORQUIO_PREFIX_DIR"
                 else
                     echo "Cancelled."
-                    exit 0
+                    exit 10
                 fi
                 ;;
             *)
                 echo "Installation cancelled."
-                exit 0
+                exit 10
                 ;;
         esac
     else
@@ -158,12 +158,12 @@ if [ "$AUTO_ACCEPT" = false ] && { [ "$CONTAINER_EXISTS" = true ] || [ "$PREFIX_
                     rm -rf "$TORQUIO_PREFIX_DIR"
                 else
                     echo "Cancelled."
-                    exit 0
+                    exit 10
                 fi
                 ;;
             *)
                 echo "Installation cancelled."
-                exit 0
+                exit 10
                 ;;
         esac
     fi
@@ -469,7 +469,7 @@ if [ "$AUTO_ACCEPT" = false ]; then
     read -p "Proceed with the wizard installation tasks? [Y/n]: " confirm_install
     if [[ "$confirm_install" =~ ^[Nn]$ ]]; then
         echo -e "${red}Installation cancelled.${reset}"
-        exit 0
+        exit 10
     fi
 fi
 
