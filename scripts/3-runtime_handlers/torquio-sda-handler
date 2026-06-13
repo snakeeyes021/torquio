@@ -143,7 +143,7 @@ if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
 fi
 
 # --- Keyboard Auto-Repeat Lag Remedy (xset) ---
-distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c 'xset r rate 500 30 && for keycode in {10..19} 23 {24..33} 36 {38..48} {52..61} 65; do xset -r $keycode; done' >/dev/null 2>&1 || true
+distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c 'xset r rate 500 30 && for keycode in {10..21} 23 {24..35} 36 {38..49} 51 {52..61} 65; do xset -r $keycode; done' >/dev/null 2>&1 || true
 
 URL="$1"
 
