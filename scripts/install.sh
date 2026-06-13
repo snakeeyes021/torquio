@@ -113,6 +113,10 @@ if [ "$AUTO_ACCEPT" = false ] && { [ "$CONTAINER_EXISTS" = true ] || [ "$PREFIX_
                     fi
                 fi
                 ;;
+            3)
+                echo -e "${red}Installation cancelled.${reset}"
+                exit 10
+                ;;
             *)
                 echo "Invalid selection. Installation cancelled."
                 exit 10
@@ -149,6 +153,10 @@ if [ "$AUTO_ACCEPT" = false ] && { [ "$CONTAINER_EXISTS" = true ] || [ "$PREFIX_
                         exit $rc
                     fi
                 fi
+                ;;
+            5)
+                echo -e "${red}Installation cancelled.${reset}"
+                exit 10
                 ;;
             *)
                 echo "Invalid selection. Installation cancelled."
