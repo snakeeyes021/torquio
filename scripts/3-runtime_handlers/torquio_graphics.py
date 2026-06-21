@@ -125,23 +125,23 @@ def query_gnome():
         if is_integer_scale:
             target_dpi = max(96, phys_dpi)
             target_factor = int(scale)
-            ideal_policy = f"[GNOME] Native Integer Scaling (xwayland-scaling-factor={target_factor} or unset)" if scale > 1.0 else "N/A (desktop not scaled)"
+            ideal_policy = f"[GNOME] Native Integer Scaling (xwayland-scaling-factor={target_factor} or unset)" if scale > 1.0 else "[GNOME] Native (no scaling)"
             rec_formula = f"Formula: WINE DPI matches physical ideal DPI ({target_dpi} DPI)"
         else:
             target_dpi = max(96, int(round(phys_dpi / scale)))
             target_factor = 1
-            ideal_policy = "[GNOME] Framebuffer Upscale (xwayland-scaling-factor=1)" if scale > 1.0 else "N/A (desktop not scaled)"
+            ideal_policy = "[GNOME] Framebuffer Upscale (xwayland-scaling-factor=1)" if scale > 1.0 else "[GNOME] Native (no scaling)"
             rec_formula = f"Formula: {phys_dpi} physical ideal DPI / {scale}x GNOME upscale = {target_dpi} target DPI"
     else:
         if is_integer_scale:
             target_dpi = int(round(96 * scale))
             target_factor = int(scale)
-            ideal_policy = f"[GNOME] Native Integer Scaling (xwayland-scaling-factor={target_factor})" if scale > 1.0 else "N/A (desktop not scaled)"
+            ideal_policy = f"[GNOME] Native Integer Scaling (xwayland-scaling-factor={target_factor})" if scale > 1.0 else "[GNOME] Native (no scaling)"
             rec_formula = f"Formula: Standard 96 DPI baseline * {scale}x scale = {target_dpi} target DPI"
         else:
             target_dpi = 96
             target_factor = 1
-            ideal_policy = "[GNOME] Framebuffer Upscale (xwayland-scaling-factor=1)" if scale > 1.0 else "N/A (desktop not scaled)"
+            ideal_policy = "[GNOME] Framebuffer Upscale (xwayland-scaling-factor=1)" if scale > 1.0 else "[GNOME] Native (no scaling)"
             rec_formula = "Formula: Standard 96 DPI baseline (compositor upscales UI)"
 
     return {
@@ -212,7 +212,7 @@ def query_kde():
                     "height": h_px,
                     "scale": scale,
                     "physical_dpi": phys_dpi,
-                    "ideal_xwayland_policy": "Apply scaling themselves" if scale > 1.0 else "N/A (desktop not scaled)",
+                    "ideal_xwayland_policy": "Apply scaling themselves" if scale > 1.0 else "[KDE] Native (no scaling)",
                     "target_wine_dpi": target_dpi,
                     "target_xwayland_factor": 1,
                     "rec_formula": rec_formula
@@ -264,7 +264,7 @@ def query_cosmic():
                     "height": h_px,
                     "scale": scale,
                     "physical_dpi": phys_dpi,
-                    "ideal_xwayland_policy": "Optimize for gaming" if scale > 1.0 else "N/A (desktop not scaled)",
+                    "ideal_xwayland_policy": "Optimize for gaming" if scale > 1.0 else "[COSMIC] Native (no scaling)",
                     "target_wine_dpi": target_dpi,
                     "target_xwayland_factor": 1,
                     "rec_formula": rec_formula

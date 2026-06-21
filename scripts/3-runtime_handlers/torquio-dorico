@@ -53,6 +53,7 @@ if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
         DE=$(echo "$GRAPHICS_JSON" | grep -o '"de": "[^"]*' | cut -d'"' -f4)
         TARGET_DPI=$(echo "$GRAPHICS_JSON" | grep -o '"target_wine_dpi": [0-9]*' | cut -d' ' -f2)
         TARGET_FACTOR=$(echo "$GRAPHICS_JSON" | grep -o '"target_xwayland_factor": [0-9]*' | cut -d' ' -f2)
+        SCALE=$(echo "$GRAPHICS_JSON" | grep -o '"scale": [0-9.]*' | cut -d' ' -f2)
         
         if [ -n "$TARGET_DPI" ] && [ "$TARGET_DPI" -gt 0 ]; then
             DPI_TO_SET="$TARGET_DPI"
@@ -82,7 +83,10 @@ if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
                     fi
                     set_config_val "warn_xwayland_change" "true"
                 fi
-                set_config_val "original_scale_factor" "${CURRENT_POLICY:-0}"
+                local backup_val=$(get_config_val "original_scale_factor" "")
+                if [ -z "$backup_val" ]; then
+                    set_config_val "original_scale_factor" "${CURRENT_POLICY:-0}"
+                fi
                 if gsettings list-schemas | grep -q org.gnome.mutter.wayland; then
                     gsettings set org.gnome.mutter.wayland xwayland-scaling-factor "$DESIRED_POLICY" 2>/dev/null || true
                 else
@@ -104,7 +108,10 @@ if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
                     fi
                     set_config_val "warn_xwayland_change" "true"
                 fi
-                set_config_val "original_kde_policy" "${CURRENT_POLICY:-false}"
+                local backup_val=$(get_config_val "original_kde_policy" "")
+                if [ -z "$backup_val" ]; then
+                    set_config_val "original_kde_policy" "${CURRENT_POLICY:-false}"
+                fi
                 kwriteconfig6 --file kdeglobals --group KScreen --key XwaylandClientsScale true 2>/dev/null || true
                 kwriteconfig6 --file kdeglobals --group KScreen --key XwaylandClientScale true 2>/dev/null || true
                 dbus-send --session --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure 2>/dev/null || true
@@ -121,7 +128,10 @@ if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
                     fi
                     set_config_val "warn_xwayland_change" "true"
                 fi
-                set_config_val "original_cosmic_policy" "${CURRENT_POLICY:-none}"
+                local backup_val=$(get_config_val "original_cosmic_policy" "")
+                if [ -z "$backup_val" ]; then
+                    set_config_val "original_cosmic_policy" "${CURRENT_POLICY:-none}"
+                fi
                 mkdir -p ~/.config/cosmic/com.system76.CosmicComp/v1
                 echo "fractional" > ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null || true
             fi
