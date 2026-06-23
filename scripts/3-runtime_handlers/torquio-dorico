@@ -75,7 +75,7 @@ if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
             
             if [ -n "$DESIRED_POLICY" ] && [ "$CURRENT_POLICY" != "$DESIRED_POLICY" ]; then
                 if [ "$WARN_DISMISSED" != "true" ]; then
-                    local warn_msg="Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This is a persistent system setting change (not temporary) and may affect the size/rendering of other XWayland applications going forward. You may also want to restart any currently running XWayland applications after enabling this mode.\n\nTorquio will back up your current settings first so they can be easily restored later.\n\nAllow Torquio to manage this?"
+                    warn_msg="Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This is a persistent system setting change (not temporary) and may affect the size/rendering of other XWayland applications going forward. You may also want to restart any currently running XWayland applications after enabling this mode.\n\nTorquio will back up your current settings first so they can be easily restored later.\n\nAllow Torquio to manage this?"
                     if command -v zenity >/dev/null 2>&1; then
                         zenity --question --title="Torquio Graphics Management" --text="$warn_msg" || exit 1
                     elif command -v kdialog >/dev/null 2>&1; then
@@ -83,7 +83,7 @@ if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
                     fi
                     set_config_val "warn_xwayland_change" "true"
                 fi
-                local backup_val=$(get_config_val "original_scale_factor" "")
+                backup_val=$(get_config_val "original_scale_factor" "")
                 if [ -z "$backup_val" ]; then
                     set_config_val "original_scale_factor" "${CURRENT_POLICY:-0}"
                 fi
@@ -100,7 +100,7 @@ if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
             fi
             if [ "$CURRENT_POLICY" != "true" ]; then
                 if [ "$WARN_DISMISSED" != "true" ]; then
-                    local warn_msg="Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This is a persistent system setting change (not temporary) and may affect the size/rendering of other XWayland applications going forward. You may also want to restart any currently running XWayland applications after enabling this mode.\n\nTorquio will back up your current settings first so they can be easily restored later.\n\nAllow Torquio to manage this?"
+                    warn_msg="Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This is a persistent system setting change (not temporary) and may affect the size/rendering of other XWayland applications going forward. You may also want to restart any currently running XWayland applications after enabling this mode.\n\nTorquio will back up your current settings first so they can be easily restored later.\n\nAllow Torquio to manage this?"
                     if command -v zenity >/dev/null 2>&1; then
                         zenity --question --title="Torquio Graphics Management" --text="$warn_msg" || exit 1
                     elif command -v kdialog >/dev/null 2>&1; then
@@ -108,7 +108,7 @@ if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
                     fi
                     set_config_val "warn_xwayland_change" "true"
                 fi
-                local backup_val=$(get_config_val "original_kde_policy" "")
+                backup_val=$(get_config_val "original_kde_policy" "")
                 if [ -z "$backup_val" ]; then
                     set_config_val "original_kde_policy" "${CURRENT_POLICY:-false}"
                 fi
@@ -120,7 +120,7 @@ if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
             CURRENT_POLICY=$(cat ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null)
             if [ "$CURRENT_POLICY" != "fractional" ]; then
                 if [ "$WARN_DISMISSED" != "true" ]; then
-                    local warn_msg="Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This is a persistent system setting change (not temporary) and may affect the size/rendering of other XWayland applications going forward. You may also want to restart any currently running XWayland applications after enabling this mode.\n\nTorquio will back up your current settings first so they can be easily restored later.\n\nAllow Torquio to manage this?"
+                    warn_msg="Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This is a persistent system setting change (not temporary) and may affect the size/rendering of other XWayland applications going forward. You may also want to restart any currently running XWayland applications after enabling this mode.\n\nTorquio will back up your current settings first so they can be easily restored later.\n\nAllow Torquio to manage this?"
                     if command -v zenity >/dev/null 2>&1; then
                         zenity --question --title="Torquio Graphics Management" --text="$warn_msg" || exit 1
                     elif command -v kdialog >/dev/null 2>&1; then
@@ -128,7 +128,7 @@ if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
                     fi
                     set_config_val "warn_xwayland_change" "true"
                 fi
-                local backup_val=$(get_config_val "original_cosmic_policy" "")
+                backup_val=$(get_config_val "original_cosmic_policy" "")
                 if [ -z "$backup_val" ]; then
                     set_config_val "original_cosmic_policy" "${CURRENT_POLICY:-none}"
                 fi
@@ -169,11 +169,53 @@ if [ -f "\$LAUNCH_PATH_FILE" ]; then
     fi
 fi
 
-cd "\$WINEPREFIX/drive_c/Program Files/Steinberg/Dorico6"
-if [ -n "\$WIN_PATH" ]; then
-    wine 'Dorico6.exe' "\$WIN_PATH"
+PRIMARY_DORICO="\$WINEPREFIX/drive_c/Program Files/Steinberg/Dorico6/Dorico6.exe"
+DORICO_EXE=""
+if [ -f "\$PRIMARY_DORICO" ]; then
+    DORICO_EXE="\$PRIMARY_DORICO"
 else
-    wine 'Dorico6.exe'
+    DORICO_EXE=\$(find "\$WINEPREFIX/drive_c/Program Files" "\$WINEPREFIX/drive_c/Program Files (x86)" -type f -iname "*dorico*.exe" 2>/dev/null | sort -V | tail -n 1)
+fi
+
+if [ -z "\$DORICO_EXE" ]; then
+    MSG="Dorico could not be located in your Wine prefix.\\n\\nPlease open the Steinberg Download Assistant (SDA) to download and install Dorico."
+    if command -v zenity >/dev/null 2>&1; then
+        zenity --error --text="\$MSG" --title="Torquio Launch Error" --width=400 2>/dev/null
+    elif command -v kdialog >/dev/null 2>&1; then
+        kdialog --error "\$MSG" --title "Torquio Launch Error" 2>/dev/null
+    else
+        echo -e "\\033[1;31mError: \$MSG\\033[0m"
+    fi
+    exit 1
+fi
+
+DORICO_DIR=\$(dirname "\$DORICO_EXE")
+DORICO_NAME=\$(basename "\$DORICO_EXE")
+
+# Detect version
+DORICO_VER=\$(basename "\$DORICO_DIR" | tr -cd '0-9')
+[ -z "\$DORICO_VER" ] && DORICO_VER="6"
+DORICO_APPDATA_DIR="\$WINEPREFIX/drive_c/users/\$USER/AppData/Roaming/Steinberg/Dorico \$DORICO_VER"
+
+# Import staged key commands if any exist
+STAGED_ZIP="\$HOME/.local/share/torquio/staged_keycommands.zip"
+STAGED_JSON="\$HOME/.local/share/torquio/staged_keycommands.json"
+
+if [ -f "\$STAGED_ZIP" ]; then
+    mkdir -p "\$DORICO_APPDATA_DIR"
+    unzip -o "\$STAGED_ZIP" -d "\$DORICO_APPDATA_DIR" >/dev/null 2>&1 || true
+    rm -f "\$STAGED_ZIP"
+elif [ -f "\$STAGED_JSON" ]; then
+    mkdir -p "\$DORICO_APPDATA_DIR"
+    cp "\$STAGED_JSON" "\$DORICO_APPDATA_DIR/" >/dev/null 2>&1 || true
+    rm -f "\$STAGED_JSON"
+fi
+
+cd "\$DORICO_DIR"
+if [ -n "\$WIN_PATH" ]; then
+    wine "\$DORICO_NAME" "\$WIN_PATH"
+else
+    wine "\$DORICO_NAME"
 fi
 EOF
 chmod +x "$RUNNER_SCRIPT"

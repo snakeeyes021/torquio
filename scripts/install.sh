@@ -588,7 +588,7 @@ if [ "$INSTALL_SOFTWARE" = true ]; then
         distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && ./scripts/2-install/install_noteperformer.sh"
     fi
     echo "Extracting Desktop Icons..."
-    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && ./scripts/2-install/extract_icons.sh"
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && ./scripts/2-install/extract_icons.sh --initial"
 fi
 
 if [ "$INTEGRATE" = true ]; then
@@ -656,18 +656,15 @@ fi
 
 # Apply Keyboard Shortcuts Import if configured
 if [ -n "$IMPORT_SHORTCUTS_PATH" ] && [ -f "$IMPORT_SHORTCUTS_PATH" ]; then
-    echo "Importing keyboard shortcuts from $IMPORT_SHORTCUTS_PATH..."
-    keycommands_dir=$(find "$TORQUIO_PREFIX_DIR/drive_c/users" -type d -path "*/AppData/Roaming/Steinberg/Dorico*" 2>/dev/null | head -n 1)
-    if [ -n "$keycommands_dir" ] && [ -d "$keycommands_dir" ]; then
-        if [[ "$IMPORT_SHORTCUTS_PATH" =~ \.zip$ ]]; then
-            unzip -o "$IMPORT_SHORTCUTS_PATH" -d "$keycommands_dir" >/dev/null || true
-        else
-            cp "$IMPORT_SHORTCUTS_PATH" "$keycommands_dir/"
-        fi
-        echo "Keyboard shortcuts successfully imported!"
+    echo "Staging keyboard shortcuts from $IMPORT_SHORTCUTS_PATH..."
+    rm -f "$TORQUIO_DATA_DIR"/staged_keycommands.*
+    
+    if [[ "$IMPORT_SHORTCUTS_PATH" =~ \.zip$ ]]; then
+        cp "$IMPORT_SHORTCUTS_PATH" "$TORQUIO_DATA_DIR/staged_keycommands.zip"
     else
-        echo "Warning: Dorico AppData directory not found. Key commands could not be imported automatically."
+        cp "$IMPORT_SHORTCUTS_PATH" "$TORQUIO_DATA_DIR/staged_keycommands.json"
     fi
+    echo "Keyboard shortcuts staged. They will be automatically imported the first time Dorico is launched."
 fi
 
 # Apply Wine registry entries for scale parameters immediately
@@ -685,7 +682,7 @@ if [ -d "$TORQUIO_PREFIX_DIR" ] && distrobox list 2>/dev/null | grep -q "$TORQUI
     distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wineserver -k && wineserver -w" >/dev/null 2>&1 || true
 fi
 
-if [ "$ACTION" = "reinstall_software" ]; then
+if [ "$ACTION" = "install" ] || [ "$ACTION" = "resume" ]; then
     echo ""
     echo "==========================================="
     echo "   Software Download Phase                 "

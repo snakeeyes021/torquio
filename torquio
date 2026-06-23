@@ -1117,11 +1117,6 @@ export_keycommands() {
 
 import_keycommands() {
     echo "=== Importing Key Commands Backup ==="
-    local keycommands_dir=$(find "$TORQUIO_PREFIX_DIR/drive_c/users" -type d -path "*/AppData/Roaming/Steinberg/Dorico*" 2>/dev/null | head -n 1)
-    if [ -z "$keycommands_dir" ] || [ ! -d "$keycommands_dir" ]; then
-        echo "Error: Dorico AppData directory not found. Key commands import cancelled."
-        return
-    fi
     
     local downloads_dir="${XDG_DOWNLOAD_DIR:-$HOME/Downloads}"
     mapfile -t backups < <(find "$downloads_dir" -maxdepth 1 -type f \( -name "torquio_keycommands_backup.zip" -o -name "keycommands_*.json" \) 2>/dev/null)
@@ -1157,13 +1152,17 @@ import_keycommands() {
         return
     fi
     
-    echo "Importing: $selected_backup"
+    echo "Staging backup: $selected_backup"
+    
+    # Clean up any existing staged files to prevent conflicts
+    rm -f "$TORQUIO_DATA_DIR"/staged_keycommands.*
+    
     if [[ "$selected_backup" =~ \.zip$ ]]; then
-        unzip -o "$selected_backup" -d "$keycommands_dir"
+        cp "$selected_backup" "$TORQUIO_DATA_DIR/staged_keycommands.zip"
     else
-        cp "$selected_backup" "$keycommands_dir/"
+        cp "$selected_backup" "$TORQUIO_DATA_DIR/staged_keycommands.json"
     fi
-    echo "Key commands successfully imported!"
+    echo "Keyboard shortcuts staged successfully! They will be automatically imported the next time you launch Dorico."
 }
 
 manage_keycommands() {

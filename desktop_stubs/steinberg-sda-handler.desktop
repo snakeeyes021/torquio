@@ -5,4 +5,5 @@ Icon=torquio-sda
 Type=Application
 Terminal=false
 StartupWMClass=steinberg download assistant.exe
+Categories=AudioVideo;Audio;
 MimeType=x-scheme-handler/net-steinberg-sda;

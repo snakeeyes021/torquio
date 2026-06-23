@@ -4,10 +4,25 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../common.sh"
 
+INITIAL_INSTALL=false
+if [[ "$1" == "--initial" ]]; then
+    INITIAL_INSTALL=true
+fi
+
 # Ensure directories exist
 ICON_DIR="$HOME/.local/share/icons/hicolor/256x256/apps"
 mkdir -p "$ICON_DIR"
 mkdir -p "$HOME/.local/share/applications"
+
+update_host_icon_cache() {
+    if command -v distrobox-host-exec >/dev/null 2>&1; then
+        distrobox-host-exec gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor/" >/dev/null 2>&1 || true
+        distrobox-host-exec touch "$HOME/.local/share/icons/hicolor" >/dev/null 2>&1 || true
+    elif command -v gtk-update-icon-cache >/dev/null 2>&1; then
+        gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor/" >/dev/null 2>&1 || true
+        touch "$HOME/.local/share/icons/hicolor" >/dev/null 2>&1 || true
+    fi
+}
 
 extract_icon() {
     local primary_path="$1"
@@ -22,24 +37,27 @@ extract_icon() {
     if [ -f "$primary_path" ]; then
         exe_path="$primary_path"
     else
-        echo "Warning: Hardcoded path not found for $icon_name."
-        echo "Initiating fallback search using pattern: $search_pattern..."
+        if [ "$INITIAL_INSTALL" = "false" ]; then
+            echo "Warning: Hardcoded path not found for $icon_name."
+            echo "Initiating fallback search using pattern: $search_pattern..."
+        fi
         
         # 2. Fallback search in Program Files and Program Files (x86)
         # Using case-insensitive matching and catching common naming variations
         exe_path=$(find "$TORQUIO_PREFIX_DIR/drive_c/Program Files" "$TORQUIO_PREFIX_DIR/drive_c/Program Files (x86)" -type f -iname "$search_pattern" 2>/dev/null | head -n 1)
         
         if [ -z "$exe_path" ]; then
-            echo "Error: Could not locate executable for $icon_name even with fallback search. Skipping."
+            if [ "$INITIAL_INSTALL" = "true" ]; then
+                echo "Info: $icon_name is not yet installed in the Wine prefix. The launcher and icon will be automatically registered when installed via the Download Assistant."
+            else
+                echo "Error: Could not locate executable for $icon_name even with fallback search. Skipping."
+            fi
             return
         fi
-        echo "Found fallback executable at: $exe_path"
-    fi
-    
-    # --- Dynamic Desktop Launcher Registration ---
-    if [ -n "$desktop_name" ] && [ -f "$SCRIPT_DIR/../../desktop_stubs/$desktop_name" ]; then
-        echo "Registering desktop launcher: $desktop_name..."
-        sed "s|\$HOME|$HOME|g" "$SCRIPT_DIR/../../desktop_stubs/$desktop_name" > "$HOME/.local/share/applications/$desktop_name"
+        
+        if [ "$INITIAL_INSTALL" = "false" ]; then
+            echo "Found fallback executable at: $exe_path"
+        fi
     fi
     
     echo "Extracting icon from $exe_path to $icon_name..."
@@ -94,8 +112,24 @@ extract_icon() {
         rm -rf "$proj_tmp"
     fi
     # ----------------------------------------------
-
+    
     rm -rf "$tmp_dir"
+    
+    # --- Update Host Icon Cache BEFORE Desktop Launcher Registration ---
+    update_host_icon_cache
+    
+    # --- Dynamic Desktop Launcher Registration ---
+    if [ -n "$desktop_name" ] && [ -f "$SCRIPT_DIR/../../desktop_stubs/$desktop_name" ]; then
+        echo "Registering desktop launcher: $desktop_name..."
+        sed "s|\$HOME|$HOME|g" "$SCRIPT_DIR/../../desktop_stubs/$desktop_name" > "$HOME/.local/share/applications/$desktop_name"
+        
+        # Update desktop database for the new launcher
+        if command -v distrobox-host-exec >/dev/null 2>&1; then
+            distrobox-host-exec update-desktop-database "$HOME/.local/share/applications/" >/dev/null 2>&1 || true
+        elif command -v update-desktop-database >/dev/null 2>&1; then
+            update-desktop-database "$HOME/.local/share/applications/" >/dev/null 2>&1 || true
+        fi
+    fi
 }
 
 echo "Extracting Torquio icons and registering launchers..."

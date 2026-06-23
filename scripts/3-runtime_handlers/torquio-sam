@@ -151,7 +151,7 @@ if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
             
             if [ -n "$DESIRED_POLICY" ] && [ "$CURRENT_POLICY" != "$DESIRED_POLICY" ]; then
                 if [ "$WARN_DISMISSED" != "true" ]; then
-                    local warn_msg="Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This is a persistent system setting change (not temporary) and may affect the size/rendering of other XWayland applications going forward. You may also want to restart any currently running XWayland applications after enabling this mode.\n\nTorquio will back up your current settings first so they can be easily restored later.\n\nAllow Torquio to manage this?"
+                    warn_msg="Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This is a persistent system setting change (not temporary) and may affect the size/rendering of other XWayland applications going forward. You may also want to restart any currently running XWayland applications after enabling this mode.\n\nTorquio will back up your current settings first so they can be easily restored later.\n\nAllow Torquio to manage this?"
                     if command -v zenity >/dev/null 2>&1; then
                         zenity --question --title="Torquio Graphics Management" --text="$warn_msg" || exit 1
                     elif command -v kdialog >/dev/null 2>&1; then
@@ -159,7 +159,7 @@ if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
                     fi
                     set_config_val "warn_xwayland_change" "true"
                 fi
-                local backup_val=$(get_config_val "original_scale_factor" "")
+                backup_val=$(get_config_val "original_scale_factor" "")
                 if [ -z "$backup_val" ]; then
                     set_config_val "original_scale_factor" "${CURRENT_POLICY:-0}"
                 fi
@@ -176,7 +176,7 @@ if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
             fi
             if [ "$CURRENT_POLICY" != "true" ]; then
                 if [ "$WARN_DISMISSED" != "true" ]; then
-                    local warn_msg="Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This is a persistent system setting change (not temporary) and may affect the size/rendering of other XWayland applications going forward. You may also want to restart any currently running XWayland applications after enabling this mode.\n\nTorquio will back up your current settings first so they can be easily restored later.\n\nAllow Torquio to manage this?"
+                    warn_msg="Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This is a persistent system setting change (not temporary) and may affect the size/rendering of other XWayland applications going forward. You may also want to restart any currently running XWayland applications after enabling this mode.\n\nTorquio will back up your current settings first so they can be easily restored later.\n\nAllow Torquio to manage this?"
                     if command -v zenity >/dev/null 2>&1; then
                         zenity --question --title="Torquio Graphics Management" --text="$warn_msg" || exit 1
                     elif command -v kdialog >/dev/null 2>&1; then
@@ -184,7 +184,7 @@ if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
                     fi
                     set_config_val "warn_xwayland_change" "true"
                 fi
-                local backup_val=$(get_config_val "original_kde_policy" "")
+                backup_val=$(get_config_val "original_kde_policy" "")
                 if [ -z "$backup_val" ]; then
                     set_config_val "original_kde_policy" "${CURRENT_POLICY:-false}"
                 fi
@@ -196,7 +196,7 @@ if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
             CURRENT_POLICY=$(cat ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null)
             if [ "$CURRENT_POLICY" != "fractional" ]; then
                 if [ "$WARN_DISMISSED" != "true" ]; then
-                    local warn_msg="Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This is a persistent system setting change (not temporary) and may affect the size/rendering of other XWayland applications going forward. You may also want to restart any currently running XWayland applications after enabling this mode.\n\nTorquio will back up your current settings first so they can be easily restored later.\n\nAllow Torquio to manage this?"
+                    warn_msg="Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This is a persistent system setting change (not temporary) and may affect the size/rendering of other XWayland applications going forward. You may also want to restart any currently running XWayland applications after enabling this mode.\n\nTorquio will back up your current settings first so they can be easily restored later.\n\nAllow Torquio to manage this?"
                     if command -v zenity >/dev/null 2>&1; then
                         zenity --question --title="Torquio Graphics Management" --text="$warn_msg" || exit 1
                     elif command -v kdialog >/dev/null 2>&1; then
@@ -204,7 +204,7 @@ if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
                     fi
                     set_config_val "warn_xwayland_change" "true"
                 fi
-                local backup_val=$(get_config_val "original_cosmic_policy" "")
+                backup_val=$(get_config_val "original_cosmic_policy" "")
                 if [ -z "$backup_val" ]; then
                     set_config_val "original_cosmic_policy" "${CURRENT_POLICY:-none}"
                 fi
@@ -244,11 +244,34 @@ if [ -f "\$URL_FILE" ]; then
     rm -f "\$URL_FILE"
 fi
 
-cd "\$WINEPREFIX/drive_c/Program Files/Steinberg/Activation Manager"
-if [ -n "\$URL" ]; then
-    wine 'SteinbergActivationManager.exe' --redirect "\$URL"
+PRIMARY_SAM="\$WINEPREFIX/drive_c/Program Files/Steinberg/Activation Manager/SteinbergActivationManager.exe"
+SAM_EXE=""
+if [ -f "\$PRIMARY_SAM" ]; then
+    SAM_EXE="\$PRIMARY_SAM"
 else
-    wine 'SteinbergActivationManager.exe'
+    SAM_EXE=\$(find "\$WINEPREFIX/drive_c/Program Files" "\$WINEPREFIX/drive_c/Program Files (x86)" -type f -iname "*activation*manager*.exe" 2>/dev/null | head -n 1)
+fi
+
+if [ -z "\$SAM_EXE" ]; then
+    MSG="Steinberg Activation Manager could not be located in your Wine prefix.\\n\\nPlease open the Steinberg Download Assistant (SDA) to install it."
+    if command -v zenity >/dev/null 2>&1; then
+        zenity --error --text="\$MSG" --title="Torquio Launch Error" --width=400 2>/dev/null
+    elif command -v kdialog >/dev/null 2>&1; then
+        kdialog --error "\$MSG" --title "Torquio Launch Error" 2>/dev/null
+    else
+        echo -e "\\033[1;31mError: \$MSG\\033[0m"
+    fi
+    exit 1
+fi
+
+SAM_DIR=\$(dirname "\$SAM_EXE")
+SAM_NAME=\$(basename "\$SAM_EXE")
+
+cd "\$SAM_DIR"
+if [ -n "\$URL" ]; then
+    wine "\$SAM_NAME" --redirect "\$URL"
+else
+    wine "\$SAM_NAME"
 fi
 EOF
 chmod +x "$RUNNER_SCRIPT"
