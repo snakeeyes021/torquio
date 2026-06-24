@@ -572,7 +572,6 @@ print_wizard_banner
 echo -e "${blue}=== Installation Manifest ===${reset}"
 echo -e "  - Graphics Management:        ${wine}$SET_MANAGE${reset}"
 echo -e "  - Target Wine DPI:            ${wine}$SET_MANUAL_DPI DPI${reset}"
-echo -e "  - Match Physical DPI:         ${wine}$SET_MATCH_PHYS${reset}"
 echo -e "  - FreeType Interpreter:       ${wine}v$SET_FREETYPE${reset}"
 if [ -n "$MAPPED_FOLDER_PATH" ]; then
     type_str="Network Drive"
