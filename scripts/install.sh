@@ -120,7 +120,7 @@ if [ "$AUTO_ACCEPT" = false ] && { [ "$CONTAINER_EXISTS" = true ] || [ "$PREFIX_
         echo "  the missing pieces."
         echo ""
         echo "How would you like to proceed?"
-        echo -e "  ${wine}1)${reset} Resume / Repair Incomplete Installation (Recommended)"
+        echo -e "  ${wine}1)${reset} Resume / Repair Incomplete Installation"
         echo -e "  ${wine}2)${reset} Fresh Reinstallation (Deletes container & Wine prefix)"
         echo -e "  ${wine}3)${reset} Cancel and Exit"
         echo ""
