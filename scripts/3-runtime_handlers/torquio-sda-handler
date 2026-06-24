@@ -219,32 +219,48 @@ if [ -z "$URL" ]; then
         # Clean up old status files to avoid stale matches
         find "$TORQUIO_PREFIX_DIR/drive_c/users" -path "*/AppData/Local/Temp/*" -name "*.json" -delete 2>/dev/null || true
         
-        while true; do
-            # Clean up any virtual/unfunctional Windows desktop shortcuts created by installers
-            clean_desktop_lnk
-            
-            # 1. Check if Dorico success status file has been written
-            DORICO_STATUS_FILE=$(find "$TORQUIO_PREFIX_DIR/drive_c/users" -path "*/AppData/Local/Temp/*" -name "*Dorico*Application*Installer.json" 2>/dev/null | head -n 1)
-            
-            if [ -n "$DORICO_STATUS_FILE" ] && [ -f "$DORICO_STATUS_FILE" ]; then
-                artifactId=$(grep -o '"artifactId":\s*"[^"]*"' "$DORICO_STATUS_FILE" | head -n 1 | cut -d'"' -f4)
-                success=$(grep -o '"success":\s*\(true\|false\)' "$DORICO_STATUS_FILE" | head -n 1 | cut -d':' -f2 | tr -d '[:space:]')
-                
-                if [[ "$artifactId" =~ Dorico.*Application_Installer ]] && [ "$success" = "true" ]; then
-                    echo "Dorico installation success detected! Extracting icons..."
-                    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$TORQUIO_REPO_DIR\" && ./scripts/2-install/extract_icons.sh"
-                    mv "$DORICO_STATUS_FILE" "${DORICO_STATUS_FILE}.processed" 2>/dev/null || rm -f "$DORICO_STATUS_FILE"
-                fi
-            fi
-            
-            # 2. Check if the SDA processes have terminated (fallback in case of exit/cancel without installing)
-            if ! distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "ps auxww" | grep -iE "Steinberg Download Assistant\.exe|STEI~B2R\.EXE|aria2c\.exe" > /dev/null; then
-                echo "SDA processes terminated. Exiting watcher."
+        # Wait up to 30 seconds for the SDA processes to start active first
+        echo "Waiting for SDA processes to start..."
+        SDA_STARTED=false
+        for i in {1..15}; do
+            if distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "ps auxww" | grep -iE "Steinberg Download Assistant\.exe|STEI~B2R\.EXE|aria2c\.exe" > /dev/null; then
+                echo "SDA processes detected active."
+                SDA_STARTED=true
                 break
             fi
-            
-            sleep 4
+            sleep 2
         done
+
+        if [ "$SDA_STARTED" = "true" ]; then
+            while true; do
+                # Clean up any virtual/unfunctional Windows desktop shortcuts created by installers
+                clean_desktop_lnk
+                
+                # 1. Check if Dorico success status file has been written
+                DORICO_STATUS_FILE=$(find "$TORQUIO_PREFIX_DIR/drive_c/users" -path "*/AppData/Local/Temp/*" -name "*Dorico*Application*Installer.json" 2>/dev/null | head -n 1)
+                
+                if [ -n "$DORICO_STATUS_FILE" ] && [ -f "$DORICO_STATUS_FILE" ]; then
+                    artifactId=$(grep -o '"artifactId":\s*"[^"]*"' "$DORICO_STATUS_FILE" | head -n 1 | cut -d'"' -f4)
+                    success=$(grep -o '"success":\s*\(true\|false\)' "$DORICO_STATUS_FILE" | head -n 1 | cut -d':' -f2 | tr -d '[:space:]')
+                    
+                    if [[ "$artifactId" =~ Dorico.*Application_Installer ]] && [ "$success" = "true" ]; then
+                        echo "Dorico installation success detected! Extracting icons..."
+                        distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$TORQUIO_REPO_DIR\" && ./scripts/2-install/extract_icons.sh"
+                        mv "$DORICO_STATUS_FILE" "${DORICO_STATUS_FILE}.processed" 2>/dev/null || rm -f "$DORICO_STATUS_FILE"
+                    fi
+                fi
+                
+                # 2. Check if the SDA processes have terminated (fallback in case of exit/cancel without installing)
+                if ! distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "ps auxww" | grep -iE "Steinberg Download Assistant\.exe|STEI~B2R\.EXE|aria2c\.exe" > /dev/null; then
+                    echo "SDA processes terminated. Exiting watcher."
+                    break
+                fi
+                
+                sleep 4
+            done
+        else
+            echo "SDA processes never started. Exiting watcher."
+        fi
     ) > "$HOME/.local/share/torquio/sda_watcher.log" 2>&1 &
 fi
 
