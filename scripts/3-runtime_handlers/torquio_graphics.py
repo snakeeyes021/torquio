@@ -125,23 +125,23 @@ def query_gnome():
         if is_integer_scale:
             target_dpi = max(96, phys_dpi)
             target_factor = int(scale)
-            ideal_policy = f"[GNOME] Native Integer Scaling (xwayland-scaling-factor={target_factor} or unset)" if scale > 1.0 else "[GNOME] Native (no scaling)"
+            ideal_policy = f"Native Integer Scaling (xwayland-scaling-factor={target_factor})" if scale > 1.0 else "Native (no scaling)"
             rec_formula = f"Formula: WINE DPI matches physical ideal DPI ({target_dpi} DPI)"
         else:
             target_dpi = max(96, int(round(phys_dpi / scale)))
             target_factor = 1
-            ideal_policy = "[GNOME] Framebuffer Upscale (xwayland-scaling-factor=1)" if scale > 1.0 else "[GNOME] Native (no scaling)"
+            ideal_policy = "Framebuffer Upscale (xwayland-scaling-factor=1)" if scale > 1.0 else "Native (no scaling)"
             rec_formula = f"Formula: {phys_dpi} physical ideal DPI / {scale}x GNOME upscale = {target_dpi} target DPI"
     else:
         if is_integer_scale:
             target_dpi = int(round(96 * scale))
             target_factor = int(scale)
-            ideal_policy = f"[GNOME] Native Integer Scaling (xwayland-scaling-factor={target_factor})" if scale > 1.0 else "[GNOME] Native (no scaling)"
+            ideal_policy = f"Native Integer Scaling (xwayland-scaling-factor={target_factor})" if scale > 1.0 else "Native (no scaling)"
             rec_formula = f"Formula: Standard 96 DPI baseline * {scale}x scale = {target_dpi} target DPI"
         else:
             target_dpi = 96
             target_factor = 1
-            ideal_policy = "[GNOME] Framebuffer Upscale (xwayland-scaling-factor=1)" if scale > 1.0 else "[GNOME] Native (no scaling)"
+            ideal_policy = "Framebuffer Upscale (xwayland-scaling-factor=1)" if scale > 1.0 else "Native (no scaling)"
             rec_formula = "Formula: Standard 96 DPI baseline (compositor upscales UI)"
 
     return {
@@ -163,113 +163,177 @@ def query_kde():
     if not out:
         return None
     
-    # Parse priority 1
-    blocks = out.split("Output: ")
-    for block in blocks[1:]:
-        if "priority 1" in block or "priority: 1" in block or "primary" in block: # Fallback just in case
-            lines = block.split("\n")
-            tokens = lines[0].split()
-            connector1 = tokens[1] if len(tokens) > 1 else "Unknown"
-            connector2 = tokens[-1] if len(tokens) > 0 else "Unknown"
-            
-            scale = 1.0
-            w_px = 0
-            h_px = 0
-            
-            for line in lines:
-                if "Scale:" in line:
-                    scale_match = re.search(r'Scale:\s*([\d\.]+)', line)
-                    if scale_match:
-                        scale = float(scale_match.group(1))
-                elif "Modes:" in line:
-                    pass
-                elif "*" in line and "x" in line and "@" in line:
-                    res_match = re.search(r'(\d+)x(\d+)@', line)
-                    if res_match:
-                        w_px = int(res_match.group(1))
-                        h_px = int(res_match.group(2))
-            
-            if w_px > 0:
-                phys_dpi = get_edid_dpi(connector1, w_px, h_px)
-                used_connector = connector1
-                if phys_dpi == 96 and connector2 != "Unknown" and connector2 != connector1:
-                    phys_dpi = get_edid_dpi(connector2, w_px, h_px)
-                    used_connector = connector2
-                
-                match_physical = should_match_physical_dpi()
-                if match_physical:
-                    target_dpi = max(96, phys_dpi)
-                    rec_formula = f"Formula: {phys_dpi} physical ideal DPI (Scale XWayland clients themselves)"
-                else:
-                    target_dpi = max(96, int(round(96 * scale)))
-                    rec_formula = f"Formula: Standard 96 DPI baseline * {scale}x scale = {target_dpi} target DPI"
-                
-                return {
-                    "de": "KDE",
-                    "supported": True,
-                    "connector": used_connector,
-                    "width": w_px,
-                    "height": h_px,
-                    "scale": scale,
-                    "physical_dpi": phys_dpi,
-                    "ideal_xwayland_policy": "Apply scaling themselves" if scale > 1.0 else "[KDE] Native (no scaling)",
-                    "target_wine_dpi": target_dpi,
-                    "target_xwayland_factor": 1,
-                    "rec_formula": rec_formula
-                }
-    return None
+    # Parse priority 1 or fall back to the first available output block
+    blocks = [b for b in out.split("Output: ")[1:] if b.strip()]
+    if not blocks:
+        return None
+        
+    target_block = None
+    for block in blocks:
+        if "priority 1" in block or "priority: 1" in block or "primary" in block:
+            target_block = block
+            break
+    if not target_block:
+        target_block = blocks[0]
+        
+    lines = target_block.split("\n")
+    # Retrieve connector name using regex (Output: was stripped during split)
+    connector_match = re.search(r'^\s*(?:\d+\s+)?(\S+)', lines[0])
+    used_connector = connector_match.group(1) if connector_match else "Unknown"
+    
+    scale = 1.0
+    w_px = 0
+    h_px = 0
+    
+    for line in lines:
+        if "Scale:" in line:
+            scale_match = re.search(r'Scale:\s*([\d\.]+)', line)
+            if scale_match:
+                scale = float(scale_match.group(1))
+        elif "Geometry:" in line:
+            geom_match = re.search(r'Geometry:\s*-?\d+,-?\d+\s+(\d+)x(\d+)', line)
+            if geom_match:
+                w_px = int(geom_match.group(1))
+                h_px = int(geom_match.group(2))
+        
+        # Check all lines for the current mode marker '*'
+        if "*" in line and "x" in line:
+            res_match = re.search(r'(\d+)x(\d+)', line)
+            if res_match:
+                w_px_mode = int(res_match.group(1))
+                h_px_mode = int(res_match.group(2))
+                # Only use modes resolution if Geometry didn't successfully set it
+                if w_px == 0:
+                    w_px = w_px_mode
+                    h_px = h_px_mode
+                    
+    if w_px == 0:
+        for line in lines:
+            if "x" in line:
+                res_match = re.search(r'(\d+)x(\d+)', line)
+                if res_match:
+                    w_px = int(res_match.group(1))
+                    h_px = int(res_match.group(2))
+                    break
+                    
+    if w_px == 0:
+        w_px = 1920
+        h_px = 1080
+        
+    phys_dpi = get_edid_dpi(used_connector, w_px, h_px)
+    match_physical = should_match_physical_dpi()
+    if match_physical:
+        target_dpi = max(96, phys_dpi)
+        rec_formula = f"Formula: {phys_dpi} physical ideal DPI (Scale XWayland clients themselves)"
+    else:
+        target_dpi = max(96, int(round(96 * scale)))
+        rec_formula = f"Formula: Standard 96 DPI baseline * {scale}x scale = {target_dpi} target DPI"
+        
+    return {
+        "de": "KDE",
+        "supported": True,
+        "connector": used_connector,
+        "width": w_px,
+        "height": h_px,
+        "scale": scale,
+        "physical_dpi": phys_dpi,
+        "ideal_xwayland_policy": "Scale XWayland clients themselves (XwaylandClientsScale=true)" if scale > 1.0 else "Native (no scaling)",
+        "target_wine_dpi": target_dpi,
+        "target_xwayland_factor": 1,
+        "rec_formula": rec_formula
+    }
 
 def query_cosmic():
     out = run_cmd("cosmic-randr list")
     if not out:
         return None
         
-    blocks = out.split("\n\n")
-    for block in blocks:
-        if "Xwayland primary: true" in block:
-            lines = block.split("\n")
-            tokens = lines[0].split()
-            connector = tokens[0].strip(':') if len(tokens) > 0 else "Unknown"
-            scale = 1.0
-            w_px = 0
-            h_px = 0
+    # Group output by unindented lines to prevent splitting metadata from mode details
+    lines = out.splitlines()
+    blocks = []
+    current_connector = None
+    current_lines = []
+    
+    for line in lines:
+        if not line.strip():
+            continue
+        if not line.startswith(" ") and not line.startswith("\t"):
+            if current_connector:
+                blocks.append((current_connector, current_lines))
+            current_connector = line.split()[0].strip(':') if line.split() else "Unknown"
+            current_lines = [line]
+        else:
+            current_lines.append(line)
             
-            for line in lines:
-                if "Scale:" in line:
-                    scale_match = re.search(r'Scale:\s*([\d\.]+)%', line)
-                    if scale_match:
-                        scale = float(scale_match.group(1)) / 100.0
-                elif "(current)" in line:
-                    res_match = re.search(r'(\d+)x(\d+)', line)
-                    if res_match:
-                        w_px = int(res_match.group(1))
-                        h_px = int(res_match.group(2))
+    if current_connector:
+        blocks.append((current_connector, current_lines))
+        
+    if not blocks:
+        return None
+        
+    target_connector = None
+    target_lines = None
+    for connector, b_lines in blocks:
+        block_text = "\n".join(b_lines)
+        if "Xwayland primary: true" in block_text or "Xwayland primary: True" in block_text:
+            target_connector = connector
+            target_lines = b_lines
+            break
             
-            if w_px > 0:
-                phys_dpi = get_edid_dpi(connector, w_px, h_px)
+    if not target_connector:
+        target_connector = blocks[0][0]
+        target_lines = blocks[0][1]
+        
+    scale = 1.0
+    w_px = 0
+    h_px = 0
+    
+    for line in target_lines:
+        if "Scale:" in line:
+            scale_match = re.search(r'Scale:\s*([\d\.]+)%', line)
+            if scale_match:
+                scale = float(scale_match.group(1)) / 100.0
+        elif "(current)" in line:
+            res_match = re.search(r'(\d+)x(\d+)', line)
+            if res_match:
+                w_px = int(res_match.group(1))
+                h_px = int(res_match.group(2))
                 
-                match_physical = should_match_physical_dpi()
-                if match_physical:
-                    target_dpi = max(96, phys_dpi)
-                    rec_formula = f"Formula: {phys_dpi} physical ideal DPI (Scale XWayland clients themselves)"
-                else:
-                    target_dpi = max(96, int(round(96 * scale)))
-                    rec_formula = f"Formula: Standard 96 DPI baseline * {scale}x scale = {target_dpi} target DPI"
-                
-                return {
-                    "de": "COSMIC",
-                    "supported": True,
-                    "connector": connector,
-                    "width": w_px,
-                    "height": h_px,
-                    "scale": scale,
-                    "physical_dpi": phys_dpi,
-                    "ideal_xwayland_policy": "Optimize for gaming" if scale > 1.0 else "[COSMIC] Native (no scaling)",
-                    "target_wine_dpi": target_dpi,
-                    "target_xwayland_factor": 1,
-                    "rec_formula": rec_formula
-                }
-    return None
+    if w_px == 0:
+        for line in target_lines:
+            if "x" in line and ("@" in line or "Hz" in line):
+                res_match = re.search(r'(\d+)x(\d+)', line)
+                if res_match:
+                    w_px = int(res_match.group(1))
+                    h_px = int(res_match.group(2))
+                    break
+                    
+    if w_px == 0:
+        w_px = 1920
+        h_px = 1080
+        
+    phys_dpi = get_edid_dpi(target_connector, w_px, h_px)
+    match_physical = should_match_physical_dpi()
+    if match_physical:
+        target_dpi = max(96, phys_dpi)
+        rec_formula = f"Formula: {phys_dpi} physical ideal DPI (Scale XWayland clients themselves)"
+    else:
+        target_dpi = max(96, int(round(96 * scale)))
+        rec_formula = f"Formula: Standard 96 DPI baseline * {scale}x scale = {target_dpi} target DPI"
+        
+    return {
+        "de": "COSMIC",
+        "supported": True,
+        "connector": target_connector,
+        "width": w_px,
+        "height": h_px,
+        "scale": scale,
+        "physical_dpi": phys_dpi,
+        "ideal_xwayland_policy": "Optimize for gaming and full-screen apps (descale_xwayland=fractional)" if scale > 1.0 else "Native (no scaling)",
+        "target_wine_dpi": target_dpi,
+        "target_xwayland_factor": 1,
+        "rec_formula": rec_formula
+    }
 
 def query_x11():
     out = run_cmd("xrandr --current")
@@ -314,8 +378,9 @@ def query_x11():
     if w_px == 0:
         return None
         
+    phys_dpi = get_edid_dpi(connector, w_px, h_px)
     return {
-        "de": "X11 (Generic)",
+        "de": "Generic",
         "supported": False,
         "connector": connector,
         "width": w_px,
@@ -330,35 +395,45 @@ def query_x11():
 
 def main():
     session_type = os.environ.get("XDG_SESSION_TYPE", "").lower()
-    de = os.environ.get("XDG_CURRENT_DESKTOP", "").upper()
+    de_env = os.environ.get("XDG_CURRENT_DESKTOP", "").upper()
     
+    if "GNOME" in de_env:
+        de_name = "GNOME"
+    elif "KDE" in de_env:
+        de_name = "KDE"
+    elif "COSMIC" in de_env:
+        de_name = "COSMIC"
+    elif "CINNAMON" in de_env:
+        de_name = "Cinnamon"
+    else:
+        de_name = de_env if de_env else "Generic"
+        
     result = None
     if session_type == "x11":
         result = query_x11()
-        if result:
-            result["de"] = f"{de} (X11)" if de else "X11 (Generic)"
     else:
-        if "GNOME" in de:
+        if de_name == "GNOME":
             result = query_gnome()
-        elif "KDE" in de:
+        elif de_name == "KDE":
             result = query_kde()
-        elif "COSMIC" in de:
+        elif de_name == "COSMIC":
             result = query_cosmic()
             
     if not result:
         # Fallback to query_x11 if Wayland check failed or unsupported DE
         result = query_x11()
-        if result:
-            result["de"] = f"{de} (X11 Fallback)" if de else "X11 Fallback"
-            
+        
     if not result:
         # Fallback or unsupported
         result = {
-            "de": de if de else "Unknown",
+            "de": de_name,
             "supported": False
         }
+    else:
+        result["de"] = de_name
         
     print(json.dumps(result))
 
 if __name__ == "__main__":
     main()
+

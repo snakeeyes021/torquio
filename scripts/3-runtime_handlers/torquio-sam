@@ -170,9 +170,13 @@ if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
                 fi
             fi
         elif [ "$DE" = "KDE" ]; then
-            CURRENT_POLICY=$(kreadconfig6 --file kdeglobals --group KScreen --key XwaylandClientsScale 2>/dev/null)
+            local kread_bin="kreadconfig6"
+            command -v kreadconfig6 >/dev/null 2>&1 || kread_bin="kreadconfig5"
+            local kwrite_bin="kwriteconfig6"
+            command -v kwriteconfig6 >/dev/null 2>&1 || kwrite_bin="kwriteconfig5"
+            CURRENT_POLICY=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientsScale 2>/dev/null)
             if [ -z "$CURRENT_POLICY" ]; then
-                CURRENT_POLICY=$(kreadconfig6 --file kdeglobals --group KScreen --key XwaylandClientScale 2>/dev/null)
+                CURRENT_POLICY=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientScale 2>/dev/null)
             fi
             if [ "$CURRENT_POLICY" != "true" ]; then
                 if [ "$WARN_DISMISSED" != "true" ]; then
@@ -188,8 +192,8 @@ if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
                 if [ -z "$backup_val" ]; then
                     set_config_val "original_kde_policy" "${CURRENT_POLICY:-false}"
                 fi
-                kwriteconfig6 --file kdeglobals --group KScreen --key XwaylandClientsScale true 2>/dev/null || true
-                kwriteconfig6 --file kdeglobals --group KScreen --key XwaylandClientScale true 2>/dev/null || true
+                $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientsScale true 2>/dev/null || true
+                $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientScale true 2>/dev/null || true
                 dbus-send --session --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure 2>/dev/null || true
             fi
         elif [ "$DE" = "COSMIC" ]; then

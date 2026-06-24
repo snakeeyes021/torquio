@@ -302,18 +302,43 @@ if [ "$AUTO_ACCEPT" = false ]; then
             echo ""
             
             # Query current host policy
-            host_policy="1"
+            host_policy="Unknown"
+            host_policy_val=""
             graphics_json=$(python3 "$SCRIPT_DIR/scripts/3-runtime_handlers/torquio_graphics.py" 2>/dev/null || true)
             de=$(echo "$graphics_json" | grep -o '"de": "[^"]*' | cut -d'"' -f4 || true)
             if [ "$de" = "GNOME" ]; then
-                host_policy=$(get_xwayland_scaling_factor)
-                [ -z "$host_policy" ] && host_policy="1"
+                host_policy_val=$(get_xwayland_scaling_factor)
+                [ -z "$host_policy_val" ] && host_policy_val="0"
+                if [ "$host_policy_val" = "1" ]; then
+                    host_policy="Framebuffer Upscale (xwayland-scaling-factor=1)"
+                elif [ "$host_policy_val" = "0" ]; then
+                    host_policy="System Default (xwayland-scaling-factor=0)"
+                else
+                    host_policy="Override Scaling (xwayland-scaling-factor=$host_policy_val)"
+                fi
             elif [ "$de" = "KDE" ]; then
-                host_policy=$(kreadconfig6 --file kdeglobals --group KScreen --key XwaylandClientsScale 2>/dev/null || true)
-                [ -z "$host_policy" ] && host_policy="false"
+                local kread_bin="kreadconfig6"
+                command -v kreadconfig6 >/dev/null 2>&1 || kread_bin="kreadconfig5"
+                host_policy_val=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientsScale 2>/dev/null || true)
+                if [ -z "$host_policy_val" ]; then
+                    host_policy_val=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientScale 2>/dev/null || true)
+                fi
+                [ -z "$host_policy_val" ] && host_policy_val="true"
+                if [ "$host_policy_val" = "true" ]; then
+                    host_policy="Scale XWayland clients themselves (XwaylandClientsScale=true)"
+                else
+                    host_policy="Scale XWayland clients by compositor (XwaylandClientsScale=false)"
+                fi
             elif [ "$de" = "COSMIC" ]; then
-                host_policy=$(cat ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null || true)
-                [ -z "$host_policy" ] && host_policy="none"
+                host_policy_val=$(cat ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null || true)
+                [ -z "$host_policy_val" ] && host_policy_val="false"
+                if [ "$host_policy_val" = "fractional" ]; then
+                    host_policy="Optimize for gaming and full-screen apps (descale_xwayland=fractional)"
+                elif [ "$host_policy_val" = "true" ]; then
+                    host_policy="Optimize for applications (descale_xwayland=true)"
+                else
+                    host_policy="Maximum compatibility mode (descale_xwayland=false)"
+                fi
             fi
             
             # Query recommendations
@@ -321,9 +346,9 @@ if [ "$AUTO_ACCEPT" = false ]; then
             rec_dpi=$(echo "$graphics_json" | grep -o '"target_wine_dpi": [0-9]*' | cut -d' ' -f2 || true)
             rec_formula=$(echo "$graphics_json" | grep -o '"rec_formula": "[^"]*' | cut -d'"' -f4 || true)
             if [ "$de" = "KDE" ]; then
-                rec_policy="[KDE] Scale XWayland clients themselves (XwaylandClientsScale=true)"
+                rec_policy="Scale XWayland clients themselves (XwaylandClientsScale=true)"
             elif [ "$de" = "COSMIC" ]; then
-                rec_policy="[COSMIC] Optimize for Games (fractional)"
+                rec_policy="Optimize for gaming and full-screen apps (descale_xwayland=fractional)"
             fi
             
             echo "Confirm manual scaling values to be used:"
@@ -342,7 +367,7 @@ if [ "$AUTO_ACCEPT" = false ]; then
                 fi
                 
                 if [ "$de" = "GNOME" ]; then
-                    read -p "Enter manual GNOME XWayland scaling factor (1 = Framebuffer Upscale, 2 = Native scale) [Current: $host_policy]: " user_policy
+                    read -p "Enter manual GNOME XWayland scaling factor (1 = Framebuffer Upscale, 2 = Native scale) [Current: $host_policy_val]: " user_policy
                     if [[ "$user_policy" =~ ^[0-9]+$ ]]; then
                         if gsettings list-schemas | grep -q org.gnome.mutter.wayland; then
                             gsettings set org.gnome.mutter.wayland xwayland-scaling-factor "$user_policy" 2>/dev/null || true
@@ -352,18 +377,20 @@ if [ "$AUTO_ACCEPT" = false ]; then
                         echo "Host GNOME XWayland scaling factor set to $user_policy."
                     fi
                 elif [ "$de" = "KDE" ]; then
-                    read -p "Enter manual KDE XWayland scale policy (true = scale clients, false = scale compositor) [Current: $host_policy]: " user_policy
+                    read -p "Enter manual KDE XWayland scale policy (true = scale clients, false = scale compositor) [Current: $host_policy_val]: " user_policy
                     if [[ "$user_policy" = "true" || "$user_policy" = "false" ]]; then
-                        kwriteconfig6 --file kdeglobals --group KScreen --key XwaylandClientsScale "$user_policy" 2>/dev/null || true
-                        kwriteconfig6 --file kdeglobals --group KScreen --key XwaylandClientScale "$user_policy" 2>/dev/null || true
+                        local kwrite_bin="kwriteconfig6"
+                        command -v kwriteconfig6 >/dev/null 2>&1 || kwrite_bin="kwriteconfig5"
+                        $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientsScale "$user_policy" 2>/dev/null || true
+                        $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientScale "$user_policy" 2>/dev/null || true
                         dbus-send --session --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure 2>/dev/null || true
                         echo "Host KDE XWayland policy set to $user_policy."
                     fi
                 elif [ "$de" = "COSMIC" ]; then
-                    read -p "Enter manual COSMIC XWayland scale policy (fractional or none) [Current: $host_policy]: " user_policy
-                    if [[ "$user_policy" = "fractional" || "$user_policy" = "none" ]]; then
+                    read -p "Enter manual COSMIC XWayland scale policy (fractional, true, or false) [Current: $host_policy_val]: " user_policy
+                    if [[ "$user_policy" = "fractional" || "$user_policy" = "true" || "$user_policy" = "false" ]]; then
                         mkdir -p ~/.config/cosmic/com.system76.CosmicComp/v1
-                        if [ "$user_policy" = "none" ]; then
+                        if [ "$user_policy" = "false" ]; then
                             rm -f ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland
                         else
                             echo "$user_policy" > ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null || true

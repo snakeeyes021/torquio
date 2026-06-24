@@ -78,13 +78,21 @@ if [ "$MANAGE_GRAPHICS" = "true" ] || [ "$(get_config_val "auto_scale_mutter" "f
         echo -e "Torquio detected that host KDE XWayland policy was modified from ${wine}$ORIG_KDE${reset} to ${wine}true${reset}."
         read -p "Would you like to restore your KDE XWayland clients scale policy to $ORIG_KDE? [Y/n]: " restore_confirm
         if [[ ! "$restore_confirm" =~ ^[Nn]$ ]]; then
-            if command -v kwriteconfig6 >/dev/null 2>&1; then
-                kwriteconfig6 --file kdeglobals --group KScreen --key XwaylandClientsScale "$ORIG_KDE" 2>/dev/null || true
-                kwriteconfig6 --file kdeglobals --group KScreen --key XwaylandClientScale "$ORIG_KDE" 2>/dev/null || true
+            local kwrite_bin="kwriteconfig6"
+            if ! command -v kwriteconfig6 >/dev/null 2>&1; then
+                if command -v kwriteconfig5 >/dev/null 2>&1; then
+                    kwrite_bin="kwriteconfig5"
+                else
+                    kwrite_bin=""
+                fi
+            fi
+            if [ -n "$kwrite_bin" ]; then
+                $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientsScale "$ORIG_KDE" 2>/dev/null || true
+                $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientScale "$ORIG_KDE" 2>/dev/null || true
                 dbus-send --session --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure 2>/dev/null || true
                 echo -e "  [${green}SUCCESS${reset}] Host KDE XWayland policy restored to $ORIG_KDE."
             else
-                echo -e "  [${yellow}WARNING${reset}] kwriteconfig6 not found. Manual scale restore required."
+                echo -e "  [${yellow}WARNING${reset}] kwriteconfig6 or kwriteconfig5 not found. Manual scale restore required."
             fi
         fi
     fi

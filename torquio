@@ -132,9 +132,13 @@ apply_graphics_settings() {
                 fi
             fi
         elif [ "$de" = "KDE" ]; then
-            local current_policy=$(kreadconfig6 --file kdeglobals --group KScreen --key XwaylandClientsScale 2>/dev/null)
+            local kread_bin="kreadconfig6"
+            command -v kreadconfig6 >/dev/null 2>&1 || kread_bin="kreadconfig5"
+            local kwrite_bin="kwriteconfig6"
+            command -v kwriteconfig6 >/dev/null 2>&1 || kwrite_bin="kwriteconfig5"
+            local current_policy=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientsScale 2>/dev/null)
             if [ -z "$current_policy" ]; then
-                current_policy=$(kreadconfig6 --file kdeglobals --group KScreen --key XwaylandClientScale 2>/dev/null)
+                current_policy=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientScale 2>/dev/null)
             fi
             if [ "$current_policy" != "true" ]; then
                 local backup_val=$(get_config_val "original_kde_policy" "")
@@ -142,8 +146,8 @@ apply_graphics_settings() {
                     set_config_val "original_kde_policy" "${current_policy:-false}"
                     echo "Backed up current KDE XWayland scaling policy (${current_policy:-false})."
                 fi
-                kwriteconfig6 --file kdeglobals --group KScreen --key XwaylandClientsScale true 2>/dev/null || true
-                kwriteconfig6 --file kdeglobals --group KScreen --key XwaylandClientScale true 2>/dev/null || true
+                $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientsScale true 2>/dev/null || true
+                $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientScale true 2>/dev/null || true
                 dbus-send --session --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure 2>/dev/null || true
             fi
         elif [ "$de" = "COSMIC" ]; then
@@ -279,15 +283,17 @@ show_graphics_diagnostics() {
             fi
         fi
     elif [ "$de" = "KDE" ]; then
-        local kp=$(kreadconfig6 --file kdeglobals --group KScreen --key XwaylandClientsScale 2>/dev/null)
+        local kread_bin="kreadconfig6"
+        command -v kreadconfig6 >/dev/null 2>&1 || kread_bin="kreadconfig5"
+        local kp=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientsScale 2>/dev/null)
         if [ -z "$kp" ]; then
-            kp=$(kreadconfig6 --file kdeglobals --group KScreen --key XwaylandClientScale 2>/dev/null)
+            kp=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientScale 2>/dev/null)
         fi
         if [ "$kp" = "true" ] || [ -z "$kp" ]; then
-            sys_policy="[KDE] Scale XWayland clients themselves (System Default)"
+            sys_policy="Scale XWayland clients themselves (XwaylandClientsScale=true)"
             effective_scaling="Governed by Wine DPI (Compositor Unscaled)"
         else
-            sys_policy="[KDE] Scale XWayland clients by compositor (XwaylandClientsScale=false)"
+            sys_policy="Scale XWayland clients by compositor (XwaylandClientsScale=false)"
             if [ "$scale" = "1" ] || [ "$scale" = "1.0" ] || [ "$scale" = "1.00" ]; then
                 effective_scaling="Native (no scaling)"
             else
@@ -297,13 +303,13 @@ show_graphics_diagnostics() {
     elif [ "$de" = "COSMIC" ]; then
         local cp=$(cat ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null)
         if [ "$cp" = "fractional" ]; then
-            sys_policy="[COSMIC] Optimize for gaming and full-screen apps (descale_xwayland=fractional)"
+            sys_policy="Optimize for gaming and full-screen apps (descale_xwayland=fractional)"
             effective_scaling="Governed by Wine DPI (Compositor Unscaled)"
         elif [ "$cp" = "true" ]; then
-            sys_policy="[COSMIC] Optimize for applications (descale_xwayland=true)"
+            sys_policy="Optimize for applications (descale_xwayland=true)"
             effective_scaling="Governed by Wine DPI (Compositor Unscaled)"
         else
-            sys_policy="[COSMIC] Maximum compatibility mode (System Default / descale_xwayland=false)"
+            sys_policy="Maximum compatibility mode (descale_xwayland=false)"
             if [ "$scale" = "1" ] || [ "$scale" = "1.0" ] || [ "$scale" = "1.00" ]; then
                 effective_scaling="Native (no scaling)"
             else
@@ -464,8 +470,10 @@ configure_graphics() {
                 echo ""
                 read -p "Would you like to restore your KDE XWayland scale setting back to its original value ($orig_kde)? [Y/n]: " restore_confirm
                 if [[ ! "$restore_confirm" =~ ^[Nn]$ ]]; then
-                    kwriteconfig6 --file kdeglobals --group KScreen --key XwaylandClientsScale "$orig_kde" 2>/dev/null || true
-                    kwriteconfig6 --file kdeglobals --group KScreen --key XwaylandClientScale "$orig_kde" 2>/dev/null || true
+                    local kwrite_bin="kwriteconfig6"
+                    command -v kwriteconfig6 >/dev/null 2>&1 || kwrite_bin="kwriteconfig5"
+                    $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientsScale "$orig_kde" 2>/dev/null || true
+                    $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientScale "$orig_kde" 2>/dev/null || true
                     dbus-send --session --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure 2>/dev/null || true
                     echo "KDE XWayland scale setting restored to $orig_kde."
                     restored=true
@@ -759,15 +767,17 @@ show_status() {
             fi
         fi
     elif [ "$de" = "KDE" ]; then
-        local kp=$(kreadconfig6 --file kdeglobals --group KScreen --key XwaylandClientsScale 2>/dev/null)
+        local kread_bin="kreadconfig6"
+        command -v kreadconfig6 >/dev/null 2>&1 || kread_bin="kreadconfig5"
+        local kp=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientsScale 2>/dev/null)
         if [ -z "$kp" ]; then
-            kp=$(kreadconfig6 --file kdeglobals --group KScreen --key XwaylandClientScale 2>/dev/null)
+            kp=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientScale 2>/dev/null)
         fi
         if [ "$kp" = "true" ] || [ -z "$kp" ]; then
-            sys_policy="[KDE] Scale XWayland clients themselves (System Default)"
+            sys_policy="Scale XWayland clients themselves (XwaylandClientsScale=true)"
             effective_scaling="Governed by Wine DPI (Compositor Unscaled)"
         else
-            sys_policy="[KDE] Scale XWayland clients by compositor (XwaylandClientsScale=false)"
+            sys_policy="Scale XWayland clients by compositor (XwaylandClientsScale=false)"
             if [ "$scale" = "1" ] || [ "$scale" = "1.0" ] || [ "$scale" = "1.00" ]; then
                 effective_scaling="Native (no scaling)"
             else
@@ -777,13 +787,13 @@ show_status() {
     elif [ "$de" = "COSMIC" ]; then
         local cp=$(cat ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null)
         if [ "$cp" = "fractional" ]; then
-            sys_policy="[COSMIC] Optimize for gaming and full-screen apps (descale_xwayland=fractional)"
+            sys_policy="Optimize for gaming and full-screen apps (descale_xwayland=fractional)"
             effective_scaling="Governed by Wine DPI (Compositor Unscaled)"
         elif [ "$cp" = "true" ]; then
-            sys_policy="[COSMIC] Optimize for applications (descale_xwayland=true)"
+            sys_policy="Optimize for applications (descale_xwayland=true)"
             effective_scaling="Governed by Wine DPI (Compositor Unscaled)"
         else
-            sys_policy="[COSMIC] Maximum compatibility mode (System Default / descale_xwayland=false)"
+            sys_policy="Maximum compatibility mode (descale_xwayland=false)"
             if [ "$scale" = "1" ] || [ "$scale" = "1.0" ] || [ "$scale" = "1.00" ]; then
                 effective_scaling="Native (no scaling)"
             else
