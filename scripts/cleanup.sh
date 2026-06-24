@@ -137,6 +137,24 @@ rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/torquio-sam.png"
 # Removing MIME types
 rm -f "$HOME/.local/share/mime/packages/application-x-dorico.xml"
 
+echo "Removing orphaned Windows desktop shortcuts..."
+host_desktop="${XDG_DESKTOP_DIR:-$HOME/Desktop}"
+if [ -f "$HOME/.config/user-dirs.dirs" ]; then
+    host_desktop=$( (source "$HOME/.config/user-dirs.dirs" 2>/dev/null && echo "${XDG_DESKTOP_DIR:-$HOME/Desktop}") || echo "$host_desktop" )
+fi
+for dir in "$host_desktop" "$TORQUIO_PREFIX_DIR/drive_c/users/Public/Desktop" "$TORQUIO_PREFIX_DIR"/drive_c/users/*/Desktop; do
+    if [ -d "$dir" ]; then
+        find "$dir" -maxdepth 1 -type f \( \
+            -name "Activation Manager.lnk" -o \
+            -name "Steinberg Activation Manager.lnk" -o \
+            -name "Dorico*.lnk" -o \
+            -name "HALion*.lnk" -o \
+            -name "Groove Agent*.lnk" -o \
+            -name "Steinberg Library Manager.lnk" \
+        \) -delete 2>/dev/null || true
+    fi
+done
+
 echo "Updating desktop database and icon cache..."
 update-desktop-database "$HOME/.local/share/applications/" || true
 update-mime-database "$HOME/.local/share/mime/" || true

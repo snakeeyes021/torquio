@@ -37,6 +37,25 @@ print_wizard_banner() {
     echo ""
 }
 
+clean_desktop_lnk() {
+    local host_desktop="${XDG_DESKTOP_DIR:-$HOME/Desktop}"
+    if [ -f "$HOME/.config/user-dirs.dirs" ]; then
+        host_desktop=$( (source "$HOME/.config/user-dirs.dirs" 2>/dev/null && echo "${XDG_DESKTOP_DIR:-$HOME/Desktop}") || echo "$host_desktop" )
+    fi
+    for dir in "$host_desktop" "$TORQUIO_PREFIX_DIR/drive_c/users/Public/Desktop" "$TORQUIO_PREFIX_DIR"/drive_c/users/*/Desktop; do
+        if [ -d "$dir" ]; then
+            find "$dir" -maxdepth 1 -type f \( \
+                -name "Activation Manager.lnk" -o \
+                -name "Steinberg Activation Manager.lnk" -o \
+                -name "Dorico*.lnk" -o \
+                -name "HALion*.lnk" -o \
+                -name "Groove Agent*.lnk" -o \
+                -name "Steinberg Library Manager.lnk" \
+            \) -delete 2>/dev/null || true
+        fi
+    done
+}
+
 # 1. State Detection & Action Choice
 CONTAINER_EXISTS=false
 if distrobox list 2>/dev/null | grep -q "$TORQUIO_CONTAINER_NAME"; then
@@ -698,6 +717,8 @@ if [ "$ACTION" = "install" ] || [ "$ACTION" = "resume" ]; then
     echo "Opening the Steinberg Download Assistant (SDA)..."
     nohup "$HOME/.local/bin/torquio-sda-handler" > /dev/null 2>&1 &
 fi
+# Clean up any virtual/unfunctional Windows desktop shortcuts created by installers
+clean_desktop_lnk
 
 echo ""
 echo "================================================================"
