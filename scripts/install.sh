@@ -264,99 +264,120 @@ if [ "$AUTO_ACCEPT" = false ]; then
     echo -e "${gray}by re-running the configuration wizard or via the Torquio menus.${reset}"
     echo "--------------------------------------------------"
     if [ "$XDG_SESSION_TYPE" = "x11" ]; then
-        echo "X11 session detected. Automated scaling management is Wayland-only."
+        echo "X11 session detected."
+        echo ""
         echo "WINE natively detects and applies host display scaling settings under X11."
+        echo "Automated XWayland scaling management is a Wayland-only feature."
+        echo ""
+        echo -e "${green}No graphics configuration is required for your setup.${reset}"
+        echo ""
         SET_MANAGE="false"
         SET_MATCH_PHYS="false"
         SET_MANUAL_DPI="$CUR_MANUAL_DPI"
-        echo ""
+        read -p "Press [Enter] to continue to the next step..." temp
     else
+        echo -e "${gray}Note: You can change all configuration settings later at any time${reset}"
+        echo -e "${gray}by re-running the configuration wizard or via the Torquio menus.${reset}"
+        echo "--------------------------------------------------"
         echo "Torquio can automatically coordinate your Wayland desktop's XWayland"
         echo "scaling policy and Wine DPI settings for optimal rendering."
         echo ""
         
-        def_manage="Y"
-        if [ "$CUR_MANAGE" = "false" ]; then def_manage="N"; fi
-        manage_bracket="[Y/n]"
-        if [ "$def_manage" = "N" ]; then manage_bracket="[y/N]"; fi
-        read -p "Would you like Torquio to automatically manage display scaling? $manage_bracket: " auto_scaling
+        # We need the scale early to know if we should even bother asking
+        graphics_json=$(python3 "$SCRIPT_DIR/scripts/3-runtime_handlers/torquio_graphics.py" 2>/dev/null || true)
+        scale=$(echo "$graphics_json" | grep -o '"scale": [0-9.]*' | cut -d' ' -f2 || echo "1.0")
         
-        if [[ -z "$auto_scaling" && "$def_manage" = "Y" ]] || [[ "$auto_scaling" =~ ^[Yy]$ ]]; then
-            SET_MANAGE="true"
-            SET_MANUAL_DPI="96"
-            SET_MATCH_PHYS="$CUR_MATCH_PHYS"
-        else
+        if [ "$scale" = "1" ] || [ "$scale" = "1.0" ] || [ "$scale" = "1.00" ]; then
+            echo -e "Torquio has detected an unscaled monitor (${wine}100%${reset})."
+            echo "Because no fractional or integer scaling is currently applied to your"
+            echo "display, XWayland policy overrides are not required."
+            echo ""
             SET_MANAGE="false"
             SET_MATCH_PHYS="false"
-            echo ""
+            SET_MANUAL_DPI="96"
+            read -p "Press [Enter] to continue to the next step..." temp
+        else
+            def_manage="Y"
+            if [ "$CUR_MANAGE" = "false" ]; then def_manage="N"; fi
+            manage_bracket="[Y/n]"
+            if [ "$def_manage" = "N" ]; then manage_bracket="[y/N]"; fi
+            read -p "Would you like Torquio to automatically manage display scaling? $manage_bracket: " auto_scaling
             
-            # Query current host policy
-            host_policy="Unknown"
-            host_policy_val=""
-            graphics_json=$(python3 "$SCRIPT_DIR/scripts/3-runtime_handlers/torquio_graphics.py" 2>/dev/null || true)
-            de=$(echo "$graphics_json" | grep -o '"de": "[^"]*' | cut -d'"' -f4 || true)
-            if [ "$de" = "GNOME" ]; then
-                host_policy_val=$(get_xwayland_scaling_factor)
-                [ -z "$host_policy_val" ] && host_policy_val="0"
-                if [ "$host_policy_val" = "1" ]; then
-                    host_policy="Framebuffer Upscale (xwayland-scaling-factor=1)"
-                elif [ "$host_policy_val" = "0" ]; then
-                    host_policy="System Default (xwayland-scaling-factor=0)"
-                else
-                    host_policy="Override Scaling (xwayland-scaling-factor=$host_policy_val)"
-                fi
-            elif [ "$de" = "KDE" ]; then
-                kread_bin="kreadconfig6"
-                command -v kreadconfig6 >/dev/null 2>&1 || kread_bin="kreadconfig5"
-                host_policy_val=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientsScale 2>/dev/null || true)
-                if [ -z "$host_policy_val" ]; then
-                    host_policy_val=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientScale 2>/dev/null || true)
-                fi
-                [ -z "$host_policy_val" ] && host_policy_val="true"
-                if [ "$host_policy_val" = "true" ]; then
-                    host_policy="Scale XWayland clients themselves (XwaylandClientsScale=true)"
-                else
-                    host_policy="Scale XWayland clients by compositor (XwaylandClientsScale=false)"
-                fi
-            elif [ "$de" = "COSMIC" ]; then
-                host_policy_val=$(cat ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null || true)
-                [ -z "$host_policy_val" ] && host_policy_val="false"
-                if [ "$host_policy_val" = "fractional" ]; then
-                    host_policy="Optimize for gaming and full-screen apps (descale_xwayland=fractional)"
-                elif [ "$host_policy_val" = "true" ]; then
-                    host_policy="Optimize for applications (descale_xwayland=true)"
-                else
-                    host_policy="Maximum compatibility mode (descale_xwayland=false)"
-                fi
-            fi
-            
-            # Query recommendations
-            rec_policy=$(echo "$graphics_json" | grep -o '"ideal_xwayland_policy": "[^"]*' | cut -d'"' -f4 || true)
-            rec_dpi=$(echo "$graphics_json" | grep -o '"target_wine_dpi": [0-9]*' | cut -d' ' -f2 || true)
-            rec_formula=$(echo "$graphics_json" | grep -o '"rec_formula": "[^"]*' | cut -d'"' -f4 || true)
-            if [ "$de" = "KDE" ]; then
-                rec_policy="Scale XWayland clients themselves (XwaylandClientsScale=true)"
-            elif [ "$de" = "COSMIC" ]; then
-                rec_policy="Optimize for gaming and full-screen apps (descale_xwayland=fractional)"
-            fi
-            
-            echo "Confirm manual scaling values to be used:"
-            echo -e "  Wine Prefix DPI:         ${wine}96 DPI${reset}"
-            echo -e "  XWayland Scaling Policy: ${wine}$host_policy${reset}"
-            echo ""
-            echo -e "${blue}Torquio Recommendations for this Monitor:${reset}"
-            echo -e "  Recommended Wine DPI:    ${green}${rec_dpi:-96} DPI${reset} (${rec_formula:-Standard 96 DPI baseline})"
-            echo -e "  Recommended XWayland:    ${green}${rec_policy:-N/A}${reset}"
-            echo ""
-            read -p "Use these manual defaults? [Y/n]: " manual_confirm
-            if [[ "$manual_confirm" =~ ^[Nn]$ ]]; then
+            if [[ -z "$auto_scaling" && "$def_manage" = "Y" ]] || [[ "$auto_scaling" =~ ^[Yy]$ ]]; then
+                SET_MANAGE="true"
+                SET_MANUAL_DPI="96"
+                SET_MATCH_PHYS="$CUR_MATCH_PHYS"
+            else
+                SET_MANAGE="false"
+                SET_MATCH_PHYS="false"
                 echo ""
-                echo -e "${blue}How to choose your custom WINE DPI:${reset}"
-                echo "Your ideal WINE DPI is usually: 96 * (your desktop scaling factor)."
-                echo "  - A 1080p screen with no scaling (100%) should be left at 96 DPI."
-                echo "  - A 4K screen using 150% scaling should usually opt for 96 * 1.5 = 144 DPI."
+                
+                # Query current host policy
+                host_policy="Unknown"
+                host_policy_val=""
+                de=$(echo "$graphics_json" | grep -o '"de": "[^"]*' | cut -d'"' -f4 || true)
+                if [ "$de" = "GNOME" ]; then
+                    host_policy_val=$(get_xwayland_scaling_factor)
+                    [ -z "$host_policy_val" ] && host_policy_val="0"
+                    if [ "$host_policy_val" = "1" ]; then
+                        host_policy="Framebuffer Upscale (xwayland-scaling-factor=1)"
+                    elif [ "$host_policy_val" = "0" ]; then
+                        host_policy="System Default (xwayland-scaling-factor=0)"
+                    else
+                        host_policy="Override Scaling (xwayland-scaling-factor=$host_policy_val)"
+                    fi
+                elif [ "$de" = "KDE" ]; then
+                    kread_bin="kreadconfig6"
+                    command -v kreadconfig6 >/dev/null 2>&1 || kread_bin="kreadconfig5"
+                    host_policy_val=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientsScale 2>/dev/null || true)
+                    if [ -z "$host_policy_val" ]; then
+                        host_policy_val=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientScale 2>/dev/null || true)
+                    fi
+                    [ -z "$host_policy_val" ] && host_policy_val="true"
+                    if [ "$host_policy_val" = "true" ]; then
+                        host_policy="Scale XWayland clients themselves (XwaylandClientsScale=true)"
+                    else
+                        host_policy="Scale XWayland clients by compositor (XwaylandClientsScale=false)"
+                    fi
+                elif [ "$de" = "COSMIC" ]; then
+                    host_policy_val=$(cat ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null || true)
+                    [ -z "$host_policy_val" ] && host_policy_val="false"
+                    if [ "$host_policy_val" = "fractional" ]; then
+                        host_policy="Optimize for gaming and full-screen apps (descale_xwayland=fractional)"
+                    elif [ "$host_policy_val" = "true" ]; then
+                        host_policy="Optimize for applications (descale_xwayland=true)"
+                    else
+                        host_policy="Maximum compatibility mode (descale_xwayland=false)"
+                    fi
+                fi
+                
+                # Query recommendations
+                rec_policy=$(echo "$graphics_json" | grep -o '"ideal_xwayland_policy": "[^"]*' | cut -d'"' -f4 || true)
+                rec_dpi=$(echo "$graphics_json" | grep -o '"target_wine_dpi": [0-9]*' | cut -d' ' -f2 || true)
+                rec_formula=$(echo "$graphics_json" | grep -o '"rec_formula": "[^"]*' | cut -d'"' -f4 || true)
+                if [ "$de" = "KDE" ]; then
+                    rec_policy="Scale XWayland clients themselves (XwaylandClientsScale=true)"
+                elif [ "$de" = "COSMIC" ]; then
+                    rec_policy="Optimize for gaming and full-screen apps (descale_xwayland=fractional)"
+                fi
+                
+                echo "Confirm manual scaling values to be used:"
+                echo -e "  Wine Prefix DPI:         ${wine}96 DPI${reset}"
+                echo -e "  XWayland Scaling Policy: ${wine}$host_policy${reset}"
                 echo ""
-                read -p "Enter custom WINE DPI (e.g. 96, 120, 144, 192) [Current: $CUR_MANUAL_DPI]: " user_dpi
+                echo -e "${blue}Torquio Recommendations for this Monitor:${reset}"
+                echo -e "  Recommended Wine DPI:    ${green}${rec_dpi:-96} DPI${reset} (${rec_formula:-Standard 96 DPI baseline})"
+                echo -e "  Recommended XWayland:    ${green}${rec_policy:-N/A}${reset}"
+                echo ""
+                read -p "Use these manual defaults? [Y/n]: " manual_confirm
+                if [[ "$manual_confirm" =~ ^[Nn]$ ]]; then
+                    echo ""
+                    echo -e "${blue}How to choose your custom WINE DPI:${reset}"
+                    echo "Your ideal WINE DPI is usually: 96 * (your desktop scaling factor)."
+                    echo "  - A 1080p screen with no scaling (100%) should be left at 96 DPI."
+                    echo "  - A 4K screen using 150% scaling should usually opt for 96 * 1.5 = 144 DPI."
+                    echo ""
+                    read -p "Enter custom WINE DPI (e.g. 96, 120, 144, 192) [Current: $CUR_MANUAL_DPI]: " user_dpi
                 if [[ "$user_dpi" =~ ^[0-9]+$ ]]; then
                     SET_MANUAL_DPI="$user_dpi"
                 fi
@@ -398,6 +419,7 @@ if [ "$AUTO_ACCEPT" = false ]; then
             fi
         fi
     fi
+fi
 
     # Step 2: Font Hinting Style
     print_wizard_banner
@@ -570,7 +592,11 @@ fi
 # Confirm Install manifest
 print_wizard_banner
 echo -e "${blue}=== Installation Manifest ===${reset}"
-echo -e "  - Graphics Management:        ${wine}$SET_MANAGE${reset}"
+manifest_manage_str="${wine}$SET_MANAGE${reset}"
+if [ "$XDG_SESSION_TYPE" = "x11" ]; then
+    manifest_manage_str="${gray}N/A (Wayland Only)${reset}"
+fi
+echo -e "  - Graphics Management:        $manifest_manage_str"
 echo -e "  - Target Wine DPI:            ${wine}$SET_MANUAL_DPI DPI${reset}"
 echo -e "  - FreeType Interpreter:       ${wine}v$SET_FREETYPE${reset}"
 if [ -n "$MAPPED_FOLDER_PATH" ]; then
