@@ -712,6 +712,35 @@ configure_graphics() {
     fi
 }
 
+refresh_launchers() {
+    local wine="\033[38;5;125m"
+    local blue="\033[38;5;110m"
+    local green="\033[38;5;108m"
+    local reset="\033[0m"
+
+    echo -e "${blue}=== Refreshing Launchers & Icons ===${reset}"
+    echo ""
+    
+    # 1. Extract icons and refresh desktop files
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$SCRIPT_DIR\" && ./scripts/2-install/extract_icons.sh"
+    
+    # 2. Copy launcher wrappers to ~/.local/bin
+    echo "Copying launcher wrapper scripts to ~/.local/bin/..."
+    mkdir -p "$HOME/.local/bin"
+    for handler in "$SCRIPT_DIR/scripts/3-runtime_handlers/"torquio*; do
+        local base_name=$(basename "$handler")
+        if [ "$base_name" = "torquio-sda-handler" ]; then
+            sed "s|@TORQUIO_REPO_DIR@|$SCRIPT_DIR|g" "$handler" > "$HOME/.local/bin/$base_name"
+        else
+            cp "$handler" "$HOME/.local/bin/"
+        fi
+    done
+    chmod +x "$HOME/.local/bin/"torquio*
+    echo -e "${green}Launchers and icons successfully refreshed!${reset}"
+    echo ""
+    read -p "Press [Enter] to return to the main menu..." temp
+}
+
 show_status() {
     local wine="\033[38;5;125m"
     local gray="\033[38;5;244m"
@@ -1452,7 +1481,7 @@ show_menu() {
                     ;;
                 3)  show_status ;;
                 4)  configure_graphics; clear; continue ;;
-                5)  distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$SCRIPT_DIR\" && ./scripts/2-install/extract_icons.sh" ;;
+                5)  refresh_launchers; clear; continue ;;
                 6)  manage_folder_mappings; clear; continue ;;
                 7)  manage_keycommands; clear; continue ;;
                 8)  manage_wine; clear; continue ;;
