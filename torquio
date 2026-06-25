@@ -724,7 +724,11 @@ refresh_launchers() {
     # 1. Extract icons and refresh desktop files
     distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$SCRIPT_DIR\" && ./scripts/2-install/extract_icons.sh"
     
-    # 2. Copy launcher wrappers to ~/.local/bin
+    # 2. Refresh Wine prefix registry settings and debugger wrapper
+    echo "Refreshing Wine prefix registry settings & debugger..."
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$SCRIPT_DIR\" && ./scripts/2-install/setup_prefix.sh"
+
+    # 3. Copy launcher wrappers to ~/.local/bin
     echo "Copying launcher wrapper scripts to ~/.local/bin/..."
     mkdir -p "$HOME/.local/bin"
     for handler in "$SCRIPT_DIR/scripts/3-runtime_handlers/"torquio*; do

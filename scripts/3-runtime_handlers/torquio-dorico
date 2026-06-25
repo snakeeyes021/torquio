@@ -217,7 +217,7 @@ cat << EOF > "$RUNNER_SCRIPT"
 #!/bin/bash
 export DBUS_SYSTEM_BUS_ADDRESS="unix:path=/run/host/run/dbus/system_bus_socket"
 export WINEPREFIX="$TORQUIO_PREFIX_DIR"
-export WINEDLLOVERRIDES="winemenubuilder.exe=d"
+export WINEDLLOVERRIDES="winemenubuilder.exe=d;wineconsole.exe=d"
 export PATH="$WINE_CUSTOM_BIN:\$PATH"
 export FREETYPE_PROPERTIES="truetype:interpreter-version=$FREETYPE_INTERP"
 
@@ -289,3 +289,18 @@ else
 fi
 
 distrobox enter "$TORQUIO_CONTAINER_NAME" -- "$RUNNER_SCRIPT"
+
+# --- Crash Log Capture ---
+for crash_log in "$TORQUIO_PREFIX_DIR/drive_c"/winedbg_crash_*.log; do
+    if [ -f "$crash_log" ]; then
+        echo ""
+        echo "========================================="
+        echo "=== PROCESS CRASH DETECTED ==="
+        echo "Crash Details Log: $(basename "$crash_log")"
+        echo "Time: $(date)"
+        echo "-----------------------------------------"
+        cat "$crash_log"
+        echo "========================================="
+        rm -f "$crash_log"
+    fi
+done
