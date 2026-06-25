@@ -73,6 +73,9 @@ if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
         
         WARN_DISMISSED=$(get_config_val "warn_xwayland_change" "false")
         
+        HOST_CHANGE_NEEDED=false
+        DESIRED_POLICY=""
+        
         if [ "$DE" = "GNOME" ]; then
             CURRENT_POLICY=$(gsettings get org.gnome.mutter.wayland xwayland-scaling-factor 2>/dev/null | awk '{print $NF}')
             if [ -z "$CURRENT_POLICY" ]; then
@@ -91,29 +94,12 @@ if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
             fi
             
             if [ -n "$DESIRED_POLICY" ] && [ "$CURRENT_POLICY" != "$DESIRED_POLICY" ]; then
-                if [ "$WARN_DISMISSED" != "true" ]; then
-                    warn_msg="Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This is a persistent system setting change (not temporary) and may affect the size/rendering of other XWayland applications going forward. You may also want to restart any currently running XWayland applications after enabling this mode.\n\nTorquio will back up your current settings first so they can be easily restored later.\n\nAllow Torquio to manage this?"
-                    if command -v zenity >/dev/null 2>&1; then
-                        zenity --question --title="Torquio Graphics Management" --text="$warn_msg" || exit 1
-                    elif command -v kdialog >/dev/null 2>&1; then
-                        kdialog --yesno "$warn_msg" --title "Torquio Graphics Management" || exit 1
-                    fi
-                    set_config_val "warn_xwayland_change" "true"
-                fi
-                backup_val=$(get_config_val "original_scale_factor" "")
-                if [ -z "$backup_val" ]; then
-                    set_config_val "original_scale_factor" "${CURRENT_POLICY:-0}"
-                fi
-                if gsettings list-schemas | grep -q org.gnome.mutter.wayland; then
-                    gsettings set org.gnome.mutter.wayland xwayland-scaling-factor "$DESIRED_POLICY" 2>/dev/null || true
-                else
-                    gsettings set org.gnome.mutter xwayland-scaling-factor "$DESIRED_POLICY" 2>/dev/null || true
-                fi
+                HOST_CHANGE_NEEDED=true
             fi
         elif [ "$DE" = "KDE" ]; then
-            local kread_bin="kreadconfig6"
+            kread_bin="kreadconfig6"
             command -v kreadconfig6 >/dev/null 2>&1 || kread_bin="kreadconfig5"
-            local kwrite_bin="kwriteconfig6"
+            kwrite_bin="kwriteconfig6"
             command -v kwriteconfig6 >/dev/null 2>&1 || kwrite_bin="kwriteconfig5"
             CURRENT_POLICY=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientsScale 2>/dev/null)
             if [ -z "$CURRENT_POLICY" ]; then
@@ -123,22 +109,7 @@ if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
                 CURRENT_POLICY="true"
             fi
             if [ "$CURRENT_POLICY" != "true" ]; then
-                if [ "$WARN_DISMISSED" != "true" ]; then
-                    warn_msg="Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This is a persistent system setting change (not temporary) and may affect the size/rendering of other XWayland applications going forward. You may also want to restart any currently running XWayland applications after enabling this mode.\n\nTorquio will back up your current settings first so they can be easily restored later.\n\nAllow Torquio to manage this?"
-                    if command -v zenity >/dev/null 2>&1; then
-                        zenity --question --title="Torquio Graphics Management" --text="$warn_msg" || exit 1
-                    elif command -v kdialog >/dev/null 2>&1; then
-                        kdialog --yesno "$warn_msg" --title "Torquio Graphics Management" || exit 1
-                    fi
-                    set_config_val "warn_xwayland_change" "true"
-                fi
-                backup_val=$(get_config_val "original_kde_policy" "")
-                if [ -z "$backup_val" ]; then
-                    set_config_val "original_kde_policy" "${CURRENT_POLICY:-false}"
-                fi
-                $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientsScale true 2>/dev/null || true
-                $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientScale true 2>/dev/null || true
-                dbus-send --session --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure 2>/dev/null || true
+                HOST_CHANGE_NEEDED=true
             fi
         elif [ "$DE" = "COSMIC" ]; then
             CURRENT_POLICY=$(cat ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null)
@@ -147,33 +118,89 @@ if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
                 DESIRED_POLICY="$CURRENT_POLICY"
             fi
             if [ "$CURRENT_POLICY" != "$DESIRED_POLICY" ]; then
-                if [ "$WARN_DISMISSED" != "true" ]; then
-                    warn_msg="Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This is a persistent system setting change (not temporary) and may affect the size/rendering of other XWayland applications going forward. You may also want to restart any currently running XWayland applications after enabling this mode.\n\nTorquio will back up your current settings first so they can be easily restored later.\n\nAllow Torquio to manage this?"
-                    if command -v zenity >/dev/null 2>&1; then
-                        zenity --question --title="Torquio Graphics Management" --text="$warn_msg" || exit 1
-                    elif command -v kdialog >/dev/null 2>&1; then
-                        kdialog --yesno "$warn_msg" --title "Torquio Graphics Management" || exit 1
-                    fi
-                    set_config_val "warn_xwayland_change" "true"
-                fi
-                backup_val=$(get_config_val "original_cosmic_policy" "")
-                if [ -z "$backup_val" ]; then
-                    set_config_val "original_cosmic_policy" "${CURRENT_POLICY:-none}"
-                fi
-                mkdir -p ~/.config/cosmic/com.system76.CosmicComp/v1
-                echo "$DESIRED_POLICY" > ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null || true
+                HOST_CHANGE_NEEDED=true
             fi
         fi
-    fi
-
-    # Update LogPixels registry key if it differs
-    CURRENT_REG_DPI=$(distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine reg query \"HKCU\\Control Panel\\Desktop\" /v LogPixels 2>/dev/null" | grep -o '0x[0-9a-fA-F]*' | xargs printf "%d" 2>/dev/null || echo "96")
-    if [ "$CURRENT_REG_DPI" != "$DPI_TO_SET" ]; then
-        distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$FREETYPE_INTERP\"; wine reg add \"HKCU\\Control Panel\\Desktop\" /v LogPixels /t REG_DWORD /d $DPI_TO_SET /f" >/dev/null 2>&1 || true
         
-        # Only restart wineserver if no other Steinberg/Dorico processes are currently running and we are not in a file-open flow
-        if [ -z "$LAUNCH_ARG" ]; then
-            if ! distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "ps auxww" | grep -iE "Dorico|Activation|Download|STEI|aria2" | grep -v grep >/dev/null 2>&1; then
+        # Check WINE DPI key
+        CURRENT_REG_DPI=$(distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine reg query \"HKCU\\Control Panel\\Desktop\" /v LogPixels 2>/dev/null" | grep -o '0x[0-9a-fA-F]*' | xargs printf "%d" 2>/dev/null || echo "96")
+        
+        WINE_CHANGE_NEEDED=false
+        if [ "$CURRENT_REG_DPI" != "$DPI_TO_SET" ]; then
+            WINE_CHANGE_NEEDED=true
+        fi
+        
+        if [ "$HOST_CHANGE_NEEDED" = "true" ] || [ "$WINE_CHANGE_NEEDED" = "true" ]; then
+            active_apps_running=false
+            if distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "ps auxww" | grep -iE "Dorico.*\.exe|Download.*Assistant.*\.exe|Activation.*Manager.*\.exe|aria2c" | grep -v grep >/dev/null 2>&1; then
+                active_apps_running=true
+            fi
+            
+            should_apply=true
+            
+            if [ "$active_apps_running" = "true" ]; then
+                # Check if we can restart (not in file-open flow)
+                if [ -z "$LAUNCH_ARG" ]; then
+                    warn_msg="Torquio detected a display scaling change. To apply this change, the active WINE session needs to be restarted.\n\nWould you like Torquio to close active applications and apply the new scaling now?"
+                    if command -v zenity >/dev/null 2>&1; then
+                        zenity --question --title="Torquio Graphics Change" --text="$warn_msg" --width=400 2>/dev/null || should_apply=false
+                    elif command -v kdialog >/dev/null 2>&1; then
+                        kdialog --yesno "$warn_msg" --title "Torquio Graphics Change" 2>/dev/null || should_apply=false
+                    else
+                        should_apply=true
+                    fi
+                else
+                    should_apply=false
+                fi
+            fi
+            
+            if [ "$should_apply" = "true" ]; then
+                # Apply host scaling change if needed
+                if [ "$HOST_CHANGE_NEEDED" = "true" ]; then
+                    if [ "$WARN_DISMISSED" != "true" ]; then
+                        warn_msg="Torquio needs to adjust your global XWayland scaling policy for optimal Dorico performance. This is a persistent system setting change (not temporary) and may affect the size/rendering of other XWayland applications going forward. You may also want to restart any currently running XWayland applications after enabling this mode.\n\nTorquio will back up your current settings first so they can be easily restored later.\n\nAllow Torquio to manage this?"
+                        if command -v zenity >/dev/null 2>&1; then
+                            zenity --question --title="Torquio Graphics Management" --text="$warn_msg" || exit 1
+                        elif command -v kdialog >/dev/null 2>&1; then
+                            kdialog --yesno "$warn_msg" --title "Torquio Graphics Management" || exit 1
+                        fi
+                        set_config_val "warn_xwayland_change" "true"
+                    fi
+                    
+                    if [ "$DE" = "GNOME" ]; then
+                        backup_val=$(get_config_val "original_scale_factor" "")
+                        if [ -z "$backup_val" ]; then
+                            set_config_val "original_scale_factor" "${CURRENT_POLICY:-0}"
+                        fi
+                        if gsettings list-schemas | grep -q org.gnome.mutter.wayland; then
+                            gsettings set org.gnome.mutter.wayland xwayland-scaling-factor "$DESIRED_POLICY" 2>/dev/null || true
+                        else
+                            gsettings set org.gnome.mutter xwayland-scaling-factor "$DESIRED_POLICY" 2>/dev/null || true
+                        fi
+                    elif [ "$DE" = "KDE" ]; then
+                        backup_val=$(get_config_val "original_kde_policy" "")
+                        if [ -z "$backup_val" ]; then
+                            set_config_val "original_kde_policy" "${CURRENT_POLICY:-false}"
+                        fi
+                        $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientsScale true 2>/dev/null || true
+                        $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientScale true 2>/dev/null || true
+                        dbus-send --session --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure 2>/dev/null || true
+                    elif [ "$DE" = "COSMIC" ]; then
+                        backup_val=$(get_config_val "original_cosmic_policy" "")
+                        if [ -z "$backup_val" ]; then
+                            set_config_val "original_cosmic_policy" "${CURRENT_POLICY:-none}"
+                        fi
+                        mkdir -p ~/.config/cosmic/com.system76.CosmicComp/v1
+                        echo "$DESIRED_POLICY" > ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null || true
+                    fi
+                fi
+                
+                # Apply WINE registry DPI change if needed
+                if [ "$WINE_CHANGE_NEEDED" = "true" ]; then
+                    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$FREETYPE_INTERP\"; wine reg add \"HKCU\\Control Panel\\Desktop\" /v LogPixels /t REG_DWORD /d $DPI_TO_SET /f" >/dev/null 2>&1 || true
+                fi
+                
+                # Restart wineserver
                 distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wineserver -k && wineserver -w" >/dev/null 2>&1 || true
             fi
         fi
