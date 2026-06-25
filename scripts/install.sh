@@ -276,9 +276,6 @@ if [ "$AUTO_ACCEPT" = false ]; then
         SET_MANUAL_DPI="$CUR_MANUAL_DPI"
         read -p "Press [Enter] to continue to the next step..." temp
     else
-        echo -e "${gray}Note: You can change all configuration settings later at any time${reset}"
-        echo -e "${gray}by re-running the configuration wizard or via the Torquio menus.${reset}"
-        echo "--------------------------------------------------"
         echo "Torquio can automatically coordinate your Wayland desktop's XWayland"
         echo "scaling policy and Wine DPI settings for optimal rendering."
         echo ""
