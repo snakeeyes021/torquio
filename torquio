@@ -496,66 +496,95 @@ configure_graphics() {
             }
 
             if [ "$de" = "GNOME" ] && [ -n "$orig_scale" ]; then
-                local from_desc
-                if [ "$orig_scale" = "1" ]; then
-                    from_desc="Framebuffer Upscale (xwayland-scaling-factor=1)"
-                elif [ "$orig_scale" = "0" ] || [ -z "$orig_scale" ]; then
-                    from_desc="System Default (xwayland-scaling-factor=0)"
-                else
-                    from_desc="Override Scaling (xwayland-scaling-factor=$orig_scale)"
-                fi
-                local to_desc="Framebuffer Upscale (xwayland-scaling-factor=1)"
-                print_restore_info "GNOME" "$from_desc" "$to_desc"
-                read -p "Would you like to restore your GNOME XWayland scale setting back to its original value ($from_desc)? [Y/n]: " restore_confirm
-                if [[ ! "$restore_confirm" =~ ^[Nn]$ ]]; then
-                    if gsettings list-schemas | grep -q org.gnome.mutter.wayland; then
-                        gsettings set org.gnome.mutter.wayland xwayland-scaling-factor "$orig_scale" 2>/dev/null || true
+                local cur_val=$(get_xwayland_scaling_factor)
+                if [ "${cur_val:-0}" != "$orig_scale" ]; then
+                    local from_desc
+                    if [ "$orig_scale" = "1" ]; then
+                        from_desc="Framebuffer Upscale (xwayland-scaling-factor=1)"
+                    elif [ "$orig_scale" = "0" ] || [ -z "$orig_scale" ]; then
+                        from_desc="System Default (xwayland-scaling-factor=0)"
                     else
-                        gsettings set org.gnome.mutter xwayland-scaling-factor "$orig_scale" 2>/dev/null || true
+                        from_desc="Override Scaling (xwayland-scaling-factor=$orig_scale)"
                     fi
-                    echo "GNOME XWayland scale setting restored to $from_desc."
-                    restored=true
+                    local to_desc
+                    if [ "$cur_val" = "1" ]; then
+                        to_desc="Framebuffer Upscale (xwayland-scaling-factor=1)"
+                    elif [ "$cur_val" = "0" ] || [ -z "$cur_val" ]; then
+                        to_desc="System Default (xwayland-scaling-factor=0)"
+                    else
+                        to_desc="Override Scaling (xwayland-scaling-factor=$cur_val)"
+                    fi
+                    print_restore_info "GNOME" "$from_desc" "$to_desc"
+                    read -p "Would you like to restore your GNOME XWayland scale setting back to its original value ($from_desc)? [Y/n]: " restore_confirm
+                    if [[ ! "$restore_confirm" =~ ^[Nn]$ ]]; then
+                        if gsettings list-schemas | grep -q org.gnome.mutter.wayland; then
+                            gsettings set org.gnome.mutter.wayland xwayland-scaling-factor "$orig_scale" 2>/dev/null || true
+                        else
+                            gsettings set org.gnome.mutter xwayland-scaling-factor "$orig_scale" 2>/dev/null || true
+                        fi
+                        echo "GNOME XWayland scale setting restored to $from_desc."
+                        restored=true
+                    fi
                 fi
             elif [ "$de" = "KDE" ] && [ -n "$orig_kde" ]; then
-                local from_desc
-                if [ "$orig_kde" = "false" ]; then
-                    from_desc="Scale XWayland clients by compositor (XwaylandClientsScale=false)"
-                else
-                    from_desc="Scale XWayland clients themselves (XwaylandClientsScale=true)"
-                fi
-                local to_desc="Scale XWayland clients themselves (XwaylandClientsScale=true)"
-                print_restore_info "KDE" "$from_desc" "$to_desc"
-                read -p "Would you like to restore your KDE XWayland scale setting back to its original value ($from_desc)? [Y/n]: " restore_confirm
-                if [[ ! "$restore_confirm" =~ ^[Nn]$ ]]; then
-                    local kwrite_bin="kwriteconfig6"
-                    command -v kwriteconfig6 >/dev/null 2>&1 || kwrite_bin="kwriteconfig5"
-                    $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientsScale "$orig_kde" 2>/dev/null || true
-                    $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientScale "$orig_kde" 2>/dev/null || true
-                    dbus-send --session --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure 2>/dev/null || true
-                    echo "KDE XWayland scale setting restored to $from_desc."
-                    restored=true
+                local kread_bin="kreadconfig6"
+                command -v kreadconfig6 >/dev/null 2>&1 || kread_bin="kreadconfig5"
+                local cur_val=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientsScale 2>/dev/null)
+                [ -z "$cur_val" ] && cur_val=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientScale 2>/dev/null)
+                [ -z "$cur_val" ] && cur_val="true"
+                if [ "$cur_val" != "$orig_kde" ]; then
+                    local from_desc
+                    if [ "$orig_kde" = "false" ]; then
+                        from_desc="Scale XWayland clients by compositor (XwaylandClientsScale=false)"
+                    else
+                        from_desc="Scale XWayland clients themselves (XwaylandClientsScale=true)"
+                    fi
+                    local to_desc
+                    if [ "$cur_val" = "false" ]; then
+                        to_desc="Scale XWayland clients by compositor (XwaylandClientsScale=false)"
+                    else
+                        to_desc="Scale XWayland clients themselves (XwaylandClientsScale=true)"
+                    fi
+                    print_restore_info "KDE" "$from_desc" "$to_desc"
+                    read -p "Would you like to restore your KDE XWayland scale setting back to its original value ($from_desc)? [Y/n]: " restore_confirm
+                    if [[ ! "$restore_confirm" =~ ^[Nn]$ ]]; then
+                        local kwrite_bin="kwriteconfig6"
+                        command -v kwriteconfig6 >/dev/null 2>&1 || kwrite_bin="kwriteconfig5"
+                        $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientsScale "$orig_kde" 2>/dev/null || true
+                        $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientScale "$orig_kde" 2>/dev/null || true
+                        dbus-send --session --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure 2>/dev/null || true
+                        echo "KDE XWayland scale setting restored to $from_desc."
+                        restored=true
+                    fi
                 fi
             elif [ "$de" = "COSMIC" ] && [ -n "$orig_cosmic" ]; then
-                local from_desc
-                if [ "$orig_cosmic" = "fractional" ]; then
-                    from_desc="Optimize for gaming and full-screen apps (descale_xwayland=fractional)"
-                elif [ "$orig_cosmic" = "true" ]; then
-                    from_desc="Optimize for applications (descale_xwayland=true)"
-                else
-                    from_desc="Maximum compatibility mode (descale_xwayland=false)"
-                fi
-                local to_desc="Optimize for gaming and full-screen apps (descale_xwayland=fractional)"
-                print_restore_info "COSMIC" "$from_desc" "$to_desc"
-                read -p "Would you like to restore your COSMIC XWayland scale setting back to its original value ($from_desc)? [Y/n]: " restore_confirm
-                if [[ ! "$restore_confirm" =~ ^[Nn]$ ]]; then
-                    mkdir -p ~/.config/cosmic/com.system76.CosmicComp/v1
-                    if [ "$orig_cosmic" = "none" ] || [ -z "$orig_cosmic" ]; then
-                        rm -f ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland
-                    else
-                        echo "$orig_cosmic" > ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null || true
+                local cur_val=$(cat ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null)
+                [ -z "$cur_val" ] && cur_val="none"
+                if [ "$cur_val" != "$orig_cosmic" ]; then
+                    get_cosmic_desc() {
+                        local val="$1"
+                        if [ "$val" = "fractional" ]; then
+                            echo "Optimize for gaming and full-screen apps (descale_xwayland=fractional)"
+                        elif [ "$val" = "true" ]; then
+                            echo "Optimize for applications (descale_xwayland=true)"
+                        else
+                            echo "Maximum compatibility mode (descale_xwayland=false)"
+                        fi
+                    }
+                    local from_desc=$(get_cosmic_desc "$orig_cosmic")
+                    local to_desc=$(get_cosmic_desc "$cur_val")
+                    print_restore_info "COSMIC" "$from_desc" "$to_desc"
+                    read -p "Would you like to restore your COSMIC XWayland scale setting back to its original value ($from_desc)? [Y/n]: " restore_confirm
+                    if [[ ! "$restore_confirm" =~ ^[Nn]$ ]]; then
+                        mkdir -p ~/.config/cosmic/com.system76.CosmicComp/v1
+                        if [ "$orig_cosmic" = "none" ] || [ -z "$orig_cosmic" ]; then
+                            rm -f ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland
+                        else
+                            echo "$orig_cosmic" > ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null || true
+                        fi
+                        echo "COSMIC XWayland scale setting restored to $from_desc."
+                        restored=true
                     fi
-                    echo "COSMIC XWayland scale setting restored to $from_desc."
-                    restored=true
                 fi
             fi
 

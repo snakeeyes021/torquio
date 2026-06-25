@@ -65,123 +65,159 @@ MANAGE_GRAPHICS=$(get_config_val "manage_graphics" "false")
 if [ "$MANAGE_GRAPHICS" = "true" ] || [ "$(get_config_val "auto_scale_mutter" "false")" = "true" ]; then
     # 1. GNOME Scaling Restore
     if [ -n "$ORIG_SCALE" ]; then
-        from_desc=""
-        if [ "$ORIG_SCALE" = "1" ]; then
-            from_desc="Framebuffer Upscale (xwayland-scaling-factor=1)"
-        elif [ "$ORIG_SCALE" = "0" ] || [ -z "$ORIG_SCALE" ]; then
-            from_desc="System Default (xwayland-scaling-factor=0)"
-        else
-            from_desc="Override Scaling (xwayland-scaling-factor=$ORIG_SCALE)"
-        fi
-        to_desc="Framebuffer Upscale (xwayland-scaling-factor=1)"
-
-        echo ""
-        echo -e "${blue}================================================================${reset}"
-        echo -e "          ${wine}XWayland Global Scaling Policy Restore${reset}"
-        echo -e "${blue}================================================================${reset}"
-        echo -e "Torquio detected that host GNOME XWayland policy was modified from ${wine}$from_desc${reset} to ${wine}$to_desc${reset}."
-        echo "During setup/launch, you set Torquio to automatically adjust your desktop"
-        echo "environment's global XWayland scaling policy to match the ideal"
-        echo "setting for Dorico."
-        echo ""
-        echo "Restoring this setting will return your system to its original scaling"
-        echo "behavior (which may affect how other XWayland applications scale)."
-        echo -e "${blue}================================================================${reset}"
-        echo ""
-        read -p "Would you like to restore your host display scale to $from_desc? [Y/n]: " restore_confirm
-        if [[ ! "$restore_confirm" =~ ^[Nn]$ ]]; then
-            if command -v gsettings >/dev/null 2>&1; then
-                if gsettings list-schemas | grep -q org.gnome.mutter.wayland; then
-                    gsettings set org.gnome.mutter.wayland xwayland-scaling-factor "$ORIG_SCALE" 2>/dev/null || true
-                else
-                    gsettings set org.gnome.mutter xwayland-scaling-factor "$ORIG_SCALE" 2>/dev/null || true
-                fi
-                echo -e "  [${green}SUCCESS${reset}] Host display scale restored to $from_desc."
+        cur_val=$(get_xwayland_scaling_factor)
+        if [ "${cur_val:-0}" != "$ORIG_SCALE" ]; then
+            from_desc=""
+            if [ "$ORIG_SCALE" = "1" ]; then
+                from_desc="Framebuffer Upscale (xwayland-scaling-factor=1)"
+            elif [ "$ORIG_SCALE" = "0" ] || [ -z "$ORIG_SCALE" ]; then
+                from_desc="System Default (xwayland-scaling-factor=0)"
             else
-                echo -e "  [${yellow}WARNING${reset}] gsettings not found. Manual scale restore required."
+                from_desc="Override Scaling (xwayland-scaling-factor=$ORIG_SCALE)"
+            fi
+            
+            to_desc=""
+            if [ "$cur_val" = "1" ]; then
+                to_desc="Framebuffer Upscale (xwayland-scaling-factor=1)"
+            elif [ "$cur_val" = "0" ] || [ -z "$cur_val" ]; then
+                to_desc="System Default (xwayland-scaling-factor=0)"
+            else
+                to_desc="Override Scaling (xwayland-scaling-factor=$cur_val)"
+            fi
+
+            echo ""
+            echo -e "${blue}================================================================${reset}"
+            echo -e "          ${wine}XWayland Global Scaling Policy Restore${reset}"
+            echo -e "${blue}================================================================${reset}"
+            echo -e "Torquio detected that host GNOME XWayland policy was modified from ${wine}$from_desc${reset} to ${wine}$to_desc${reset}."
+            echo "During setup/launch, you set Torquio to automatically adjust your desktop"
+            echo "environment's global XWayland scaling policy to match the ideal"
+            echo "setting for Dorico."
+            echo ""
+            echo "Restoring this setting will return your system to its original scaling"
+            echo "behavior (which may affect how other XWayland applications scale)."
+            echo -e "${blue}================================================================${reset}"
+            echo ""
+            read -p "Would you like to restore your host display scale to $from_desc? [Y/n]: " restore_confirm
+            if [[ ! "$restore_confirm" =~ ^[Nn]$ ]]; then
+                if command -v gsettings >/dev/null 2>&1; then
+                    if gsettings list-schemas | grep -q org.gnome.mutter.wayland; then
+                        gsettings set org.gnome.mutter.wayland xwayland-scaling-factor "$ORIG_SCALE" 2>/dev/null || true
+                    else
+                        gsettings set org.gnome.mutter xwayland-scaling-factor "$ORIG_SCALE" 2>/dev/null || true
+                    fi
+                    echo -e "  [${green}SUCCESS${reset}] Host display scale restored to $from_desc."
+                else
+                    echo -e "  [${yellow}WARNING${reset}] gsettings not found. Manual scale restore required."
+                fi
             fi
         fi
     fi
 
     # 2. KDE Scaling Restore
     if [ -n "$ORIG_KDE" ]; then
-        from_desc=""
-        if [ "$ORIG_KDE" = "false" ]; then
-            from_desc="Scale XWayland clients by compositor (XwaylandClientsScale=false)"
-        else
-            from_desc="Scale XWayland clients themselves (XwaylandClientsScale=true)"
-        fi
-        to_desc="Scale XWayland clients themselves (XwaylandClientsScale=true)"
-
-        echo ""
-        echo -e "${blue}================================================================${reset}"
-        echo -e "          ${wine}XWayland Global Scaling Policy Restore${reset}"
-        echo -e "${blue}================================================================${reset}"
-        echo "During setup/launch, Torquio automatically adjusted your desktop"
-        echo "environment's global XWayland scaling policy to match the ideal"
-        echo "setting for Dorico. This ensured Dorico's interface rendered crisply"
-        echo "at high resolution (unscaled by the compositor) instead of looking blurry."
-        echo ""
-        echo "Restoring this setting will return your system to its original scaling"
-        echo "behavior (which may affect how other XWayland applications scale)."
-        echo -e "${blue}================================================================${reset}"
-        echo ""
-        echo -e "Torquio detected that host KDE XWayland policy was modified from ${wine}$from_desc${reset} to ${wine}$to_desc${reset}."
-        read -p "Would you like to restore your KDE XWayland clients scale policy to $from_desc? [Y/n]: " restore_confirm
-        if [[ ! "$restore_confirm" =~ ^[Nn]$ ]]; then
-            kwrite_bin="kwriteconfig6"
-            if ! command -v kwriteconfig6 >/dev/null 2>&1; then
-                if command -v kwriteconfig5 >/dev/null 2>&1; then
-                    kwrite_bin="kwriteconfig5"
-                else
-                    kwrite_bin=""
-                fi
-            fi
-            if [ -n "$kwrite_bin" ]; then
-                $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientsScale "$ORIG_KDE" 2>/dev/null || true
-                $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientScale "$ORIG_KDE" 2>/dev/null || true
-                dbus-send --session --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure 2>/dev/null || true
-                echo -e "  [${green}SUCCESS${reset}] Host KDE XWayland policy restored to $from_desc."
+        kread_bin="kreadconfig6"
+        command -v kreadconfig6 >/dev/null 2>&1 || kread_bin="kreadconfig5"
+        cur_val=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientsScale 2>/dev/null)
+        [ -z "$cur_val" ] && cur_val=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientScale 2>/dev/null)
+        [ -z "$cur_val" ] && cur_val="true"
+        if [ "$cur_val" != "$ORIG_KDE" ]; then
+            from_desc=""
+            if [ "$ORIG_KDE" = "false" ]; then
+                from_desc="Scale XWayland clients by compositor (XwaylandClientsScale=false)"
             else
-                echo -e "  [${yellow}WARNING${reset}] kwriteconfig6 or kwriteconfig5 not found. Manual scale restore required."
+                from_desc="Scale XWayland clients themselves (XwaylandClientsScale=true)"
+            fi
+            
+            to_desc=""
+            if [ "$cur_val" = "false" ]; then
+                to_desc="Scale XWayland clients by compositor (XwaylandClientsScale=false)"
+            else
+                to_desc="Scale XWayland clients themselves (XwaylandClientsScale=true)"
+            fi
+
+            echo ""
+            echo -e "${blue}================================================================${reset}"
+            echo -e "          ${wine}XWayland Global Scaling Policy Restore${reset}"
+            echo -e "${blue}================================================================${reset}"
+            echo "During setup/launch, Torquio automatically adjusted your desktop"
+            echo "environment's global XWayland scaling policy to match the ideal"
+            echo "setting for Dorico. This ensured Dorico's interface rendered crisply"
+            echo "at high resolution (unscaled by the compositor) instead of looking blurry."
+            echo ""
+            echo "Restoring this setting will return your system to its original scaling"
+            echo "behavior (which may affect how other XWayland applications scale)."
+            echo -e "${blue}================================================================${reset}"
+            echo ""
+            echo -e "Torquio detected that host KDE XWayland policy was modified from ${wine}$from_desc${reset} to ${wine}$to_desc${reset}."
+            read -p "Would you like to restore your KDE XWayland clients scale policy to $from_desc? [Y/n]: " restore_confirm
+            if [[ ! "$restore_confirm" =~ ^[Nn]$ ]]; then
+                kwrite_bin="kwriteconfig6"
+                if ! command -v kwriteconfig6 >/dev/null 2>&1; then
+                    if command -v kwriteconfig5 >/dev/null 2>&1; then
+                        kwrite_bin="kwriteconfig5"
+                    else
+                        kwrite_bin=""
+                    fi
+                fi
+                if [ -n "$kwrite_bin" ]; then
+                    $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientsScale "$ORIG_KDE" 2>/dev/null || true
+                    $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientScale "$ORIG_KDE" 2>/dev/null || true
+                    dbus-send --session --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure 2>/dev/null || true
+                    echo -e "  [${green}SUCCESS${reset}] Host KDE XWayland policy restored to $from_desc."
+                else
+                    echo -e "  [${yellow}WARNING${reset}] kwriteconfig6 or kwriteconfig5 not found. Manual scale restore required."
+                fi
             fi
         fi
     fi
 
     # 3. COSMIC Scaling Restore
     if [ -n "$ORIG_COSMIC" ]; then
-        from_desc=""
-        if [ "$ORIG_COSMIC" = "fractional" ]; then
-            from_desc="Optimize for gaming and full-screen apps (descale_xwayland=fractional)"
-        elif [ "$ORIG_COSMIC" = "true" ]; then
-            from_desc="Optimize for applications (descale_xwayland=true)"
-        else
-            from_desc="Maximum compatibility mode (descale_xwayland=false)"
-        fi
-        to_desc="Optimize for gaming and full-screen apps (descale_xwayland=fractional)"
-
-        echo ""
-        echo -e "${blue}================================================================${reset}"
-        echo -e "          ${wine}XWayland Global Scaling Policy Restore${reset}"
-        echo -e "${blue}================================================================${reset}"
-        echo -e "Torquio detected that host COSMIC XWayland policy was modified from ${wine}$from_desc${reset} to ${wine}$to_desc${reset}."
-        echo "During setup/launch, you set Torquio to automatically adjust your desktop"
-        echo "environment's global XWayland scaling policy to match the ideal"
-        echo "setting for Dorico."
-        echo ""
-        echo "Restoring this setting will return your system to its original scaling"
-        echo "behavior (which may affect how other XWayland applications scale)."
-        echo -e "${blue}================================================================${reset}"
-        echo ""
-        read -p "Would you like to restore your COSMIC XWayland clients scale policy to $from_desc? [Y/n]: " restore_confirm
-        if [[ ! "$restore_confirm" =~ ^[Nn]$ ]]; then
-            mkdir -p ~/.config/cosmic/com.system76.CosmicComp/v1
-            if [ "$ORIG_COSMIC" = "none" ] || [ -z "$ORIG_COSMIC" ]; then
-                rm -f ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland
+        cur_val=$(cat ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null)
+        [ -z "$cur_val" ] && cur_val="none"
+        if [ "$cur_val" != "$ORIG_COSMIC" ]; then
+            from_desc=""
+            if [ "$ORIG_COSMIC" = "fractional" ]; then
+                from_desc="Optimize for gaming and full-screen apps (descale_xwayland=fractional)"
+            elif [ "$ORIG_COSMIC" = "true" ]; then
+                from_desc="Optimize for applications (descale_xwayland=true)"
             else
-                echo "$ORIG_COSMIC" > ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null || true
+                from_desc="Maximum compatibility mode (descale_xwayland=false)"
             fi
-            echo -e "  [${green}SUCCESS${reset}] Host COSMIC XWayland policy restored to $from_desc."
+            
+            to_desc=""
+            if [ "$cur_val" = "fractional" ]; then
+                to_desc="Optimize for gaming and full-screen apps (descale_xwayland=fractional)"
+            elif [ "$cur_val" = "true" ]; then
+                to_desc="Optimize for applications (descale_xwayland=true)"
+            else
+                to_desc="Maximum compatibility mode (descale_xwayland=false)"
+            fi
+
+            echo ""
+            echo -e "${blue}================================================================${reset}"
+            echo -e "          ${wine}XWayland Global Scaling Policy Restore${reset}"
+            echo -e "${blue}================================================================${reset}"
+            echo -e "Torquio detected that host COSMIC XWayland policy was modified from ${wine}$from_desc${reset} to ${wine}$to_desc${reset}."
+            echo "During setup/launch, you set Torquio to automatically adjust your desktop"
+            echo "environment's global XWayland scaling policy to match the ideal"
+            echo "setting for Dorico."
+            echo ""
+            echo "Restoring this setting will return your system to its original scaling"
+            echo "behavior (which may affect how other XWayland applications scale)."
+            echo -e "${blue}================================================================${reset}"
+            echo ""
+            read -p "Would you like to restore your COSMIC XWayland clients scale policy to $from_desc? [Y/n]: " restore_confirm
+            if [[ ! "$restore_confirm" =~ ^[Nn]$ ]]; then
+                mkdir -p ~/.config/cosmic/com.system76.CosmicComp/v1
+                if [ "$ORIG_COSMIC" = "none" ] || [ -z "$ORIG_COSMIC" ]; then
+                    rm -f ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland
+                else
+                    echo "$ORIG_COSMIC" > ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null || true
+                fi
+                echo -e "  [${green}SUCCESS${reset}] Host COSMIC XWayland policy restored to $from_desc."
+            fi
         fi
     fi
 fi
