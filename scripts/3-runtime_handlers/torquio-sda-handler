@@ -11,7 +11,7 @@ echo "=== Torquio SDA Log Started: $(date) ==="
 echo "Script: $0"
 echo "========================================="
 
-TORQUIO_CONTAINER_NAME="torquio-env"
+TORQUIO_CONTAINER_NAME="${TORQUIO_CONTAINER_NAME:-torquio-env}"
 TORQUIO_PREFIX_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/torquio/prefix"
 WINE_CUSTOM_BIN="/opt/wine-custom/bin"
 export DBUS_SYSTEM_BUS_ADDRESS="unix:path=/run/host/run/dbus/system_bus_socket"

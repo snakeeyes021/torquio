@@ -4,7 +4,7 @@
 # This script is sourced by other scripts to ensure consistent paths and settings.
 
 # The name of the Distrobox container
-export TORQUIO_CONTAINER_NAME="torquio-env"
+export TORQUIO_CONTAINER_NAME="${TORQUIO_CONTAINER_NAME:-torquio-env}"
 
 # XDG-compliant directories for persistent data and cache
 export TORQUIO_DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/torquio"
