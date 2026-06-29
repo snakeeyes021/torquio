@@ -241,7 +241,7 @@ rm -f "$HOME/.local/bin/torquio_graphics.py"
 # Removing .desktop files
 rm -f "$HOME/.local/share/applications/Dorico.desktop"
 rm -f "$HOME/.local/share/applications/Steinberg Activation Manager.desktop"
-rm -f "$HOME/.local/share/applications/steinberg-sda-handler.desktop"
+rm -f "$HOME/.local/share/applications/Steinberg Download Assistant.desktop"
 rm -f "$HOME/.local/share/applications/wine-extension-dorico.desktop"
 
 # Removing extracted icons

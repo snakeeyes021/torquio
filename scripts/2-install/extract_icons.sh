@@ -152,7 +152,7 @@ extract_icon \
     "torquio-sda" \
     "false" \
     "" \
-    "steinberg-sda-handler.desktop"
+    "Steinberg Download Assistant.desktop"
 
 # SAM
 # Variations: Steinberg Activation Manager.exe, SteinbergActivationManager.exe, SAM.exe
