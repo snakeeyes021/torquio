@@ -1308,12 +1308,14 @@ import_keycommands() {
     echo "Staging backup: $selected_backup"
     
     # Clean up any existing staged files to prevent conflicts
+    rm -rf "$TORQUIO_DATA_DIR/staged_keycommands"
     rm -f "$TORQUIO_DATA_DIR"/staged_keycommands.*
+    mkdir -p "$TORQUIO_DATA_DIR/staged_keycommands"
     
     if [[ "$selected_backup" =~ \.zip$ ]]; then
-        cp "$selected_backup" "$TORQUIO_DATA_DIR/staged_keycommands.zip"
+        unzip -o "$selected_backup" -d "$TORQUIO_DATA_DIR/staged_keycommands/" >/dev/null 2>&1 || true
     else
-        cp "$selected_backup" "$TORQUIO_DATA_DIR/staged_keycommands.json"
+        cp "$selected_backup" "$TORQUIO_DATA_DIR/staged_keycommands/"
     fi
     echo "Keyboard shortcuts staged successfully! They will be automatically imported the next time you launch Dorico."
 }

@@ -257,20 +257,16 @@ DORICO_NAME=\$(basename "\$DORICO_EXE")
 # Detect version
 DORICO_VER=\$(basename "\$DORICO_DIR" | tr -cd '0-9')
 [ -z "\$DORICO_VER" ] && DORICO_VER="6"
-DORICO_APPDATA_DIR="\$WINEPREFIX/drive_c/users/\$USER/AppData/Roaming/Steinberg/Dorico \$DORICO_VER"
 
 # Import staged key commands if any exist
-STAGED_ZIP="\$HOME/.local/share/torquio/staged_keycommands.zip"
-STAGED_JSON="\$HOME/.local/share/torquio/staged_keycommands.json"
+STAGED_DIR="\$HOME/.local/share/torquio/staged_keycommands"
 
-if [ -f "\$STAGED_ZIP" ]; then
+if [ -d "\$STAGED_DIR" ] && [ \$(ls -A "\$STAGED_DIR" 2>/dev/null | wc -l) -gt 0 ]; then
+    DORICO_APPDATA_DIR=\$(find "\$WINEPREFIX/drive_c/users" -type d -path "*/AppData/Roaming/Steinberg/Dorico*" 2>/dev/null | head -n 1)
+    [ -z "\$DORICO_APPDATA_DIR" ] && DORICO_APPDATA_DIR="\$WINEPREFIX/drive_c/users/\$USER/AppData/Roaming/Steinberg/Dorico \$DORICO_VER"
     mkdir -p "\$DORICO_APPDATA_DIR"
-    unzip -o "\$STAGED_ZIP" -d "\$DORICO_APPDATA_DIR" >/dev/null 2>&1 || true
-    rm -f "\$STAGED_ZIP"
-elif [ -f "\$STAGED_JSON" ]; then
-    mkdir -p "\$DORICO_APPDATA_DIR"
-    cp "\$STAGED_JSON" "\$DORICO_APPDATA_DIR/" >/dev/null 2>&1 || true
-    rm -f "\$STAGED_JSON"
+    cp -r "\$STAGED_DIR"/* "\$DORICO_APPDATA_DIR/" >/dev/null 2>&1 || true
+    rm -rf "\$STAGED_DIR"
 fi
 
 cd "\$DORICO_DIR"

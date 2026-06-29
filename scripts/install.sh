@@ -611,12 +611,14 @@ fi
 # Apply Keyboard Shortcuts Import if configured
 if [ -n "$IMPORT_SHORTCUTS_PATH" ] && [ -f "$IMPORT_SHORTCUTS_PATH" ]; then
     echo "Staging keyboard shortcuts from $IMPORT_SHORTCUTS_PATH..."
+    rm -rf "$TORQUIO_DATA_DIR/staged_keycommands"
     rm -f "$TORQUIO_DATA_DIR"/staged_keycommands.*
+    mkdir -p "$TORQUIO_DATA_DIR/staged_keycommands"
     
     if [[ "$IMPORT_SHORTCUTS_PATH" =~ \.zip$ ]]; then
-        cp "$IMPORT_SHORTCUTS_PATH" "$TORQUIO_DATA_DIR/staged_keycommands.zip"
+        unzip -o "$IMPORT_SHORTCUTS_PATH" -d "$TORQUIO_DATA_DIR/staged_keycommands/" >/dev/null 2>&1 || true
     else
-        cp "$IMPORT_SHORTCUTS_PATH" "$TORQUIO_DATA_DIR/staged_keycommands.json"
+        cp "$IMPORT_SHORTCUTS_PATH" "$TORQUIO_DATA_DIR/staged_keycommands/"
     fi
     echo "Keyboard shortcuts staged. They will be automatically imported the first time Dorico is launched."
 fi
