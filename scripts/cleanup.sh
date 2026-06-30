@@ -243,6 +243,9 @@ rm -f "$HOME/.local/share/applications/Dorico.desktop"
 rm -f "$HOME/.local/share/applications/Steinberg Activation Manager.desktop"
 rm -f "$HOME/.local/share/applications/Steinberg Download Assistant.desktop"
 rm -f "$HOME/.local/share/applications/wine-extension-dorico.desktop"
+rm -f "$HOME/.local/share/applications/wine-protocol-net-steinberg-"*.desktop
+rm -f "$HOME/.local/share/applications/wine-extension-vstsound.desktop"
+rm -f "$HOME/.local/share/applications/wine-extension-slm.desktop"
 
 # Removing extracted icons
 rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/torquio-dorico.png"

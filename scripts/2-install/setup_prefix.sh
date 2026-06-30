@@ -143,4 +143,9 @@ wine reg add "HKCU\\Control Panel\\Accessibility\\Keyboard Response" /v AutoRepe
 wine reg add "HKCU\\Control Panel\\Accessibility\\Keyboard Response" /v AutoRepeatRate /t REG_SZ /d "30" /f
 wine reg add "HKCU\\Control Panel\\Accessibility\\Keyboard Response" /v Flags /t REG_SZ /d "126" /f
 
+# Force WINE to map HTTP/HTTPS schemes directly to the native DBus portal via busctl.
+# This completely bypasses winebrowser.exe and respects the wineconsole=d override.
+wine reg add "HKCR\\http\\shell\\open\\command" /ve /t REG_SZ /d "Z:\\usr\\bin\\busctl --user call org.freedesktop.portal.Desktop /org/freedesktop/portal/desktop org.freedesktop.portal.OpenURI OpenURI ssa{sv} \"\" \"%1\" 0" /f
+wine reg add "HKCR\\https\\shell\\open\\command" /ve /t REG_SZ /d "Z:\\usr\\bin\\busctl --user call org.freedesktop.portal.Desktop /org/freedesktop/portal/desktop org.freedesktop.portal.OpenURI OpenURI ssa{sv} \"\" \"%1\" 0" /f
+
 echo "Done with registry optimizations, custom debugger setup, and focus overrides!"

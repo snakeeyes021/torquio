@@ -120,6 +120,11 @@ extract_icon() {
     
     # --- Dynamic Desktop Launcher Registration ---
     if [ -n "$desktop_name" ] && [ -f "$SCRIPT_DIR/../../desktop_stubs/$desktop_name" ]; then
+        # Clean legacy WINE-generated conflicting files
+        rm -f "$HOME/.local/share/applications/wine-protocol-net-steinberg-"*.desktop
+        rm -f "$HOME/.local/share/applications/wine-extension-vstsound.desktop"
+        rm -f "$HOME/.local/share/applications/wine-extension-slm.desktop"
+
         echo "Registering desktop launcher: $desktop_name..."
         sed "s|\$HOME|$HOME|g" "$SCRIPT_DIR/../../desktop_stubs/$desktop_name" > "$HOME/.local/share/applications/$desktop_name"
         
@@ -181,6 +186,17 @@ fi
 touch "$HOME/.local/share/applications" >/dev/null 2>&1 || true
 if [ -d "$HOME/.local/share/applications" ]; then
     touch "$HOME/.local/share/applications/"*.desktop >/dev/null 2>&1 || true
+fi
+
+echo "Setting default MIME handlers for Steinberg protocols..."
+if command -v distrobox-host-exec >/dev/null 2>&1; then
+    distrobox-host-exec xdg-mime default "Steinberg Download Assistant.desktop" x-scheme-handler/net-steinberg-sda || true
+    distrobox-host-exec xdg-mime default "Steinberg Activation Manager.desktop" x-scheme-handler/net-steinberg-sam || true
+    distrobox-host-exec xdg-mime default "Steinberg Activation Manager.desktop" x-scheme-handler/net-steinberg-activation-manager || true
+elif command -v xdg-mime >/dev/null 2>&1; then
+    xdg-mime default "Steinberg Download Assistant.desktop" x-scheme-handler/net-steinberg-sda || true
+    xdg-mime default "Steinberg Activation Manager.desktop" x-scheme-handler/net-steinberg-sam || true
+    xdg-mime default "Steinberg Activation Manager.desktop" x-scheme-handler/net-steinberg-activation-manager || true
 fi
 
 echo "Icon extraction complete."
