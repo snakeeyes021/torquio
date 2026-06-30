@@ -515,7 +515,7 @@ if [ "$CREATE_CONTAINER" = true ]; then
     if distrobox list 2>/dev/null | grep -q "$TORQUIO_CONTAINER_NAME"; then
         echo "Container $TORQUIO_CONTAINER_NAME already exists. Skipping creation."
     else
-        distrobox create -i ubuntu:24.04 -n "$TORQUIO_CONTAINER_NAME" --additional-flags "--uts=host" --yes
+        distrobox create -i ubuntu:24.04 -n "$TORQUIO_CONTAINER_NAME" --hostname "$(hostname)" --yes
     fi
 fi
 
