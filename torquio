@@ -362,7 +362,7 @@ local sys_policy="Unknown"
 
 echo -e "  ${blue}[Torquio Recommendations for this Monitor]${reset}"
     if [ "$XDG_SESSION_TYPE" = "x11" ]; then
-        echo -e "  - Recommended Scaling Policy: ${yellow}N/A (Native X11 Session)${reset}"
+        echo -e "  - Recommended Scaling Policy:  ${yellow}N/A (Native X11 Session)${reset}"
         echo -e "  - Recommended Wine DPI:        ${yellow}Manual Configuration Required${reset}"
         echo ""
         echo -e "  ${yellow}[X11 Scaling Notice]${reset}"
