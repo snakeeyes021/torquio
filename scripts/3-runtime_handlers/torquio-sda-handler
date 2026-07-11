@@ -84,7 +84,7 @@ if [ -z "$URL" ] && [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "
     if [ ! -f "$SCRIPT_DIR/torquio_graphics.py" ]; then
         SCRIPT_DIR="$TORQUIO_REPO_DIR/scripts/3-runtime_handlers"
     fi
-if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
+    
     GRAPHICS_JSON=$(python3 "$SCRIPT_DIR/torquio_graphics.py")
     SUPPORTED=$(echo "$GRAPHICS_JSON" | grep -o '"supported": true')
     if [ -n "$SUPPORTED" ]; then
@@ -231,7 +231,6 @@ if [ "$XDG_SESSION_TYPE" != "x11" ] && [ "$MANAGE_GRAPHICS" = "true" ]; then
             fi
         fi
     fi
-fi
 fi
 
 # --- Keyboard Auto-Repeat Lag Remedy (xset) ---
