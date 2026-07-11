@@ -1265,7 +1265,7 @@ export_keycommands() {
     mkdir -p "$downloads_dir"
     local zip_file="$downloads_dir/torquio_keycommands_backup.zip"
     
-    (cd "$keycommands_dir" && zip -q "$zip_file" keycommands_*.json)
+    (cd "$keycommands_dir" && python3 -c "import zipfile, glob, os; z = zipfile.ZipFile('$zip_file', 'w'); [z.write(f, os.path.basename(f)) for f in glob.glob('keycommands_*.json')]; z.close()")
     echo "Successfully compressed and exported key commands to: $zip_file"
 }
 
