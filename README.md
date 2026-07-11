@@ -20,7 +20,7 @@ Before running the installer, ensure your host system has the following installe
 On many immutable distros, the above are included by default, so you're good to go. That includes:
 
 * **The Universal Blue family** (Bazzite, Bluefin, Aurora, and most, if not all, custom downstream images)
-* **SteamOS**
+* **SteamOS** (yes, it runs on Steam Deck, though there's no good gamepad profile for it yet)
 * **openSUSE Aeon / Kalpa**  
 
 > [!TIP]
@@ -52,10 +52,12 @@ Open your terminal and run the following commands to clone the repository and st
 ```bash
 git clone https://github.com/snakeeyes021/torquio.git
 cd torquio
-./scripts/install.sh
+./torquio
 ```
 
-*(You can append `-y` to `install.sh` to bypass the installer manifest confirmation prompt and scale prompts for a completely silent, automated installation).*
+Then just follow the interactive prompts to go through the install wizard.
+
+*(You can alternatively run `./torquio -i -y` to bypass the installer wizard and other prompts for a silent, automated installation).*
 
 ### What happens next?
 The build pipeline automatically handles all the heavy lifting:
@@ -70,23 +72,53 @@ After installation, the Steinberg Download Assistant will launch automatically. 
 
 ---
 
-## The Torquio Console Manager
+### Features & CLI Usage Guide
 
-Torquio provides a unified, friendly console utility to manage your environment. You can run it globally from your terminal at any time simply by typing:
+Torquio is more than just an installer. It includes a unified console orchestrator (`torquio`) to manage your Dorico environment. You can interact with it through a friendly terminal-based menu interface by running:
 
 ```bash
 torquio
 ```
 
-### Quality of Life Features
+Alternatively, you can bypass the interactive menus and run operations directly using command-line flags. Below is an overview of the core features and how to use them.
 
-*   **Console Dashboard**: Displays the active status of your container dependencies, configuration preferences, and system details in a handy CLI interface.
-*   **Automatic Scaling**: Automatically manages XWayland scaling policy/prefix DPI so that Dorico renders well given your monitor specs and settings.
-*   **Project Folder Mapping**: Maps your native host folders directly into the WINE file picker using a convenient wizard so your projects are always easily accessible.
-*   **Keyboard Shortcut Backups**: Saves or restores your custom Dorico keyboard shortcuts for convenient transport to and from other machines.
-*   **One-Click Maintenance**: Provides quick menu items to run WINE configuration, edit the registry, open a file manager inside the prefix, soft-reboot the environment, or safely shut down the server.
-*   **Startup Time Validation**: Warns you if the host system clock is out of sync, preventing tricky, hard-to-diagnose Steinberg licensing activation errors.
-*   **Assorted Problem Fixes**: Solves several annoying quirks of running Dorico on Linux, such as keyboard longpresses not working right (breaking scrubber functionality) for instance.
+### 1. Interactive Status Dashboard
+Displays active paths, checks if the Distrobox container is running, shows current Wine DPI settings and Freetype interpreter settings, and validates system clock synchronization (vital for Steinberg licensing).
+* **How to Use**:
+  * **Interactive**: Option `3` (Status Dashboard) in the main menu.
+  * **CLI Flag**: `torquio -s` or `torquio --status`
+
+### 2. Automated Display Scaling
+Wine runs on legacy X11 protocols via XWayland. In high-resolution (4K+) or fractionally scaled environments, this can cause some headaches when trying to get things dialed in visually. The automated display scaling feature automatically queries your active monitor specs and dynamically configures the Wine registry DPI and desktop compositor scaling policies (on GNOME, KDE Plasma, and COSMIC Wayland sessions).
+* **How to Use**:
+  * **Interactive**: Option `4` (Configure Graphics & Scaling) in the main menu.
+  * **CLI Flag**: `torquio -g` or `torquio --graphics`
+  * *Note: For deep architectural details, formulas, and manual setups on less popular Wayland distros, or X11, see the [Display Scaling & Graphics Strategy](docs/GRAPHICS.md) guide.*
+
+### 3. Project Folder Mapping
+Wine prefixes isolate virtual Windows drives (like `C:\`), making your native Linux directories (e.g. `~/Documents` or Cloud-synced folders) difficult to navigate to from within WINE's file chooser (and it is highly highly recommended to never save your projects inside the WINE prefix itself). The folder mapping option helpfully creates symlinks inside the Wine prefix, mapping your native host project directories or cloud-sync folders directly to convenient locations in the virtual drive.
+* **How to Use**:
+  * **Interactive**: Option `6` (Manage Folder Mappings) in the main menu.
+  * **CLI Flag**: `torquio -d [path/on/host] [link/name/in/prefix]` (or run without arguments for interactive prompts).
+
+### 4. Key Commands Backup & Restore
+This tool exports your custom Dorico keyboard shortcuts (`keycommands_*.json`, etc.) from the prefix to a zip archive on the host, and allows you to import them back at any time. If you have a key commands json you'd like to import from a previous installation (Linux or Windows), simply place the json in your ~/Downloads folder and run this tool to import it. Going forward, use the exporter to grab your key commands for use in new installations. 
+* **How to Use**:
+  * **Interactive**: Option `7` (Manage Dorico Key Commands) in the main menu.
+  * **CLI Flags**:
+    * **Export**: `torquio -x` or `torquio --export_key_commands`
+    * **Import**: `torquio -m` or `torquio --import_key_commands`
+
+### 5. Environment Maintenance & Debugging Utilities
+Occasionally, Wine servers hang, applications lock up in the background, or you're feeling adventurous and want to try installing third-party plugins/VSTs (at the moment our advice is this usually won't work, unless the VST, like Noteperformer, requires zero out-of-the-box configuration, but hey, doesn't hurt to try!). Torquio provides a small set of helper tools to keep the environment running smoothly.
+* **How to Use**:
+  * **Interactive**: Option `8` (Wine Tools & Maintenance) from the main menu provides submenus for all tasks.
+  * **CLI Flags**:
+    * **Kill Wine**: `torquio -k` or `torquio --kill_wine` (Force-stops the Wine server and all lingering Steinberg processes; useful if the app hangs).
+    * **Reboot Prefix**: `torquio -b` or `torquio --reboot` (Simulates a Windows system reboot in the prefix).
+    * **Wine Configuration**: `torquio -w` or `torquio --winecfg` (Opens the standard `winecfg` graphical control panel for library overrides).
+    * **Execute Installer**: `torquio -e [file.exe/msi]` or `torquio --execute [file.exe/msi]` (Executes custom Windows installers or tools inside the environment prefix).
+    * **Fix Icons**: `torquio -f` or `torquio --fix-icons` (Refreshes desktop icons and launcher shortcuts on the host system). This can also be useful when following a ```git pull```; at the moment, this is how you'd update Torquio.
 
 ---
 
@@ -94,90 +126,15 @@ torquio
 
 Because Dorico runs via WINE (which currently operates on legacy X11 protocols via XWayland), high-resolution monitors can cause scaling headaches on modern Wayland desktop environments. 
 
-If you use anything that is 1440p or below and you don't use desktop environment fractional scaling, there's a good chance you're in the clear and don't really need to worry about this. However, if you use anything that's 4K or above, have a high DPI screen that requires fractional scaling, or you use Dorico on a laptop that sometimes gets plugged into a dock/monitor with a different DPI or desktop scaling factor from your laptop's screen, you may want to read on.
+Torquio provides an **Auto Graphics Mode** that handles this automatically by managing the desktop's XWayland scaling protocol as well as the WINE prefix's DPI setting. Auto Graphics Mode is available on recent versions **GNOME**, **KDE Plasma**, and **Cosmic** (it may work on older versions, but we can't guarantee how far back said compatibility extends). 
 
-Torquio's **Auto Graphics Mode** attempts to solve these various scenarios by managing the desktop's XWayland scaling protocol as well as the WINE prefix's DPI setting. Auto Graphics Mode is available on recent Wayland versions of **GNOME**, **KDE Plasma**, and **Cosmic** (where it handles DPI *and* coordinates compositor scaling policies). Auto Graphics Mode and the Match Hardware Physical DPI options are exclusive to modern Wayland compositors and are not available on **X11 sessions**, as display scaling behavior varies across X11 desktop environments and would not be feasible to automatically manage. Luckily, proper scaling on X11 should largely only require manually changing the WINE prefix DPI, and very often the default 96 will be sufficient.
+If you use standard 1080p/1440p monitors without fractional scaling, the default manual settings are usually perfect. However, if you are running a 4K+ monitor, use fractional scaling, or use a laptop that you occasionally plug into larger external monitors, you may want to turn on auto graphics mode or consult our guide:
 
-If your use case *does* fall into one of the above categories but you're not on a supported desktop environment (and could benefit from some direction on how to manage things) or you just want to know what's going on under the hood, here's a useful graph:
+👉 **[Display Scaling & Graphics Strategy](docs/GRAPHICS.md)**
 
-```mermaid
-graph TD
-    Start(["Scaling Strategy Guide"]):::normal
-    Fork{"4K+ Resolution, Fractional Scaling,\nOR Mixed-DPI Multi-Monitor?"}:::normal
-    LowRes["Good to go!\n(Fine to leave in Manual Mode; no scaling changes needed)"]:::normal
-    DE{"What Desktop Session/Environment?"}:::normal
-    KDEPath["Auto & Manual Modes Available"]:::auto
-    GnomePath["Auto & Manual Modes Available"]:::auto
-    X11Path["Manual Mode Only\n(Auto-scaling unsupported)"]:::manual
-    OtherWayland["Manual Mode Only"]:::manual
-    KDEAction["1. Set XWayland apps to scale themselves\n(Called 'Optimize for Games' on COSMIC; default on KDE)\n2. Set WINE DPI to match desktop scale factor (96 * Desktop Scale)"]:::auto
-    GnomeAction["1. Enable Framebuffer Upscaling (set xwayland-scaling-factor to 1)\n2. Keep WINE DPI at standard default (96 DPI; compositor upscales the UI)"]:::auto
-    GnomeLag{"Performance Lag?"}:::auto
-    GnomePerf["Consider manually lowering system resolution to 1440p or 1080p before launching Dorico"]:::auto
-    OtherAction["Depends on XWayland policy controls:\n- Prefer KDE/COSMIC method if available\n- If standard Framebuffer Upscale is the only option, follow the GNOME method"]:::manual
-    X11Action["Proper scaling settings differ across X11 DEs.\nUse 'Set/change WINE Prefix DPI' tool to match your DE settings."]:::manual
+This document details the scaling formulas, a visual strategy guide flowchart, manual configuration instructions for other Wayland compositors (like Sway/Hyprland) or X11 desktop environments (like Linux Mint/Cinnamon), and global scaling cautions.
 
-    Start --> Fork
-    Fork -- "No" --> LowRes
-    Fork -- "Yes" --> DE
-    DE -- "KDE Plasma / COSMIC (Wayland)" --> KDEPath
-    DE -- "GNOME (Wayland)" --> GnomePath
-    DE -- "Any X11 Desktop" --> X11Path
-    DE -- "Other Wayland Desktops" --> OtherWayland
-    KDEPath --> KDEAction
-    GnomePath --> GnomeAction
-    GnomeAction --> GnomeLag
-    GnomeLag -- "Yes" --> GnomePerf
-    OtherWayland --> OtherAction
-    X11Path --> X11Action
-
-    classDef auto fill:#1b2e1e,stroke:#a6e3a1,stroke-width:1px,color:#cdd6f4;
-    classDef manual fill:#2a2421,stroke:#f9e2af,stroke-width:1px,color:#cdd6f4;
-    classDef normal fill:#1e1e2e,stroke:#313244,stroke-width:1px,color:#cdd6f4;
-```
-
-### Under the Hood: The Formulas
-
-Depending on how your Desktop Environment scales legacy X11/XWayland applications, the target WINE DPI is calculated relative to a standard **`96 DPI`** logical baseline (desktop scale factor $\times$ 96):
-
-*   **For GNOME (or other Mutter-based environments using Framebuffer Upscaling on Wayland)**: 
-    Disabling native XWayland scaling (`xwayland-scaling-factor=1`) forces the app to render at 100% and lets the compositor upscale the window. To prevent text/UI from being double-scaled, the WINE DPI remains at its default baseline:
-
-$$\text{Target WINE DPI} = 96\text{ DPI}$$
-
-    *(e.g., WINE renders at standard 96 DPI, and the GNOME compositor upscales the final output window to the target desktop scale factor)*
-
-*   **For KDE Plasma / COSMIC on Wayland (or other environments supporting Native Application Scaling)**:
-    Allowing XWayland applications to scale themselves bypasses compositor upscaling. The window renders sharp at native 1:1, and WINE scales its own UI elements directly:
-
-$$\text{Target WINE DPI} = 96 \times \text{Desktop Scale Factor}$$
-
-    *(e.g., 96 baseline DPI * 1.50x desktop scale = 144 target DPI)*
-
-> [!NOTE]
-> **Match Hardware Physical DPI Option (Wayland Only):**
-> Alternatively, you can enable **Match Hardware Physical DPI** in the graphics configuration menu. If enabled, scaling calculations will anchor directly to your monitor's exact hardware physical subpixel density (queried from EDID data, e.g. `161 DPI`) instead of the standard `96 DPI` baseline. This can be useful if you prefer a slightly different UI scale in Dorico to compensate for the physical size of your screen.
-> 
-> *Note: Match Hardware Physical DPI and Automated Graphics Management are Wayland-only features and are bypassed on X11 sessions.*
-
-### Manual Configuration for Other Desktops
-
-If your environment is not supported by Torquio's Auto Graphics Mode, you can configure display scaling manually:
-*   **Other Wayland Desktops (e.g., Sway, Hyprland, Wayfire)**: Check if your compositor exposes XWayland scaling policies. If you can configure XWayland clients to scale themselves, enable this and set your WINE DPI to match your desktop's scale factor (96 * Scale). If standard compositor/framebuffer upscaling is the only option, follow the GNOME method (keep WINE DPI at 96 and turn on framebuffer upscaling).
-*   **X11 Desktops (e.g., XFCE, Cinnamon, MATE, GNOME/KDE/COSMIC on X11)**: The proper scaling settings will differ for the various X11 desktop environments. Please consult your own particular DE's scaling method and set the Wine Prefix DPI manually using option 2 ("Set/change WINE Prefix DPI") in the Torquio configuration menu if needed. As an example, on Mint, you would set the following DPI values depending on what desktop scaling you have enabled in your settings:
-    *   **Integer Scaling (e.g., 200%)**: Set DPI to `Scale × 96` (e.g., 192 DPI).
-    *   **Fractional Scaling with "Scale Down" enabled**: Set DPI to **192 DPI** (as Mint assumes a 200% base render and scales down from there).
-    *   **Fractional Scaling with "Scale Up" enabled**: Leave DPI on the default **96 DPI** (as Mint assumes a 100% base render and scales up from there).
-
-> [!CAUTION]
-> **XWayland Note:** As mentioned, Auto Graphics Mode manages a global desktop setting (your desktop environment's XWayland scaling policy). If you actively use other legacy X11/XWayland applications on your desktop alongside Dorico (excluding games, which typically prefer the same unscaled mode Dorico uses), consider sticking to **Manual Graphics Mode** instead. See the graphics configuration menu to determine whether your current XWayland scaling method differs from the Torquio-recommended setting.
-
-> [!TIP]
-> **Performance Recommendation**
-> At 4K+ resolutions, regardless of scaling, we have noticed some performance degradation/lagginess even on decent hardware. If you experience unacceptable lag, consider manually bumping your system desktop resolution down to 1440p or 1080p before you launch Dorico.
-
-
----
+----
 
 ## Uninstallation / Clean Start
 
@@ -187,6 +144,16 @@ If you ever need to completely wipe the Torquio environment (including the conta
 torquio --uninstall
 ```
 
+> [!NOTE]
+> If you installed Dorico prior to our name change (from "Valerio" to "Torquio"), we recommend uninstalling and performing a clean re-install to get yourself onto the new system. This also gives you access to future updates and features as they are released. However, the normal uninstall option will not work. For this specific situation, we have a Valerio-specific cleanup script, which you can run with the following command (assuming you're in the root of the git repo):
+>
+>```bash
+>./scripts/cleanup_valerio.sh
+>```
+>
+> The script will still prompt you to confirm that you've deactivated your licenses or backed up any projects you may have been (unwisely) storing in the prefix. Once complete, you can proceed with a normal installation of the new Torquio system following the instructions above.
+
+
 ---
 
 ## For Developers & Contributors
@@ -194,6 +161,7 @@ torquio --uninstall
 If you are looking to understand how this system works under the hood, contribute to the scripts, or read the historical design decisions, please refer to the `docs/` directory:
 
 *   **[Architecture & Blueprint](docs/ARCHITECTURE.md):** The core technical design (Containers, Custom WINE, URI Handoffs).
+*   **[Display Scaling & Graphics Strategy](docs/GRAPHICS.md):** The math formulas, Mermaid decision guide, and manual configurations.
 *   **[Contributing Guide](CONTRIBUTING.md):** Our standard Git workflow, development guidelines, and how to safely test your changes.
 *   **[Release Manifests](docs/RELEASES.md):** The verifiable combinations of WINE versions and Steinberg app versions.
 *   **[Project Backlog](docs/BACKLOG.md):** Current tasks and active sprint items.
@@ -219,16 +187,14 @@ torquio/
 
 ## Project Status: Alpha
 
-Torquio is fully working for its primary job, but should be considered early-stage software. 
+Torquio is fully functional for its primary job, but should be considered early-stage software. 
 
 When using it, keep the following architectural realities in mind:
+* **Version Breaking Changes**: As the project is optimized, future updates/features could in some rare circumstances require a full removal and reinstall. It's not tremendously likely, but we can't definitively promise that it could never happen.
+* **Missing Features**: Some quality of life features have yet to be implemented, and there's no guarantee we'll ever cross everything off our wishlist. Initial build/install can take longer than we'd like, certain things are less automatic than they should be, and any number of other inconveniences could pop up here and there. We hope we've cast a pretty wide net and made Torquio work for most people who need it, but if something is just absolutely broken or some quirk of the way we've done things makes its use impossible with your setup, do of course open an issue above.
 * **The prefix is just files in a folder**: But that's where Dorico and your Steinberg licenses live. While Torquio includes safety checks and prompts to prevent accidents, understand that running `torquio --uninstall` completely wipes the prefix.
     * **Licenses:** Because Steinberg licenses are stored *inside* the prefix, wiping the environment without deactivating your license first will permanently prevent access to it (thus requiring you to deactivate the license on Steinberg's website; we don't know if there's some sort of limit or monitoring for fraud prevention on this type of deactivation, nor would we like to find out, so we try to avoid this at all costs and recommend you do the same). Always deactivate via the Steinberg Activation Manager before a clean reinstall.
     * **Project Files:** Save your `.dorico` project files to your local user directory, not inside the prefix. Torquio provides a convenient tool to map links to your native host folders directly onto specific prefix locations, providing convenient access to them via the WINE file picker dialogs. To that end, not an advertisement, but we really love Insync (coupled with your cloud service of choice), which, yes, is proprietary/paid software, but it gets the job done and does so reliably. 
-
-
-* **Version Breaking Changes**: As the project is optimized, future updates/features could in some rare circumstances require a full removal and reinstall. It's not tremendously likely, but we can't definitively promise that it could never happen.
-* **Missing Features**: Some quality of life features have yet to be implemented, and there's no guarantee we'll ever cross everything off our wishlist. Initial build/install can take longer than we'd like, certain things are less automatic than they should be, and any number of other inconveniences could pop up here and there. We hope we've cast a pretty wide net and made Torquio work for most people who need it, but if something is just absolutely broken or some quirk of the way we've done things makes its use impossible with your setup, do of course open an issue above.
 
 ## Legal & Disclaimer
 
