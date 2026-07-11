@@ -34,14 +34,13 @@ print_header() {
     
     # System Clock Status Check (SAM/SDA licensing safeguard)
     python3 -c "
-import urllib.request, time, datetime
+import urllib.request, email.utils, datetime
 try:
     req = urllib.request.Request('https://www.google.com', method='HEAD')
     with urllib.request.urlopen(req, timeout=3) as response:
         srv_date_str = response.headers.get('Date')
     if srv_date_str:
-        srv_time = time.strptime(srv_date_str, '%a, %d %b %Y %H:%M:%S GMT')
-        srv_dt = datetime.datetime(*srv_time[:6], tzinfo=datetime.timezone.utc)
+        srv_dt = email.utils.parsedate_to_datetime(srv_date_str)
         local_dt = datetime.datetime.now(datetime.timezone.utc)
         diff = abs((srv_dt - local_dt).total_seconds())
         if diff > 180:
