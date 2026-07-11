@@ -60,38 +60,6 @@ except Exception:
     
 }
 
-get_config_val() {
-    local key="$1"
-    local default="$2"
-    local config_file="$HOME/.config/torquio/config.json"
-    if [ ! -f "$config_file" ]; then
-        echo "$default"
-        return
-    fi
-    python3 -c "import json; d=json.load(open('$config_file')); v=d.get('$key', '$default'); print(str(v).lower() if isinstance(v, bool) else v)" 2>/dev/null || echo "$default"
-}
-
-set_config_val() {
-    local key="$1"
-    local val="$2"
-    local config_file="$HOME/.config/torquio/config.json"
-    mkdir -p "$(dirname "$config_file")"
-    if [ ! -f "$config_file" ]; then
-        echo "{}" > "$config_file"
-    fi
-    python3 -c "
-import json
-f = '$config_file'
-try: d = json.load(open(f))
-except Exception: d = {}
-val = '$val'
-if val.lower() == 'true': val = True
-elif val.lower() == 'false': val = False
-elif val.isdigit(): val = int(val)
-d['$key'] = val
-json.dump(d, open(f, 'w'), indent=4)
-" 2>/dev/null || true
-}
 
 apply_graphics_settings() {
     if ! distrobox list 2>/dev/null | grep -q "$TORQUIO_CONTAINER_NAME" || [ ! -d "$TORQUIO_PREFIX_DIR" ]; then

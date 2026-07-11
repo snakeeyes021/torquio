@@ -25,7 +25,7 @@ get_config_val() {
         echo "$default"
         return
     fi
-    python3 -c "import json; d=json.load(open('$config_file')); v=d.get('$key', '$default'); print(str(v).lower() if isinstance(v, bool) else v)" 2>/dev/null || echo "$default"
+    python3 -c 'import sys, json; d=json.load(open(sys.argv[1])); v=d.get(sys.argv[2], sys.argv[3]); print(str(v).lower() if isinstance(v, bool) else v)' "$config_file" "$key" "$default" 2>/dev/null || echo "$default"
 }
 
 set_config_val() {
@@ -36,18 +36,24 @@ set_config_val() {
     if [ ! -f "$config_file" ]; then
         echo "{}" > "$config_file"
     fi
-    python3 -c "
-import json
-f = '$config_file'
-try: d = json.load(open(f))
-except Exception: d = {}
-val = '$val'
-if val.lower() == 'true': val = True
-elif val.lower() == 'false': val = False
-elif val.isdigit(): val = int(val)
-d['$key'] = val
-json.dump(d, open(f, 'w'), indent=4)
-" 2>/dev/null || true
+    python3 -c '
+import sys, json
+f = sys.argv[1]
+key = sys.argv[2]
+val = sys.argv[3]
+try:
+    d = json.load(open(f))
+except Exception:
+    d = {}
+if val.lower() == "true":
+    val = True
+elif val.lower() == "false":
+    val = False
+elif val.isdigit():
+    val = int(val)
+d[key] = val
+json.dump(d, open(f, "w"), indent=4)
+' "$config_file" "$key" "$val" 2>/dev/null || true
 }
 
 # --- System Clock Verification & Safeguard ---
