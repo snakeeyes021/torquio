@@ -56,23 +56,24 @@ set_config_val() {
     if [ ! -f "$config_file" ]; then
         echo "{}" > "$config_file"
     fi
-    python3 -c "
-import json
-f = '$config_file'
+    python3 -c '
+import sys, json
+f = sys.argv[1]
+key = sys.argv[2]
+val = sys.argv[3]
 try:
     d = json.load(open(f))
 except Exception:
     d = {}
-val = '$val'
-if val.lower() == 'true':
+if val.lower() == "true":
     val = True
-elif val.lower() == 'false':
+elif val.lower() == "false":
     val = False
 elif val.isdigit():
     val = int(val)
-d['$key'] = val
-json.dump(d, open(f, 'w'), indent=4)
-" 2>/dev/null || true
+d[key] = val
+json.dump(d, open(f, "w"), indent=4)
+' "$config_file" "$key" "$val" 2>/dev/null || true
 }
 
 get_xwayland_scaling_factor() {
