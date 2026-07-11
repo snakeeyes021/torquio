@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../common.sh"
 
 # Array of directories to search. Order matters: it will stop at the first match.
-SEARCH_DIRS=("$VALERIO_INSTALLERS_DIR" "$HOME/Downloads" "$(pwd)")
+SEARCH_DIRS=("$TORQUIO_INSTALLERS_DIR" "$HOME/Downloads" "$(pwd)")
 FOUND_INSTALLER=""
 
 # 1. Search Phase
@@ -20,7 +20,7 @@ fi
 # 2. Download / Fallback Phase
 if [ -z "$FOUND_INSTALLER" ]; then
     echo "Error: Cantai installer not found locally."
-    echo "Please download the installer and place it in $VALERIO_INSTALLERS_DIR, ~/Downloads, or run this script from the directory containing it."
+    echo "Please download the installer and place it in $TORQUIO_INSTALLERS_DIR, ~/Downloads, or run this script from the directory containing it."
     
     exit 1
 fi
@@ -46,12 +46,12 @@ fi
 if [[ "$1" == "--interactive" ]]; then
     echo "Launching Cantai installer interactively..."
     # Passing the guaranteed absolute path ($EXTRACTED_EXE) to Wine inside the Distrobox container.
-    distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$VALERIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine \"$EXTRACTED_EXE\"" || true
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine \"$EXTRACTED_EXE\"" || true
 else
     echo "Installing Cantai silently..."
     # TODO: Replace the active command below with the correct silent installation flag once identified.
     # It will likely look something like this:
-    # distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$VALERIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine \"$EXTRACTED_EXE\" /S" || true
+    # distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine \"$EXTRACTED_EXE\" /S" || true
     
-    distrobox enter "$VALERIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$VALERIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine \"$EXTRACTED_EXE\"" || true
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine \"$EXTRACTED_EXE\"" || true
 fi

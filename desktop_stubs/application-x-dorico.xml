@@ -1,8 +1,8 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
   <mime-type type="application/x-dorico">
     <comment>Dorico Project</comment>
     <glob pattern="*.dorico"/>
-    <icon name="valerio-dorico-project"/>
+    <icon name="torquio-dorico-project"/>
   </mime-type>
 </mime-info>

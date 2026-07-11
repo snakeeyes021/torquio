@@ -25,3 +25,8 @@ installers/
 .DS_Store
 *.tmp
 *.bak
+
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*$py.class

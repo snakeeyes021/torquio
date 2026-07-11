@@ -4,7 +4,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../common.sh"
 
-if [ -f "/opt/wine-custom/bin/wine" ]; then
+if [ -f "/opt/wine-custom/.torquio_wine_build_complete" ]; then
     echo "Custom Wine engine is already compiled and installed at /opt/wine-custom. Skipping build."
     exit 0
 fi
@@ -48,11 +48,13 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
     winetricks \
     unzip \
     cabextract \
-    icoutils
+    icoutils \
+    libcups2 libcups2:i386 \
+    x11-xserver-utils
 
 echo "Cloning zhiyi wine branch..."
-mkdir -p "$VALERIO_BUILD_DIR"
-cd "$VALERIO_BUILD_DIR"
+mkdir -p "$TORQUIO_BUILD_DIR"
+cd "$TORQUIO_BUILD_DIR"
 
 if [ ! -d "wine-source" ]; then
     git clone https://gitlab.winehq.org/zhiyi/wine wine-source
@@ -81,4 +83,5 @@ sudo chown $USER:$USER /opt/wine-custom
 cd ../wine64 && make install prefix=/opt/wine-custom
 cd ../wine32 && make install prefix=/opt/wine-custom
 
+touch /opt/wine-custom/.torquio_wine_build_complete
 echo "Done building Wine!"

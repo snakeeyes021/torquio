@@ -1,0 +1,1640 @@
+#!/bin/bash
+set -e
+
+# --- Logging Setup ---
+TORQUIO_LOG_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/torquio/logs"
+mkdir -p "$TORQUIO_LOG_DIR"
+(ls -t "$TORQUIO_LOG_DIR"/*.log 2>/dev/null | tail -n +21 | xargs rm -f 2>/dev/null) &
+LOG_FILE="$TORQUIO_LOG_DIR/torquio_main_$(date +%Y-%m-%d_%H-%M-%S).log"
+exec > >(tee -i "$LOG_FILE") 2>&1
+echo "=== Torquio Main Log Started: $(date) ==="
+echo "Script: $0"
+echo "========================================="
+
+# Torquio: Steinberg on Linux CLI App
+# Replaces simple install wrappers with a unified console manager.
+
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+source "$SCRIPT_DIR/scripts/common.sh"
+
+print_header() {
+    local wine="\033[38;5;125m"
+    local gray="\033[38;5;244m"
+    local reset="\033[0m"
+
+    echo -e "${gray}================================================================${reset}"
+    echo -e "${wine} ████████╗  ██████╗  ██████╗   ██████╗  ██╗   ██╗ ██╗  ██████╗ ${reset}"
+    echo -e "${wine} ╚══██╔══╝ ██╔═══██╗ ██╔══██╗ ██╔═══██╗ ██║   ██║ ██║ ██╔═══██╗${reset}"
+    echo -e "${wine}    ██║    ██║   ██║ ██████╔╝ ██║   ██║ ██║   ██║ ██║ ██║   ██║${reset}"
+    echo -e "${wine}    ██║    ██║   ██║ ██╔══██╗ ██║▄▄ ██║ ██║   ██║ ██║ ██║   ██║${reset}"
+    echo -e "${wine}    ██║    ╚██████╔╝ ██║  ██║ ╚██████╔╝ ╚██████╔╝ ██║ ╚██████╔╝${reset}"
+    echo -e "${wine}    ╚═╝     ╚═════╝  ╚═╝  ╚═╝  ╚══▀▀═╝   ╚═════╝  ╚═╝  ╚═════╝ ${reset}"
+    echo -e "${wine}                              —— B Y  R E D  F O X  L A B S ——${reset}"
+    echo -e "${gray}================================================================${reset}"
+    
+    # System Clock Status Check (SAM/SDA licensing safeguard)
+    python3 -c "
+import urllib.request, email.utils, datetime
+try:
+    req = urllib.request.Request('https://www.google.com', method='HEAD')
+    with urllib.request.urlopen(req, timeout=3) as response:
+        srv_date_str = response.headers.get('Date')
+    if srv_date_str:
+        srv_dt = email.utils.parsedate_to_datetime(srv_date_str)
+        local_dt = datetime.datetime.now(datetime.timezone.utc)
+        diff = abs((srv_dt - local_dt).total_seconds())
+        if diff > 180:
+            print('')
+            print('\033[38;5;179mSystem Clock Status:\033[0m')
+            print(f'  \033[38;5;167mWARNING: System clock is out of sync by {int(diff)} seconds!\033[0m')
+            print(f'  Server Time (UTC): {srv_dt.strftime(\"%Y-%m-%d %H:%M:%S\")}')
+            print(f'  System Time (UTC): {local_dt.strftime(\"%Y-%m-%d %H:%M:%S\")}')
+            print('  This is \033[38;5;167mHIGHLY LIKELY\033[0m to cause errors in the Steinberg Activation Manager.')
+except Exception:
+    print('')
+    print('\033[38;5;244mSystem Clock Status:\033[0m')
+    print('  \033[38;5;179mWARNING: Torquio attempts to verify that your system clock is\033[0m')
+    print('  \033[38;5;179maccurate in order to prevent SAM licensing issues. Offline or\033[0m')
+    print('  \033[38;5;179munable to contact time server. System clock could not be verified.\033[0m')
+"
+    
+}
+
+
+apply_graphics_settings() {
+    if ! distrobox list 2>/dev/null | grep -q "$TORQUIO_CONTAINER_NAME" || [ ! -d "$TORQUIO_PREFIX_DIR" ]; then
+        return
+    fi
+
+    echo "Applying graphics settings to Wine prefix..."
+    
+    local manage_graphics=$(get_config_val "manage_graphics" "false")
+    if [ "$XDG_SESSION_TYPE" = "x11" ]; then
+        manage_graphics="false"
+    fi
+    local manual_dpi=$(get_config_val "manual_dpi" "96")
+    local ft_int=$(get_config_val "freetype_interpreter" "40")
+    local dpi_to_set="$manual_dpi"
+
+    if [ "$manage_graphics" = "true" ]; then
+        local graphics_json=$(python3 "$SCRIPT_DIR/scripts/3-runtime_handlers/torquio_graphics.py")
+        local target_dpi=$(echo "$graphics_json" | grep -o '"target_wine_dpi": [0-9]*' | cut -d' ' -f2)
+        local target_factor=$(echo "$graphics_json" | grep -o '"target_xwayland_factor": [0-9]*' | cut -d' ' -f2)
+        local de=$(echo "$graphics_json" | grep -o '"de": "[^"]*' | cut -d'"' -f4)
+        local scale=$(echo "$graphics_json" | grep -o '"scale": [0-9.]*' | cut -d' ' -f2)
+        
+        if [ -n "$target_dpi" ] && [ "$target_dpi" -gt 0 ]; then
+            dpi_to_set="$target_dpi"
+        fi
+        # Write registry value inside container
+        distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$ft_int\"; wine reg add \"HKCU\\Control Panel\\Desktop\" /v LogPixels /t REG_DWORD /d $dpi_to_set /f" >/dev/null 2>&1 || true
+        
+        # Apply XWayland desktop policy immediately
+        if [ "$de" = "GNOME" ]; then
+            local current_policy=$(get_xwayland_scaling_factor)
+            local desired_policy="$target_factor"
+            if [ "$target_factor" -gt 1 ] && { [ "$current_policy" = "0" ] || [ -z "$current_policy" ]; }; then
+                desired_policy="$current_policy"
+            fi
+            if [ "$desired_policy" = "1" ] && { [ "$current_policy" = "0" ] || [ -z "$current_policy" ]; }; then
+                if [ "$scale" = "1" ] || [ "$scale" = "1.0" ] || [ "$scale" = "1.00" ] || [ -z "$scale" ]; then
+                    desired_policy="$current_policy"
+                fi
+            fi
+            if [ -n "$desired_policy" ] && [ "$current_policy" != "$desired_policy" ]; then
+                local backup_val=$(get_config_val "original_scale_factor" "")
+                if [ -z "$backup_val" ]; then
+                    set_config_val "original_scale_factor" "${current_policy:-0}"
+                    echo "Backed up current GNOME XWayland scaling policy (${current_policy:-0})."
+                fi
+                if gsettings list-schemas | grep -q org.gnome.mutter.wayland; then
+                    gsettings set org.gnome.mutter.wayland xwayland-scaling-factor "$desired_policy" 2>/dev/null || true
+                else
+                    gsettings set org.gnome.mutter xwayland-scaling-factor "$desired_policy" 2>/dev/null || true
+                fi
+            fi
+        elif [ "$de" = "KDE" ]; then
+            local kread_bin="kreadconfig6"
+            command -v kreadconfig6 >/dev/null 2>&1 || kread_bin="kreadconfig5"
+            local kwrite_bin="kwriteconfig6"
+            command -v kwriteconfig6 >/dev/null 2>&1 || kwrite_bin="kwriteconfig5"
+            local current_policy=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientsScale 2>/dev/null)
+            if [ -z "$current_policy" ]; then
+                current_policy=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientScale 2>/dev/null)
+            fi
+            if [ -z "$current_policy" ]; then
+                current_policy="true"
+            fi
+            if [ "$current_policy" != "true" ]; then
+                local backup_val=$(get_config_val "original_kde_policy" "")
+                if [ -z "$backup_val" ]; then
+                    set_config_val "original_kde_policy" "${current_policy:-false}"
+                    echo "Backed up current KDE XWayland scaling policy (${current_policy:-false})."
+                fi
+                $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientsScale true 2>/dev/null || true
+                $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientScale true 2>/dev/null || true
+                dbus-send --session --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure 2>/dev/null || true
+            fi
+        elif [ "$de" = "COSMIC" ]; then
+            local current_policy=$(cat ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null)
+            local desired_policy="fractional"
+            if [ "$scale" = "1" ] || [ "$scale" = "1.0" ] || [ "$scale" = "1.00" ]; then
+                desired_policy="$current_policy"
+            fi
+            if [ "$current_policy" != "$desired_policy" ]; then
+                local backup_val=$(get_config_val "original_cosmic_policy" "")
+                if [ -z "$backup_val" ]; then
+                    set_config_val "original_cosmic_policy" "${current_policy:-none}"
+                    echo "Backed up current COSMIC XWayland scaling policy (${current_policy:-none})."
+                fi
+                mkdir -p ~/.config/cosmic/com.system76.CosmicComp/v1
+                echo "$desired_policy" > ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null || true
+            fi
+        fi
+        
+        # Mark warning as dismissed
+        set_config_val "warn_xwayland_change" "true"
+    fi
+
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine reg add \"HKCU\\Software\\Wine\\X11 Driver\" /v FocusOnClick /t REG_SZ /d Y /f && wine reg add \"HKCU\\Software\\Wine\\X11 Driver\" /v UseTakeFocus /t REG_SZ /d N /f" >/dev/null 2>&1 || true
+
+    # Kill wine server to apply changes immediately
+    echo "Restarting Wine server to load changes..."
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wineserver -k && wineserver -w" >/dev/null 2>&1 || true
+    echo "Graphics settings successfully applied."
+}
+
+get_wine_prefix_dpi() {
+    local reg_file="$TORQUIO_PREFIX_DIR/user.reg"
+    if [ ! -f "$reg_file" ]; then
+        echo "Unknown"
+        return
+    fi
+    python3 -c '
+import sys, os, re
+reg_file = sys.argv[1]
+if not os.path.exists(reg_file):
+    print("Unknown")
+    sys.exit(0)
+try:
+    with open(reg_file, "r", encoding="utf-8", errors="ignore") as f:
+        content = f.read()
+except Exception:
+    print("Unknown")
+    sys.exit(0)
+match = re.search(r"\[Control Panel\\\\Desktop\][^\[]*?\"LogPixels\"=dword:([0-9a-fA-F]+)", content)
+if match:
+    print(int(match.group(1), 16))
+else:
+    print(96)
+' "$reg_file" 2>/dev/null || echo "Unknown"
+}
+
+
+show_graphics_diagnostics() {
+    local graphics_json="$1"
+    local de="$2"
+    local supported="$3"
+    local w_px="$4"
+    local h_px="$5"
+
+    local wine="\033[38;5;125m"
+    local reset="\033[0m"
+    local blue="\033[38;5;110m"
+    local green="\033[38;5;108m"
+    local red="\033[38;5;167m"
+    local yellow="\033[38;5;179m"
+    local gray="\033[38;5;244m"
+    local dark_gray="\033[38;5;240m"
+
+    local cur_manage=$(get_config_val "manage_graphics" "false")
+    local ft_int=$(get_config_val "freetype_interpreter" "40")
+    local mode_str="Manual Mode"
+    if [ "$XDG_SESSION_TYPE" = "x11" ]; then
+        mode_str="N/A (Wayland Only)"
+    elif [ "${cur_manage,,}" = "true" ] || [ "$cur_manage" = "1" ]; then
+        mode_str="Automated Mode"
+    fi
+
+    local match_phys=$(get_config_val "match_physical_dpi" "false")
+    local match_phys_str="Off"
+    if [ "$XDG_SESSION_TYPE" = "x11" ]; then
+        match_phys_str="N/A (Wayland Only)"
+    elif [ "${match_phys,,}" = "true" ] || [ "$match_phys" = "1" ]; then
+        match_phys_str="On"
+    fi
+
+    echo -e "${blue}=== Torquio Graphics Status & Diagnostics ===${reset}"
+    echo ""
+
+    local connector=$(echo "$graphics_json" | grep -o '"connector": "[^"]*' | cut -d'"' -f4)
+    local scale=$(echo "$graphics_json" | grep -o '"scale": [0-9.]*' | cut -d' ' -f2)
+    local phys_dpi=$(echo "$graphics_json" | grep -o '"physical_dpi": [0-9]*' | cut -d' ' -f2)
+    local target_dpi=$(echo "$graphics_json" | grep -o '"target_wine_dpi": [0-9]*' | cut -d' ' -f2)
+
+    if [ -z "$w_px" ] || [ "$w_px" -eq 0 ]; then
+        echo -e "  Active Main Monitor:       ${red}Unknown / Undetected${reset}"
+        echo -e "  Desktop Scale Factor:      ${red}Unknown / Undetected${reset}"
+    else
+        local scale_pct=$(python3 -c "print(int(round($scale * 100)))" 2>/dev/null || echo "100")
+        echo -e "  Active Main Monitor:       ${wine}${w_px}x${h_px}${reset} (${connector:-Unknown})"
+        echo -e "  Desktop Scale Factor:      ${wine}${scale_pct}% (${scale})${reset}"
+    fi
+    echo ""
+
+    echo -e "  ${blue}[Current System Values]${reset}"
+    
+local sys_policy="Unknown"
+    local effective_scaling="Unknown"
+    local rec_policy="Unknown"
+    local is_scaled=true
+
+    # Determine if we are actively scaling
+    if [ "$scale" = "1" ] || [ "$scale" = "1.0" ] || [ "$scale" = "1.00" ] || [ -z "$scale" ]; then
+        is_scaled=false
+    fi
+
+    # 1. Determine Configured Policy & Base Recommendation
+    if [[ "$de" =~ X11 ]] || [ "$XDG_SESSION_TYPE" = "x11" ]; then
+        sys_policy="N/A (Native X11 Session)"
+        rec_policy="N/A (Native X11 Session)"
+        is_scaled=false # X11 handles this natively anyway
+
+    elif [ "$de" = "GNOME" ]; then
+        local gp=$(get_xwayland_scaling_factor)
+        if [ "$gp" = "1" ]; then
+            sys_policy="[GNOME] Framebuffer Upscale (xwayland-scaling-factor=1)"
+        elif [ "$gp" = "0" ] || [ -z "$gp" ]; then
+            sys_policy="[GNOME] System Default (Supersampled Downscale)"
+        else
+            sys_policy="[GNOME] Native Integer Scaling (xwayland-scaling-factor=$gp)"
+        fi
+
+        # Determine GNOME Recommendation based on integer vs fractional
+        if [ "$scale" = "2" ] || [ "$scale" = "2.0" ] || [ "$scale" = "3" ] || [ "$scale" = "3.0" ]; then
+            local int_scale=$(printf "%.0f" "$scale")
+            rec_policy="[GNOME] Native Integer Scaling (xwayland-scaling-factor=$int_scale)"
+        else
+            rec_policy="[GNOME] Framebuffer Upscale (xwayland-scaling-factor=1)"
+        fi
+
+    elif [ "$de" = "KDE" ]; then
+        local kread_bin="kreadconfig6"
+        command -v kreadconfig6 >/dev/null 2>&1 || kread_bin="kreadconfig5"
+        local kp=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientsScale 2>/dev/null)
+        if [ -z "$kp" ]; then
+            kp=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientScale 2>/dev/null)
+        fi
+        
+        if [ "$kp" = "true" ] || [ -z "$kp" ]; then
+            sys_policy="[KDE] Scale XWayland clients themselves"
+        else
+            sys_policy="[KDE] Scale XWayland clients by compositor"
+        fi
+        rec_policy="[KDE] Scale XWayland clients themselves"
+
+    elif [ "$de" = "COSMIC" ]; then
+        local cp=$(cat ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null)
+        if [ "$cp" = "fractional" ]; then
+            sys_policy="[COSMIC] Optimize for gaming and full-screen apps"
+        elif [ "$cp" = "true" ]; then
+            sys_policy="[COSMIC] Optimize for applications"
+        else
+            sys_policy="[COSMIC] System Default (Maximum compatibility)"
+        fi
+        rec_policy="[COSMIC] Optimize for gaming and full-screen apps"
+        
+    else
+        sys_policy="Unsupported DE (${de:-Unknown})"
+        rec_policy="Unsupported DE (Manual management required)"
+    fi
+
+    # 2. Apply Flattening Logic for Effective State and Recommendation Output
+    if [ "$is_scaled" = "false" ]; then
+        effective_scaling="Native (no scaling)"
+        rec_policy="Native (no scaling)"
+    else
+        effective_scaling="$sys_policy"
+    fi
+
+    local current_wine_dpi=$(get_wine_prefix_dpi)
+
+    echo -e "  - Graphics Management:         ${wine}${mode_str}${reset}"
+    echo -e "  - Match Physical DPI:          ${wine}${match_phys_str}${reset}"
+    echo -e "  - XWayland Policy Setting:     ${wine}${sys_policy}${reset}"
+    echo -e "  - Effective XWayland Scaling:  ${wine}${effective_scaling}${reset}"
+    echo -e "  - Wine Prefix DPI:             ${wine}${current_wine_dpi} DPI${reset}"
+    echo -e "  - FreeType Interpreter:        ${wine}v${ft_int}${reset}"
+    echo ""
+
+echo -e "  ${blue}[Torquio Recommendations for this Monitor]${reset}"
+    if [ "$XDG_SESSION_TYPE" = "x11" ]; then
+        echo -e "  - Recommended Scaling Policy:  ${yellow}N/A (Native X11 Session)${reset}"
+        echo -e "  - Recommended Wine DPI:        ${yellow}Manual Configuration Required${reset}"
+        echo ""
+        echo -e "  ${yellow}[X11 Scaling Notice]${reset}"
+        echo -e "  The proper scaling settings will differ for the various X11 desktop environments."
+        echo -e "  Please consult your own particular DE's scaling method and set the Wine Prefix"
+        echo -e "  DPI manually using option 2 if needed."
+        echo ""
+        echo -e "  As an example, on Mint, you would set the following DPI values depending on"
+        echo -e "  what desktop scaling you have enabled in your settings:"
+        echo -e "  - ${wine}Integer Scaling (e.g., 200%)${reset}: Set DPI to Scale × 96 (e.g., 192 DPI)."
+        echo -e "  - ${wine}Fractional Scaling with 'Scale Down' enabled${reset}: Set DPI to 192 DPI."
+        echo -e "  - ${wine}Fractional Scaling with 'Scale Up' enabled${reset}: Leave DPI on default 96 DPI."
+    elif [ -n "$supported" ]; then
+        local rec_formula=$(echo "$graphics_json" | grep -o '"rec_formula": "[^"]*' | cut -d'"' -f4)
+        echo -e "  - Recommended XWayland Policy: ${green}${rec_policy}${reset}"
+        echo -e "  - Recommended Wine DPI:        ${green}${target_dpi:-96} DPI${reset} (${rec_formula})"
+    else
+        echo -e "  - Recommended XWayland Policy: ${red}Unsupported DE (Manual management required)${reset}"
+        echo -e "  - Recommended Wine DPI:        ${red}Unsupported DE (Manual management required)${reset}"
+    fi
+    echo ""
+
+    if [ "$XDG_SESSION_TYPE" != "x11" ]; then
+        if [ "${cur_manage,,}" = "true" ] || [ "$cur_manage" = "1" ]; then
+            echo -e "  ${green}Torquio is automatically managing these settings.${reset}"
+        else
+            echo -e "  ${dark_gray}To let Torquio handle this automatically, switch to Automated Mode.${reset}"
+        fi
+        echo ""
+    fi
+
+    if [ -n "$w_px" ] && [ -n "$h_px" ] && ( [ "$w_px" -ge 3840 ] || [ "$h_px" -ge 2160 ] ); then
+        echo -e "  ${yellow}[!] Performance Warning: At 4K+ resolutions, we have noticed some performance${reset}"
+        echo -e "      ${yellow}degradation/lagginess even on decent hardware. If you experience unacceptable${reset}"
+        echo -e "      ${yellow}lag, consider manually bumping your system desktop resolution down to 1440p or${reset}"
+        echo -e "      ${yellow}1080p before you launch Dorico.${reset}"
+        echo ""
+    fi
+
+    echo -e "${gray}================================================================${reset}"
+    echo ""
+}
+
+configure_graphics() {
+    local wine="\033[38;5;125m"
+    local reset="\033[0m"
+    local blue="\033[38;5;110m"
+    local dark_gray="\033[38;5;240m"
+    local yellow="\033[38;5;179m"
+
+    local cur_manage=$(get_config_val "manage_graphics" "false")
+    local cur_manual_dpi=$(get_config_val "manual_dpi" "96")
+    local cur_interpreter=$(get_config_val "freetype_interpreter" "40")
+    
+    # Live check support
+    local graphics_json=$(python3 "$SCRIPT_DIR/scripts/3-runtime_handlers/torquio_graphics.py" 2>/dev/null)
+    local de=$(echo "$graphics_json" | grep -o '"de": "[^"]*' | cut -d'"' -f4)
+    local supported=$(echo "$graphics_json" | grep -o '"supported": true')
+    local w_px=$(echo "$graphics_json" | grep -o '"width": [0-9]*' | cut -d' ' -f2)
+    local h_px=$(echo "$graphics_json" | grep -o '"height": [0-9]*' | cut -d' ' -f2)
+
+    show_graphics_diagnostics "$graphics_json" "$de" "$supported" "$w_px" "$h_px"
+
+    echo "Options:"
+    local count=1
+    echo -e "  ${wine}${count})${reset} Auto Manage Graphics"
+    local opt_manage=$count
+    
+    local opt_inject_dpi=0
+    if [ "${cur_manage,,}" != "true" ] && [ "${cur_manage,,}" != "1" ]; then
+        count=$((count+1))
+        echo -e "  ${wine}${count})${reset} Set/change WINE Prefix DPI"
+        opt_inject_dpi=$count
+    fi
+    
+    count=$((count+1))
+    echo -e "  ${wine}${count})${reset} FreeType Hinting Interpreter"
+    local opt_interpreter=$count
+    
+    local opt_match_physical=0
+    if [ "$XDG_SESSION_TYPE" != "x11" ]; then
+        count=$((count+1))
+        echo -e "  ${wine}${count})${reset} Match Hardware Physical DPI"
+        opt_match_physical=$count
+    fi
+    
+    count=$((count+1))
+    echo -e "  ${wine}${count})${reset} [Back to main menu]"
+    local opt_back=$count
+    echo ""
+ 
+    read -p "Select an option to toggle/change (1-$count): " opt
+    if [ "$opt" = "$opt_manage" ]; then
+        if [ "$XDG_SESSION_TYPE" = "x11" ]; then
+            echo -e "${red}Error: Automated Graphics Management is a Wayland-Only feature.${reset}"
+            echo "The proper scaling settings will differ across X11 desktop environments."
+            echo "Please consult your DE's scaling method and set WINE Prefix DPI manually using option 2."
+            echo ""
+            read -p "Press [Enter] to continue..." temp
+            configure_graphics
+            return
+        fi
+        if [ -z "$supported" ]; then
+            echo "Automated XWayland Management is not supported on your Desktop Environment. Please see the recommendations in the graphics configuration page to assist in manually managing your display and scaling settings."
+            echo ""
+            read -p "Press [Enter] to continue..." temp
+            configure_graphics
+            return
+        fi
+        if [ "${cur_manage,,}" = "true" ] || [ "$cur_manage" = "1" ]; then
+            read -p "Switching to Manual Mode will disable automated launch-time scaling overrides. Continue? [y/N]: " confirm_manual
+            if [[ ! "$confirm_manual" =~ ^[Yy]$ ]]; then
+                echo "Switch to Manual Mode cancelled."
+                read -p "Press [Enter] to continue..." temp
+                configure_graphics
+                return
+            fi
+            set_config_val "manage_graphics" "false"
+            echo "Switched to Manual Mode."
+
+            local orig_scale=$(get_config_val "original_scale_factor" "")
+            local orig_kde=$(get_config_val "original_kde_policy" "")
+            local orig_cosmic=$(get_config_val "original_cosmic_policy" "")
+            local restored=false
+
+            local restore_msg_printed=false
+            print_restore_info() {
+                local target_de="$1"
+                local f_desc="$2"
+                local t_desc="$3"
+                if [ "$restore_msg_printed" = "false" ]; then
+                    echo ""
+                    echo -e "${blue}================================================================${reset}"
+                    echo -e "          ${wine}XWayland Global Scaling Policy Restore${reset}"
+                    echo -e "${blue}================================================================${reset}"
+                    echo -e "Torquio detected that host $target_de XWayland policy was modified from ${wine}$f_desc${reset} to ${wine}$t_desc${reset}."
+                    echo "During setup/launch, you set Torquio to automatically adjust your desktop"
+                    echo "environment's global XWayland scaling policy to match the ideal"
+                    echo "setting for Dorico."
+                    echo ""
+                    echo "Restoring this setting will return your system to its original scaling"
+                    echo "behavior (which may affect how other XWayland applications scale)."
+                    echo -e "${blue}================================================================${reset}"
+                    echo ""
+                    restore_msg_printed=true
+                fi
+            }
+
+            if [ "$de" = "GNOME" ] && [ -n "$orig_scale" ]; then
+                local cur_val=$(get_xwayland_scaling_factor)
+                if [ "${cur_val:-0}" != "$orig_scale" ]; then
+                    local from_desc
+                    if [ "$orig_scale" = "1" ]; then
+                        from_desc="Framebuffer Upscale (xwayland-scaling-factor=1)"
+                    elif [ "$orig_scale" = "0" ] || [ -z "$orig_scale" ]; then
+                        from_desc="System Default (xwayland-scaling-factor=0)"
+                    else
+                        from_desc="Override Scaling (xwayland-scaling-factor=$orig_scale)"
+                    fi
+                    local to_desc
+                    if [ "$cur_val" = "1" ]; then
+                        to_desc="Framebuffer Upscale (xwayland-scaling-factor=1)"
+                    elif [ "$cur_val" = "0" ] || [ -z "$cur_val" ]; then
+                        to_desc="System Default (xwayland-scaling-factor=0)"
+                    else
+                        to_desc="Override Scaling (xwayland-scaling-factor=$cur_val)"
+                    fi
+                    print_restore_info "GNOME" "$from_desc" "$to_desc"
+                    read -p "Would you like to restore your GNOME XWayland scale setting back to its original value ($from_desc)? [Y/n]: " restore_confirm
+                    if [[ ! "$restore_confirm" =~ ^[Nn]$ ]]; then
+                        if gsettings list-schemas | grep -q org.gnome.mutter.wayland; then
+                            gsettings set org.gnome.mutter.wayland xwayland-scaling-factor "$orig_scale" 2>/dev/null || true
+                        else
+                            gsettings set org.gnome.mutter xwayland-scaling-factor "$orig_scale" 2>/dev/null || true
+                        fi
+                        echo "GNOME XWayland scale setting restored to $from_desc."
+                        restored=true
+                    fi
+                fi
+            elif [ "$de" = "KDE" ] && [ -n "$orig_kde" ]; then
+                local kread_bin="kreadconfig6"
+                command -v kreadconfig6 >/dev/null 2>&1 || kread_bin="kreadconfig5"
+                local cur_val=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientsScale 2>/dev/null)
+                [ -z "$cur_val" ] && cur_val=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientScale 2>/dev/null)
+                [ -z "$cur_val" ] && cur_val="true"
+                if [ "$cur_val" != "$orig_kde" ]; then
+                    local from_desc
+                    if [ "$orig_kde" = "false" ]; then
+                        from_desc="Scale XWayland clients by compositor (XwaylandClientsScale=false)"
+                    else
+                        from_desc="Scale XWayland clients themselves (XwaylandClientsScale=true)"
+                    fi
+                    local to_desc
+                    if [ "$cur_val" = "false" ]; then
+                        to_desc="Scale XWayland clients by compositor (XwaylandClientsScale=false)"
+                    else
+                        to_desc="Scale XWayland clients themselves (XwaylandClientsScale=true)"
+                    fi
+                    print_restore_info "KDE" "$from_desc" "$to_desc"
+                    read -p "Would you like to restore your KDE XWayland scale setting back to its original value ($from_desc)? [Y/n]: " restore_confirm
+                    if [[ ! "$restore_confirm" =~ ^[Nn]$ ]]; then
+                        local kwrite_bin="kwriteconfig6"
+                        command -v kwriteconfig6 >/dev/null 2>&1 || kwrite_bin="kwriteconfig5"
+                        $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientsScale "$orig_kde" 2>/dev/null || true
+                        $kwrite_bin --file kdeglobals --group KScreen --key XwaylandClientScale "$orig_kde" 2>/dev/null || true
+                        dbus-send --session --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure 2>/dev/null || true
+                        echo "KDE XWayland scale setting restored to $from_desc."
+                        restored=true
+                    fi
+                fi
+            elif [ "$de" = "COSMIC" ] && [ -n "$orig_cosmic" ]; then
+                local cur_val=$(cat ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null)
+                [ -z "$cur_val" ] && cur_val="none"
+                if [ "$cur_val" != "$orig_cosmic" ]; then
+                    get_cosmic_desc() {
+                        local val="$1"
+                        if [ "$val" = "fractional" ]; then
+                            echo "Optimize for gaming and full-screen apps (descale_xwayland=fractional)"
+                        elif [ "$val" = "true" ]; then
+                            echo "Optimize for applications (descale_xwayland=true)"
+                        else
+                            echo "Maximum compatibility mode (descale_xwayland=false)"
+                        fi
+                    }
+                    local from_desc=$(get_cosmic_desc "$orig_cosmic")
+                    local to_desc=$(get_cosmic_desc "$cur_val")
+                    print_restore_info "COSMIC" "$from_desc" "$to_desc"
+                    read -p "Would you like to restore your COSMIC XWayland scale setting back to its original value ($from_desc)? [Y/n]: " restore_confirm
+                    if [[ ! "$restore_confirm" =~ ^[Nn]$ ]]; then
+                        mkdir -p ~/.config/cosmic/com.system76.CosmicComp/v1
+                        if [ "$orig_cosmic" = "none" ] || [ -z "$orig_cosmic" ]; then
+                            rm -f ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland
+                        else
+                            echo "$orig_cosmic" > ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null || true
+                        fi
+                        echo "COSMIC XWayland scale setting restored to $from_desc."
+                        restored=true
+                    fi
+                fi
+            fi
+
+            set_config_val "original_scale_factor" ""
+            set_config_val "original_kde_policy" ""
+            set_config_val "original_cosmic_policy" ""
+            read -p "Press [Enter] to continue..." temp
+        else
+            echo -e "${yellow}================================================================${reset}"
+            echo -e "${yellow}WARNING: Enabling Automated Mode will change your desktop's${reset}"
+            echo -e "${yellow}global XWayland scaling policy to match the ideal policy for Dorico.${reset}"
+            echo -e "${yellow}This is a persistent system setting change (not temporary) and may${reset}"
+            echo -e "${yellow}affect the size/rendering of other XWayland applications going forward.${reset}"
+            echo -e "${yellow}You may also want to restart any currently running XWayland applications${reset}"
+            echo -e "${yellow}after enabling this mode.${reset}"
+            echo -e "${yellow}----------------------------------------------------------------${reset}"
+            echo -e "${green}Torquio will back up your current desktop scaling settings,${reset}"
+            echo -e "${green}and you can easily restore them at any time by switching${reset}"
+            echo -e "${green}back to Manual Mode.${reset}"
+            echo -e "${yellow}================================================================${reset}"
+            echo ""
+            read -p "Do you want to enable Automated Mode? [y/N]: " confirm_auto
+            if [[ ! "$confirm_auto" =~ ^[Yy]$ ]]; then
+                echo "Switch to Automated Mode cancelled."
+                read -p "Press [Enter] to continue..." temp
+                configure_graphics
+                return
+            fi
+
+            set_config_val "manage_graphics" "true"
+            echo "Switched to Automated Management Mode."
+        fi
+        apply_graphics_settings
+        configure_graphics
+    elif [ "$opt_inject_dpi" -gt 0 ] && [ "$opt" = "$opt_inject_dpi" ]; then
+        echo "Standard default DPI is 96."
+        read -p "Enter DPI value to inject into prefix (e.g. 96, 120, 144, 192): " new_dpi
+        if [[ ! "$new_dpi" =~ ^[0-9]+$ ]]; then
+            echo "Invalid input. DPI must be an integer."
+            read -p "Press [Enter] to continue..." temp
+            configure_graphics
+            return
+        fi
+
+        local current_dpi=$(get_wine_prefix_dpi)
+        if [ "$current_dpi" = "$new_dpi" ]; then
+            echo "DPI of the Wine prefix is already set to $new_dpi. No changes made."
+            read -p "Press [Enter] to continue..." temp
+            configure_graphics
+            return
+        fi
+
+        echo ""
+        echo -e "${yellow}================================================================${reset}"
+        echo -e "${yellow}WARNING: Changing the prefix DPI requires restarting the Wine server.${reset}"
+        echo -e "${yellow}This will immediately close any active Dorico, SAM, or Steinberg windows.${reset}"
+        echo -e "${yellow}Please save your work first.${reset}"
+        echo -e "${yellow}================================================================${reset}"
+        echo ""
+        read -p "Do you want to continue applying $new_dpi DPI? [y/N]: " confirm_inject
+        if [[ ! "$confirm_inject" =~ ^[Yy]$ ]]; then
+            echo "DPI change cancelled."
+            read -p "Press [Enter] to continue..." temp
+            configure_graphics
+            return
+        fi
+
+        echo "Applying $new_dpi DPI value to Wine prefix..."
+        distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$cur_interpreter\"; wine reg add \"HKCU\\Control Panel\\Desktop\" /v LogPixels /t REG_DWORD /d $new_dpi /f" >/dev/null 2>&1 || true
+        echo "Restarting Wine server to load changes..."
+        distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wineserver -k && wineserver -w" >/dev/null 2>&1 || true
+        echo "DPI injection successful."
+        read -p "Press [Enter] to continue..." temp
+        configure_graphics
+    elif [ "$opt" = "$opt_interpreter" ]; then
+        echo ""
+        echo -e "${blue}=== FreeType Hinting Interpreter Selection ===${reset}"
+        echo -e "  ${wine}1)${reset} v40 (Thicker/bolder, but some fonts can look smudgey) [Default]"
+        echo -e "  ${wine}2)${reset} v35 (Thinner/crisper, but some fonts can look anemic)"
+        echo -e "  ${wine}3)${reset} [Back to graphics menu]"
+        echo ""
+        read -p "Select interpreter style (1-3): " choice_int
+        case "$choice_int" in
+            1)
+                set_config_val "freetype_interpreter" "40"
+                echo "FreeType Hinting Interpreter set to v40!"
+                apply_graphics_settings
+                echo ""
+                read -p "Press [Enter] to continue..." temp_int
+                ;;
+            2)
+                set_config_val "freetype_interpreter" "35"
+                echo "FreeType Hinting Interpreter set to v35!"
+                apply_graphics_settings
+                echo ""
+                read -p "Press [Enter] to continue..." temp_int
+                ;;
+            *)
+                ;;
+        esac
+        configure_graphics
+    elif [ "$opt" = "$opt_match_physical" ]; then
+        clear
+        local match_phys=$(get_config_val "match_physical_dpi" "false")
+        local match_phys_str="Off"
+        if [ "${match_phys,,}" = "true" ] || [ "$match_phys" = "1" ]; then
+            match_phys_str="On"
+        fi
+        
+        echo -e "${blue}================================================================${reset}"
+        echo -e "          ${wine}Match Hardware Physical DPI${reset}"
+        echo -e "${blue}================================================================${reset}"
+        echo ""
+        echo "By default, Torquio uses a standard 96 DPI logical baseline as"
+        echo "the anchor for scaling calculations. This mirrors standard OS"
+        echo "scaling, where logical DPI scales linearly (e.g. 150% = 144 DPI)."
+        echo ""
+        echo "Alternatively, you can choose to match your monitor's exact"
+        echo "hardware physical DPI (e.g. 161 DPI). This may be desirable if"
+        echo "you prefer a slightly different scale in Dorico to compensate for"
+        echo "the physical size of your screen."
+        echo ""
+        echo -e "Currently, Match Hardware Physical DPI is: ${wine}${match_phys_str}${reset}"
+        echo -e "${blue}================================================================${reset}"
+        echo ""
+        
+        if [ "$match_phys_str" = "Off" ]; then
+            read -p "Do you want to enable matching hardware physical DPI? [y/N]: " confirm_toggle
+            if [[ "$confirm_toggle" =~ ^[Yy]$ ]]; then
+                set_config_val "match_physical_dpi" "true"
+                echo "Match Hardware Physical DPI enabled."
+                if [ "${cur_manage,,}" = "true" ] || [ "$cur_manage" = "1" ]; then
+                    apply_graphics_settings
+                fi
+            else
+                echo "No changes made."
+            fi
+        else
+            read -p "Do you want to disable matching hardware physical DPI? [y/N]: " confirm_toggle
+            if [[ "$confirm_toggle" =~ ^[Yy]$ ]]; then
+                set_config_val "match_physical_dpi" "false"
+                echo "Match Hardware Physical DPI disabled."
+                if [ "${cur_manage,,}" = "true" ] || [ "$cur_manage" = "1" ]; then
+                    apply_graphics_settings
+                fi
+            else
+                echo "No changes made."
+            fi
+        fi
+        read -p "Press [Enter] to continue..." temp
+        configure_graphics
+    else
+        return 0
+    fi
+}
+
+refresh_launchers() {
+    local wine="\033[38;5;125m"
+    local blue="\033[38;5;110m"
+    local green="\033[38;5;108m"
+    local reset="\033[0m"
+
+    echo -e "${blue}=== Refreshing Launchers & Icons ===${reset}"
+    echo ""
+    
+    # 1. Extract icons and refresh desktop files
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$SCRIPT_DIR\" && ./scripts/2-install/extract_icons.sh"
+    update-desktop-database "$HOME/.local/share/applications/" >/dev/null 2>&1 || true
+    
+    # 2. Refresh Wine prefix registry settings and debugger wrapper
+    echo "Refreshing Wine prefix registry settings & debugger..."
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$SCRIPT_DIR\" && ./scripts/2-install/setup_prefix.sh"
+
+    # 3. Copy launcher wrappers to ~/.local/bin
+    echo "Copying launcher wrapper scripts to ~/.local/bin/..."
+    mkdir -p "$HOME/.local/bin"
+    for handler in "$SCRIPT_DIR/scripts/3-runtime_handlers/"torquio*; do
+        local base_name=$(basename "$handler")
+        if [ "$base_name" = "torquio-sda-handler" ]; then
+            sed "s|@TORQUIO_REPO_DIR@|$SCRIPT_DIR|g" "$handler" > "$HOME/.local/bin/$base_name"
+        else
+            cp "$handler" "$HOME/.local/bin/"
+        fi
+    done
+    chmod +x "$HOME/.local/bin/"torquio*
+    echo -e "${green}Launchers and icons successfully refreshed!${reset}"
+    echo ""
+    read -p "Press [Enter] to return to the main menu..." temp
+}
+
+show_status() {
+    local wine="\033[38;5;125m"
+    local gray="\033[38;5;244m"
+    local dark_gray="\033[38;5;240m"
+    local green="\033[38;5;108m"
+    local red="\033[38;5;167m"
+    local blue="\033[38;5;110m"
+    local reset="\033[0m"
+
+    echo -e "${gray}================================================================${reset}"
+    echo -e "             ${wine}Torquio Environment Dashboard${reset}                "
+    echo -e "${gray}================================================================${reset}"
+    echo ""
+    
+    # 1. Distrobox Container Status
+    echo -e "${blue}Distrobox Container Status:${reset}"
+    if distrobox list 2>/dev/null | grep -q "$TORQUIO_CONTAINER_NAME"; then
+        local cont_status=$(distrobox list 2>/dev/null | grep "$TORQUIO_CONTAINER_NAME" | awk -F'|' '{print $4}' | tr -d '[:space:]')
+        echo -e "  - Container: ${dark_gray}$TORQUIO_CONTAINER_NAME${reset} (Active: ${green}${cont_status:-running}${reset})"
+    else
+        echo -e "  - Container: ${dark_gray}$TORQUIO_CONTAINER_NAME${reset} (${red}Not Created${reset})"
+    fi
+    echo ""
+    
+    # 2. Wine Prefix Status
+    echo -e "${blue}Wine Prefix Status:${reset}"
+    if [ -d "$TORQUIO_PREFIX_DIR" ]; then
+        local pref_size=$(du -sh "$TORQUIO_PREFIX_DIR" 2>/dev/null | awk '{print $1}')
+        echo -e "  - Wine Prefix: ${dark_gray}$TORQUIO_PREFIX_DIR${reset} (Size: ${wine}$pref_size${reset})"
+        if [ -f "$TORQUIO_PREFIX_DIR/.torquio_core_installed" ]; then
+            echo -e "  - Core Wine Dependencies:   ${green}Installed${reset} (dotnet48, vcrun2019, wine-icu)"
+        else
+            echo -e "  - Core Wine Dependencies:   ${red}Incomplete${reset} (Run installation to fix)"
+        fi
+    else
+        echo -e "  - Wine Prefix: ${red}Not Initialized${reset} (Run installation to create)"
+    fi
+    echo ""
+    
+    # 3. Active Preferences Profile
+    echo -e "${blue}Configuration Preferences:${reset}"
+    local manage_graphics=$(get_config_val "manage_graphics" "false")
+    local freetype_interp=$(get_config_val "freetype_interpreter" "40")
+    local manage_str="Off"
+    if [ "$XDG_SESSION_TYPE" = "x11" ]; then
+        manage_str="N/A (Wayland Only)"
+    elif [ "${manage_graphics,,}" = "true" ] || [ "$manage_graphics" = "1" ]; then
+        manage_str="On"
+    fi
+    local match_phys=$(get_config_val "match_physical_dpi" "false")
+    local match_phys_str="Off"
+    if [ "$XDG_SESSION_TYPE" = "x11" ]; then
+        match_phys_str="N/A (Wayland Only)"
+    elif [ "${match_phys,,}" = "true" ] || [ "$match_phys" = "1" ]; then
+        match_phys_str="On"
+    fi
+    echo -e "  - Auto Manage Graphics:        ${wine}$manage_str${reset}"
+    echo -e "  - Match Physical DPI:          ${wine}$match_phys_str${reset}"
+    echo -e "  - FreeType Interpreter:        ${wine}v$freetype_interp${reset}"
+    echo ""
+    
+    # 4. Graphics & Display Status (Live Query)
+    echo -e "${blue}Graphics & Display Status:${reset}"
+    local graphics_json=$(python3 "$SCRIPT_DIR/scripts/3-runtime_handlers/torquio_graphics.py" 2>/dev/null)
+    local de=$(echo "$graphics_json" | grep -o '"de": "[^"]*' | cut -d'"' -f4)
+    local supported=$(echo "$graphics_json" | grep -o '"supported": true')
+    local connector=$(echo "$graphics_json" | grep -o '"connector": "[^"]*' | cut -d'"' -f4)
+    local scale=$(echo "$graphics_json" | grep -o '"scale": [0-9.]*' | cut -d' ' -f2)
+    local w_px=$(echo "$graphics_json" | grep -o '"width": [0-9]*' | cut -d' ' -f2)
+    local h_px=$(echo "$graphics_json" | grep -o '"height": [0-9]*' | cut -d' ' -f2)
+    local phys_dpi=$(echo "$graphics_json" | grep -o '"physical_dpi": [0-9]*' | cut -d' ' -f2)
+    local target_dpi=$(echo "$graphics_json" | grep -o '"target_wine_dpi": [0-9]*' | cut -d' ' -f2)
+    local policy=$(echo "$graphics_json" | grep -o '"ideal_xwayland_policy": "[^"]*' | cut -d'"' -f4)
+    local rec_formula=$(echo "$graphics_json" | grep -o '"rec_formula": "[^"]*' | cut -d'"' -f4)
+    
+    local de_display="${de:-Unknown}"
+    if [[ "$de_display" =~ GNOME|KDE|COSMIC ]] && [[ ! "$de_display" =~ X11 ]] && [[ ! "$de_display" =~ Wayland ]]; then
+        if [ "$XDG_SESSION_TYPE" = "wayland" ]; then
+            de_display="${de_display} (Wayland)"
+        else
+            de_display="${de_display} (X11)"
+        fi
+    fi
+    echo -e "  - Desktop Environment:         ${wine}${de_display}${reset}"
+    
+    if [ -n "$w_px" ] && [ "$w_px" -gt 0 ]; then
+        local scale_pct=$(python3 -c "print(int(round($scale * 100)))" 2>/dev/null || echo "100")
+        echo -e "  - Active Main Monitor:         ${wine}${w_px}x${h_px}${reset} (${connector:-Unknown})"
+        echo -e "  - Desktop Scale Factor:        ${wine}${scale_pct}% (${scale})${reset}"
+    else
+        echo -e "  - Active Main Monitor:         ${red}Unknown / Undetected${reset}"
+        echo -e "  - Desktop Scale Factor:        ${red}Unknown / Undetected${reset}"
+    fi
+
+    local sys_policy="Unknown"
+    local effective_scaling="Unknown"
+    local rec_policy="Unknown"
+    local is_scaled=true
+
+    if [ "$scale" = "1" ] || [ "$scale" = "1.0" ] || [ "$scale" = "1.00" ] || [ -z "$scale" ]; then
+        is_scaled=false
+    fi
+
+    if [[ "$de" =~ X11 ]] || [ "$XDG_SESSION_TYPE" = "x11" ]; then
+        sys_policy="N/A (Native X11 Session)"
+        rec_policy="N/A (Native X11 Session)"
+        is_scaled=false
+
+    elif [ "$de" = "GNOME" ]; then
+        local gp=$(get_xwayland_scaling_factor)
+        if [ "$gp" = "1" ]; then
+            sys_policy="[GNOME] Framebuffer Upscale (xwayland-scaling-factor=1)"
+        elif [ "$gp" = "0" ] || [ -z "$gp" ]; then
+            sys_policy="[GNOME] System Default (Supersampled Downscale)"
+        else
+            sys_policy="[GNOME] Native Integer Scaling (xwayland-scaling-factor=$gp)"
+        fi
+
+        if [ "$scale" = "2" ] || [ "$scale" = "2.0" ] || [ "$scale" = "3" ] || [ "$scale" = "3.0" ]; then
+            local int_scale=$(printf "%.0f" "$scale")
+            rec_policy="[GNOME] Native Integer Scaling (xwayland-scaling-factor=$int_scale)"
+        else
+            rec_policy="[GNOME] Framebuffer Upscale (xwayland-scaling-factor=1)"
+        fi
+
+    elif [ "$de" = "KDE" ]; then
+        local kread_bin="kreadconfig6"
+        command -v kreadconfig6 >/dev/null 2>&1 || kread_bin="kreadconfig5"
+        local kp=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientsScale 2>/dev/null)
+        if [ -z "$kp" ]; then
+            kp=$($kread_bin --file kdeglobals --group KScreen --key XwaylandClientScale 2>/dev/null)
+        fi
+        
+        if [ "$kp" = "true" ] || [ -z "$kp" ]; then
+            sys_policy="[KDE] Scale XWayland clients themselves"
+        else
+            sys_policy="[KDE] Scale XWayland clients by compositor"
+        fi
+        rec_policy="[KDE] Scale XWayland clients themselves"
+
+    elif [ "$de" = "COSMIC" ]; then
+        local cp=$(cat ~/.config/cosmic/com.system76.CosmicComp/v1/descale_xwayland 2>/dev/null)
+        if [ "$cp" = "fractional" ]; then
+            sys_policy="[COSMIC] Optimize for gaming and full-screen apps"
+        elif [ "$cp" = "true" ]; then
+            sys_policy="[COSMIC] Optimize for applications"
+        else
+            sys_policy="[COSMIC] System Default (Maximum compatibility)"
+        fi
+        rec_policy="[COSMIC] Optimize for gaming and full-screen apps"
+        
+    else
+        sys_policy="Unsupported DE (${de:-Unknown})"
+        rec_policy="Unsupported DE (Manual management required)"
+    fi
+
+    if [ "$is_scaled" = "false" ]; then
+        effective_scaling="Native (no scaling)"
+        rec_policy="Native (no scaling)"
+    else
+        effective_scaling="$sys_policy"
+    fi
+
+    local current_wine_dpi=$(get_wine_prefix_dpi)
+    echo -e "  - XWayland Policy Setting:     ${wine}${sys_policy}${reset}"
+    echo -e "  - Effective XWayland Scaling:  ${wine}${effective_scaling}${reset}"
+    echo -e "  - Current Wine DPI:            ${wine}${current_wine_dpi} DPI${reset}"
+
+    if [ "$XDG_SESSION_TYPE" = "x11" ]; then
+        echo -e "  - Recommended Scaling Policy: ${wine}N/A (Native X11 Session)${reset}"
+        echo -e "  - Recommended Wine DPI:        ${wine}Manual Config Required${reset}"
+    elif [ -n "$supported" ]; then
+        echo -e "  - Recommended XWayland Policy: ${green}${rec_policy}${reset}"
+        echo -e "  - Recommended Wine DPI:        ${green}${target_dpi:-96} DPI${reset} (${rec_formula:-Handled natively by X11})"
+    else
+        echo -e "  - Graphics Automation:         ${red}Unsupported DE${reset}"
+    fi
+    echo -e "${gray}================================================================${reset}"
+    echo ""
+}
+
+map_folder() {
+    local host_folder="$1"
+    local map_type="$2" # "drive" or "desktop"
+    local drive_letter="$3"
+    
+    local wine="\033[38;5;125m"
+    local gray="\033[38;5;244m"
+    local yellow="\033[38;5;179m"
+    local reset="\033[0m"
+    local blue="\033[38;5;110m"
+    
+    if [ -z "$host_folder" ]; then
+        echo "=== Map Local Folder ==="
+        if command -v zenity >/dev/null 2>&1; then
+            host_folder=$(zenity --file-selection --directory --title="Select Folder to Map" 2>/dev/null) || true
+        elif command -v kdialog >/dev/null 2>&1; then
+            host_folder=$(kdialog --getexistingdirectory --title="Select Folder to Map" 2>/dev/null) || true
+        else
+            read -p "Enter the absolute path of the local folder: " host_folder
+        fi
+        
+        if [ -z "$host_folder" ] || [ ! -d "$host_folder" ]; then
+            echo "Error: Invalid folder path. Mapping cancelled."
+            return 1
+        fi
+    fi
+    
+    local real_host_folder=$(realpath "$host_folder")
+    
+    if [ ! -d "$real_host_folder" ]; then
+        echo "Error: Local folder '$real_host_folder' does not exist."
+        return 1
+    fi
+
+    echo ""
+    echo -e "Selected local folder: ${wine}$real_host_folder${reset}"
+    echo ""
+    
+    if [ ! -d "$TORQUIO_PREFIX_DIR/dosdevices" ]; then
+        echo "Error: Wine prefix has not been initialized. Please run setup first."
+        return 1
+    fi
+
+    # Determine mapping type if not passed
+    if [ -z "$map_type" ]; then
+        echo "Select how you would like to map this folder in Wine:"
+        echo -e "  ${wine}1)${reset} As a Mapped Network Drive (e.g., D:\\, E:\\)"
+        echo -e "  ${wine}2)${reset} As a Shortcut inside your Desktop folder (auto-expanded in file pickers)"
+        echo -e "  ${wine}3)${reset} [Cancel]"
+        echo ""
+        read -p "Select choice (1-3): " choice_type
+        case "$choice_type" in
+            1)
+                map_type="drive"
+                ;;
+            2)
+                map_type="desktop"
+                ;;
+            *)
+                echo "Mapping cancelled."
+                return 1
+                ;;
+        esac
+    fi
+
+    if [ "$map_type" = "drive" ]; then
+        # Check if the folder is already mapped to ANY network drive
+        local existing_drive=""
+        for letter in d e f g h i j k l m n o p q r s t u v w x y; do
+            local lp="$TORQUIO_PREFIX_DIR/dosdevices/${letter}:"
+            if [ -L "$lp" ]; then
+                local tgt=$(readlink -f "$lp")
+                if [ "$tgt" = "$real_host_folder" ]; then
+                    existing_drive="${letter^^}:"
+                    break
+                fi
+            fi
+        done
+        
+        if [ -n "$existing_drive" ]; then
+            echo -e "${yellow}Warning: Folder '$real_host_folder' is already mapped to network drive $existing_drive\\${reset}"
+            read -p "Are you sure you want to map it again to a different drive letter? [y/N]: " confirm_dup
+            if [[ ! "$confirm_dup" =~ ^[Yy]$ ]]; then
+                echo "Mapping cancelled."
+                return 1
+            fi
+        fi
+
+        if [ -z "$drive_letter" ]; then
+            for letter in d e f g h i j k l m n o p q r s t u v w x y z; do
+                if [ ! -e "$TORQUIO_PREFIX_DIR/dosdevices/${letter}:" ]; then
+                    drive_letter="${letter}:"
+                    break
+                fi
+            done
+            
+            if [ -z "$drive_letter" ]; then
+                echo "Error: No available drive letters left!"
+                return 1
+            fi
+        fi
+        
+        drive_letter=$(echo "$drive_letter" | tr '[:upper:]' '[:lower:]')
+        if [[ ! "$drive_letter" =~ :$ ]]; then
+            drive_letter="${drive_letter}:"
+        fi
+        
+        local link_path="$TORQUIO_PREFIX_DIR/dosdevices/$drive_letter"
+        if [ -L "$link_path" ]; then
+            local current_target=$(readlink -f "$link_path")
+            if [ "$current_target" = "$real_host_folder" ]; then
+                echo "Folder '$real_host_folder' is already mapped to Wine drive ${drive_letter^^}\\"
+                return 0
+            fi
+        fi
+        
+        rm -f "$link_path"
+        ln -s "$real_host_folder" "$link_path"
+        echo "Successfully mapped '$real_host_folder' to Wine drive ${drive_letter^^}\\"
+        echo -e "${gray}Note: The drive letter will appear in Wine file dialogs once all Wine applications${reset}"
+        echo -e "${gray}      are closed (or after you run a Wine server shutdown in the Maintenance menu).${reset}"
+        return 0
+
+    elif [ "$map_type" = "desktop" ]; then
+        local desktop_dir="${XDG_DESKTOP_DIR:-$HOME/Desktop}"
+        if [ -f "$HOME/.config/user-dirs.dirs" ]; then
+            source "$HOME/.config/user-dirs.dirs"
+            desktop_dir="${XDG_DESKTOP_DIR:-$HOME/Desktop}"
+        fi
+        
+        mkdir -p "$desktop_dir"
+        local folder_name=$(basename "$real_host_folder")
+        local dest_link="$desktop_dir/$folder_name"
+        
+        if [ -L "$dest_link" ]; then
+            local current_target=$(readlink -f "$dest_link")
+            if [ "$current_target" = "$real_host_folder" ]; then
+                echo "Folder '$real_host_folder' is already mapped to Desktop shortcut: $dest_link"
+                return 0
+            fi
+        fi
+        
+        if [ -e "$dest_link" ] && [ ! -L "$dest_link" ]; then
+            echo "Error: A physical file or folder named '$folder_name' already exists on your Desktop."
+            read -p "Enter a custom shortcut name: " custom_name
+            if [ -z "$custom_name" ]; then
+                echo "Mapping cancelled."
+                return 1
+            fi
+            dest_link="$desktop_dir/$custom_name"
+        fi
+        
+        rm -f "$dest_link"
+        ln -s "$real_host_folder" "$dest_link"
+        echo "Successfully mapped '$real_host_folder' to Desktop shortcut: $(basename "$dest_link")"
+        return 0
+    fi
+}
+
+unmap_folder() {
+    local wine="\033[38;5;125m"
+    local gray="\033[38;5;244m"
+    local reset="\033[0m"
+    echo "=== Unmap Local Folder ==="
+    
+    local mapped_drives=()
+    local drive_letters=()
+    
+    # 1. Scan for Mapped Network Drives
+    if [ -d "$TORQUIO_PREFIX_DIR/dosdevices" ]; then
+        for letter in d e f g h i j k l m n o p q r s t u v w x y; do
+            local link_path="$TORQUIO_PREFIX_DIR/dosdevices/${letter}:"
+            if [ -L "$link_path" ]; then
+                local target=$(readlink -f "$link_path")
+                mapped_drives+=("[Network Drive]    ${letter^^}: -> $target")
+                drive_letters+=("drive|$letter")
+            fi
+        done
+    fi
+
+    # 2. Scan for Desktop Shortcuts
+    local desktop_dir="${XDG_DESKTOP_DIR:-$HOME/Desktop}"
+    if [ -f "$HOME/.config/user-dirs.dirs" ]; then
+        source "$HOME/.config/user-dirs.dirs"
+        desktop_dir="${XDG_DESKTOP_DIR:-$HOME/Desktop}"
+    fi
+    
+    if [ -d "$desktop_dir" ]; then
+        for f in "$desktop_dir"/*; do
+            if [ -L "$f" ]; then
+                local target=$(readlink -f "$f")
+                if [ -d "$target" ]; then
+                    mapped_drives+=("[Desktop Shortcut] $(basename "$f") -> $target")
+                    drive_letters+=("desktop|$f")
+                fi
+            fi
+        done
+    fi
+
+    if [ ${#mapped_drives[@]} -eq 0 ]; then
+        echo "No mapped folders found."
+        return 1
+    fi
+
+    echo "Currently mapped folders:"
+    for i in "${!mapped_drives[@]}"; do
+        echo "  $((i+1))) ${mapped_drives[$i]}"
+    done
+    echo "  $(( ${#mapped_drives[@]} + 1 ))) [Cancel]"
+    echo ""
+    read -p "Select a shortcut to unmap (1-$(( ${#mapped_drives[@]} + 1 ))): " choice
+    if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#mapped_drives[@]}" ]; then
+        local idx=$((choice-1))
+        local target_info="${drive_letters[$idx]}"
+        local type=$(echo "$target_info" | cut -d'|' -f1)
+        local value=$(echo "$target_info" | cut -d'|' -f2-)
+        
+        if [ "$type" = "drive" ]; then
+            rm -f "$TORQUIO_PREFIX_DIR/dosdevices/${value}:"
+            echo "Successfully unmapped drive ${value^^}:"
+            echo -e "${gray}Note: The drive letter will disappear from Wine file dialogs once all Wine applications${reset}"
+            echo -e "${gray}      are closed (or after you run a Wine server shutdown in the Maintenance menu).${reset}"
+            return 0
+        elif [ "$type" = "desktop" ]; then
+            rm -f "$value"
+            echo "Successfully removed Desktop shortcut: $(basename "$value")"
+            return 0
+        fi
+    else
+        echo "Operation cancelled."
+        return 1
+    fi
+}
+
+manage_folder_mappings() {
+    local wine="\033[38;5;125m"
+    local reset="\033[0m"
+    local blue="\033[38;5;110m"
+
+    while true; do
+        echo -e "${blue}=== Manage Folder Mappings ===${reset}"
+        echo ""
+        echo -e "  ${wine}1)${reset} Map a Local Folder to Wine"
+        echo -e "  ${wine}2)${reset} Unmap an Existing Wine Folder"
+        echo -e "  ${wine}3)${reset} [Back to main menu]"
+        echo ""
+        read -p "Select an option (1-3): " opt_map
+        case "$opt_map" in
+            1)
+                echo ""
+                if map_folder; then
+                    echo ""
+                    read -p "Press [Enter] to continue..." temp_map
+                fi
+                ;;
+            2)
+                echo ""
+                if unmap_folder; then
+                    echo ""
+                    read -p "Press [Enter] to continue..." temp_map
+                fi
+                ;;
+            *)
+                return
+                ;;
+        esac
+        clear
+    done
+}
+
+export_keycommands() {
+    echo "=== Exporting Key Commands Backup ==="
+    local keycommands_dir=$(find "$TORQUIO_PREFIX_DIR/drive_c/users" -type d -path "*/AppData/Roaming/Steinberg/Dorico*" 2>/dev/null | head -n 1)
+    if [ -z "$keycommands_dir" ] || [ ! -d "$keycommands_dir" ]; then
+        echo "Error: Dorico AppData directory not found. Please make sure Dorico has been installed and run."
+        return
+    fi
+    
+    mapfile -t files < <(find "$keycommands_dir" -type f -name "keycommands_*.json" 2>/dev/null)
+    if [ ${#files[@]} -eq 0 ]; then
+        echo "No keycommands_*.json files found to export."
+        return
+    fi
+    
+    echo "Found files to export:"
+    for f in "${files[@]}"; do
+        echo "  - $(basename "$f")"
+    done
+    
+    local downloads_dir="${XDG_DOWNLOAD_DIR:-$HOME/Downloads}"
+    mkdir -p "$downloads_dir"
+    local zip_file="$downloads_dir/torquio_keycommands_backup.zip"
+    
+    (cd "$keycommands_dir" && python3 -c "import zipfile, glob, os; z = zipfile.ZipFile('$zip_file', 'w'); [z.write(f, os.path.basename(f)) for f in glob.glob('keycommands_*.json')]; z.close()")
+    echo "Successfully compressed and exported key commands to: $zip_file"
+}
+
+import_keycommands() {
+    echo "=== Importing Key Commands Backup ==="
+    
+    local downloads_dir="${XDG_DOWNLOAD_DIR:-$HOME/Downloads}"
+    mapfile -t backups < <(find "$downloads_dir" -maxdepth 1 -type f \( -name "torquio_keycommands_backup.zip" -o -name "keycommands_*.json" \) 2>/dev/null)
+    
+    local selected_backup=""
+    if [ ${#backups[@]} -eq 1 ]; then
+        selected_backup="${backups[0]}"
+        echo "Auto-detected backup file: $(basename "$selected_backup")"
+    elif [ ${#backups[@]} -gt 1 ]; then
+        echo "Multiple backup files found in $downloads_dir:"
+        for i in "${!backups[@]}"; do
+            echo "  $((i+1))) $(basename "${backups[$i]}")"
+        done
+        echo "  $(( ${#backups[@]} + 1 ))) [Browse...]"
+        read -p "Select a file to import (1-$(( ${#backups[@]} + 1 ))): " choice
+        if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#backups[@]}" ]; then
+            selected_backup="${backups[$((choice-1))]}"
+        fi
+    fi
+    
+    if [ -z "$selected_backup" ]; then
+        if command -v zenity >/dev/null 2>&1; then
+            selected_backup=$(zenity --file-selection --file-filter="Backup (*.zip *.json) | *.zip *.json" --title="Select Key Commands Backup File" 2>/dev/null) || true
+        elif command -v kdialog >/dev/null 2>&1; then
+            selected_backup=$(kdialog --getopenfilename "$downloads_dir" "*.zip *.json" --title="Select Key Commands Backup File" 2>/dev/null) || true
+        else
+            read -p "Enter path to key commands backup file (.zip or .json): " selected_backup
+        fi
+    fi
+    
+    if [ -z "$selected_backup" ] || [ ! -f "$selected_backup" ]; then
+        echo "No backup file selected. Import cancelled."
+        return
+    fi
+    
+    echo "Staging backup: $selected_backup"
+    
+    # Clean up any existing staged files to prevent conflicts
+    rm -rf "$TORQUIO_DATA_DIR/staged_keycommands"
+    rm -f "$TORQUIO_DATA_DIR"/staged_keycommands.*
+    mkdir -p "$TORQUIO_DATA_DIR/staged_keycommands"
+    
+    if [[ "$selected_backup" =~ \.zip$ ]]; then
+        unzip -o "$selected_backup" -d "$TORQUIO_DATA_DIR/staged_keycommands/" >/dev/null 2>&1 || true
+    else
+        cp "$selected_backup" "$TORQUIO_DATA_DIR/staged_keycommands/"
+    fi
+    echo "Keyboard shortcuts staged successfully! They will be automatically imported the next time you launch Dorico."
+}
+
+manage_keycommands() {
+    local wine="\033[38;5;125m"
+    local reset="\033[0m"
+    local blue="\033[38;5;110m"
+
+    while true; do
+        echo -e "${blue}=== Manage Dorico Key Commands ===${reset}"
+        echo ""
+        echo -e "  ${wine}1)${reset} Export Key Commands (Backup to Zip)"
+        echo -e "  ${wine}2)${reset} Import Key Commands (Restore from Backup)"
+        echo -e "  ${wine}3)${reset} [Back to main menu]"
+        echo ""
+        read -p "Select an option (1-3): " opt_kc
+        case "$opt_kc" in
+            1)
+                export_keycommands
+                ;;
+            2)
+                import_keycommands
+                ;;
+            *)
+                return
+                ;;
+        esac
+        echo ""
+        read -p "Press [Enter] to continue..." temp_kc
+    done
+}
+
+run_custom_exe() {
+    echo "=== Run Custom Installer or Executable ==="
+    echo ""
+    local selected_exe="$1"
+    
+    if [ -z "$selected_exe" ]; then
+        if command -v zenity >/dev/null 2>&1; then
+            selected_exe=$(zenity --file-selection --file-filter="Executables (*.exe *.msi) | *.exe *.msi" --title="Select Executable to Run" 2>/dev/null) || true
+        elif command -v kdialog >/dev/null 2>&1; then
+            selected_exe=$(kdialog --getopenfilename "$HOME" "*.exe *.msi" --title="Select Executable to Run" 2>/dev/null) || true
+        else
+            read -p "Enter the absolute path to the .exe or .msi file: " selected_exe
+        fi
+    fi
+    
+    if [ -z "$selected_exe" ] || [ ! -f "$selected_exe" ]; then
+        echo "No valid file selected. Operation cancelled."
+        return
+    fi
+    
+    echo "Running: $selected_exe"
+    
+    local translated_path=$(distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEDEBUG=-all; export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; winepath -w \"$selected_exe\"" | tr -d '\r')
+    local ft_int=$(get_config_val "freetype_interpreter" "40")
+    
+    if [[ "$selected_exe" =~ \.msi$ ]]; then
+        distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$ft_int\"; wine msiexec /i \"$translated_path\"" || true
+    else
+        distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$ft_int\"; wine \"$translated_path\"" || true
+    fi
+    
+    echo "Execution completed."
+}
+
+manage_wine() {
+    local wine="\033[38;5;125m"
+    local reset="\033[0m"
+    local blue="\033[38;5;110m"
+
+    while true; do
+        echo -e "${blue}=== Wine Tools & Maintenance ===${reset}"
+        echo ""
+        echo -e "  ${wine}1)${reset} Run Wine Configuration (winecfg)"
+        echo -e "  ${wine}2)${reset} Run Registry Editor (regedit)"
+        echo -e "  ${wine}3)${reset} Run Control Panel (control)"
+        echo -e "  ${wine}4)${reset} Run File Manager (explorer)"
+        echo -e "  ${wine}5)${reset} Run Command Prompt (cmd)"
+        echo -e "  ${wine}6)${reset} Reboot Wine Prefix (wineboot -r)"
+        echo -e "  ${wine}7)${reset} Shutdown Wine Server (wineserver -k)"
+        echo -e "  ${wine}8)${reset} Monitor XWayland Keyboard Events (xev)"
+        echo -e "  ${wine}9)${reset} Run Custom Installer/Executable (.exe/.msi)"
+        echo -e "  ${wine}10)${reset} Open C: Drive in Host File Manager"
+        echo -e "  ${wine}11)${reset} [Back to main menu]"
+        echo ""
+        read -p "Select an option (1-11): " opt_wine
+        local ft_int=$(get_config_val "freetype_interpreter" "40")
+        local should_prompt=true
+        case "$opt_wine" in
+            1)
+                distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$ft_int\"; winecfg" || true
+                ;;
+            2)
+                distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$ft_int\"; regedit" || true
+                ;;
+            3)
+                distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$ft_int\"; wine control" || true
+                ;;
+            4)
+                distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$ft_int\"; wine explorer" || true
+                ;;
+            5)
+                distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$ft_int\"; wine cmd" || true
+                ;;
+            6)
+                echo "Rebooting Wine prefix..."
+                distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$ft_int\"; wineboot -r" || true
+                echo "Prefix reboot completed."
+                ;;
+            7)
+                echo "Shutting down Wine server..."
+                distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wineserver -k && wineserver -w" || true
+                echo "Wine server shutdown complete."
+                ;;
+            8)
+                if ! distrobox enter "$TORQUIO_CONTAINER_NAME" -- command -v xev >/dev/null 2>&1; then
+                    echo "xev (X11 Event Viewer) is not installed in the container."
+                    read -p "Would you like to install it now? [Y/n]: " install_xev
+                    if [[ ! "$install_xev" =~ ^[Nn]$ ]]; then
+                        echo "Installing x11-utils..."
+                        distrobox enter "$TORQUIO_CONTAINER_NAME" -- sudo apt update
+                        distrobox enter "$TORQUIO_CONTAINER_NAME" -- sudo apt install -y x11-utils
+                    else
+                        clear
+                        continue
+                    fi
+                fi
+                echo "Launching X11 Event Viewer (xev)..."
+                echo "Focus the small white window that appears and press keys to monitor events."
+                echo "Press Ctrl+C inside this terminal to exit the monitor."
+                distrobox enter "$TORQUIO_CONTAINER_NAME" -- xev -event keyboard || true
+                ;;
+            9)
+                run_custom_exe
+                ;;
+            10)
+                if [ -d "$TORQUIO_PREFIX_DIR/drive_c" ]; then
+                    echo "Opening C: Drive in host file manager..."
+                    xdg-open "$TORQUIO_PREFIX_DIR/drive_c" >/dev/null 2>&1 &
+                    should_prompt=false
+                else
+                    echo "Error: Wine prefix C: drive does not exist yet."
+                fi
+                ;;
+            *)
+                return
+                ;;
+        esac
+        if [ "$should_prompt" = "true" ]; then
+            echo ""
+            read -p "Press [Enter] to continue..." temp_wine
+        fi
+        clear
+    done
+}
+
+show_menu() {
+    while true; do
+        print_header
+        echo ""
+        
+        # Check if environment is active (container exists and core is installed)
+        local env_active=false
+        if distrobox list 2>/dev/null | grep -q "$TORQUIO_CONTAINER_NAME" && [ -f "$TORQUIO_PREFIX_DIR/.torquio_core_installed" ]; then
+            env_active=true
+        fi
+        
+        local wine="\033[38;5;125m"
+        local reset="\033[0m"
+        
+        if [ "$env_active" = "true" ]; then
+            echo -e "  ${wine}1)${reset} Reinstall/Update Torquio Environment"
+            echo -e "  ${wine}2)${reset} Uninstall/Wipe Torquio"
+            echo -e "  ${wine}3)${reset} Status Dashboard"
+            echo -e "  ${wine}4)${reset} Configure Graphics & Scaling"
+            echo -e "  ${wine}5)${reset} Fix Icons & Refresh Launchers"
+            echo -e "  ${wine}6)${reset} Manage Folder Mappings (Map/Unmap)"
+            echo -e "  ${wine}7)${reset} Manage Dorico Key Commands"
+            echo -e "  ${wine}8)${reset} Wine Tools & Maintenance"
+            echo -e "  ${wine}9)${reset} Exit"
+            echo ""
+            read -p "Select an option (1-9): " choice
+            echo ""
+            case "$choice" in
+                1)
+                    if "$SCRIPT_DIR/scripts/install.sh"; then
+                        :
+                    else
+                        local rc=$?
+                        if [ $rc -eq 10 ]; then
+                            echo ""
+                            read -p "Press [Enter] to return to the main menu..." temp
+                            clear
+                            continue
+                        else
+                            exit $rc
+                        fi
+                    fi
+                    ;;
+                2)
+                    if "$SCRIPT_DIR/scripts/cleanup.sh"; then
+                        clear
+                        continue
+                    else
+                        local rc=$?
+                        if [ $rc -eq 10 ]; then
+                            echo ""
+                            read -p "Press [Enter] to return to the main menu..." temp
+                            clear
+                            continue
+                        else
+                            exit $rc
+                        fi
+                    fi
+                    ;;
+                3)  show_status ;;
+                4)  configure_graphics; clear; continue ;;
+                5)  refresh_launchers; clear; continue ;;
+                6)  manage_folder_mappings; clear; continue ;;
+                7)  manage_keycommands; clear; continue ;;
+                8)  manage_wine; clear; continue ;;
+                9)  exit 0 ;;
+                *)  echo "Invalid option. Please choose 1-9." ;;
+            esac
+        else
+            echo -e "  ${wine}1)${reset} Install Torquio Environment"
+            echo -e "  ${wine}2)${reset} Clean/Remove Torquio"
+            echo -e "  ${wine}3)${reset} Status Dashboard"
+            echo -e "  ${wine}4)${reset} Exit"
+            echo ""
+            read -p "Select an option (1-4): " choice
+            echo ""
+            case "$choice" in
+                1)
+                    if "$SCRIPT_DIR/scripts/install.sh"; then
+                        :
+                    else
+                        local rc=$?
+                        if [ $rc -eq 10 ]; then
+                            echo ""
+                            read -p "Press [Enter] to return to the main menu..." temp
+                            clear
+                            continue
+                        else
+                            exit $rc
+                        fi
+                    fi
+                    ;;
+                2)
+                    if "$SCRIPT_DIR/scripts/cleanup.sh"; then
+                        clear
+                        continue
+                    else
+                        local rc=$?
+                        if [ $rc -eq 10 ]; then
+                            echo ""
+                            read -p "Press [Enter] to return to the main menu..." temp
+                            clear
+                            continue
+                        else
+                            exit $rc
+                        fi
+                    fi
+                    ;;
+                3)  show_status ;;
+                4)  exit 0 ;;
+                *)  echo "Invalid option. Please choose 1-4." ;;
+            esac
+        fi
+        
+        echo ""
+        read -p "Press [Enter] to return to the main menu..." temp
+        clear
+    done
+}
+
+# --- CLI Flag Parsing Mode ---
+if [ $# -gt 0 ]; then
+    case "$1" in
+        -i|--install|--reinstall)
+            shift
+            "$SCRIPT_DIR/scripts/install.sh" "$@"
+            ;;
+        -r|--remove|--uninstall)
+            shift
+            "$SCRIPT_DIR/scripts/cleanup.sh" "$@"
+            ;;
+        -f|--fix-icons)
+            distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$SCRIPT_DIR\" && ./scripts/2-install/extract_icons.sh"
+            update-desktop-database "$HOME/.local/share/applications/" >/dev/null 2>&1 || true
+            ;;
+        -g|--graphics)
+            configure_graphics
+            ;;
+        -s|--status)
+            show_status
+            ;;
+        -u|--update)
+            "$SCRIPT_DIR/scripts/2-install/update_mediabay.sh"
+            ;;
+        -d|--map_folder)
+            map_folder "$2" "$3"
+            ;;
+        -x|--export_key_commands)
+            export_keycommands
+            ;;
+        -m|--import_key_commands)
+            import_keycommands
+            ;;
+        -w|--winecfg)
+            ft_int=$(get_config_val "freetype_interpreter" "40")
+            distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$ft_int\"; winecfg" || true
+            ;;
+        -k|--kill_wine)
+            echo "Shutting down Wine server..."
+            distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wineserver -k && wineserver -w" || true
+            echo "Wine server shutdown complete."
+            ;;
+        -b|--reboot)
+            echo "Rebooting Wine prefix..."
+            ft_int=$(get_config_val "freetype_interpreter" "40")
+            distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export FREETYPE_PROPERTIES=\"truetype:interpreter-version=$ft_int\"; wineboot -r" || true
+            echo "Prefix reboot completed."
+            ;;
+        -e|--execute|--run)
+            run_custom_exe "$2"
+            ;;
+        *)
+            echo "Error: Unknown argument '$1'"
+            echo "Usage: ./torquio [flags]"
+            echo "Flags:"
+            echo "  -i, --install, --reinstall  Run clean container/prefix setup."
+            echo "  -r, --remove, --uninstall   Complete environment purge."
+            echo "  -f, --fix-icons             Refresh host desktop icons."
+            echo "  -g, --graphics              Interact with display scaling configs."
+            echo "  -s, --status                Display status dashboard."
+            echo "  -u, --update                Update MediaBay."
+            echo "  -d, --map_folder [p] [l]    Map folder positional/interactively."
+            echo "  -x, --export_key_commands   Export key commands to zip."
+            echo "  -m, --import_key_commands   Import key commands zip/json."
+            echo "  -w, --winecfg               Launch winecfg in the container prefix."
+            echo "  -k, --kill_wine             Shutdown all active Wine/Steinberg processes."
+            echo "  -b, --reboot                Simulate a Windows reboot inside the prefix."
+            echo "  -e, --execute, --run [file] Execute a custom .exe or .msi in the prefix."
+            exit 1
+            ;;
+    esac
+else
+    # Interactive menu mode
+    clear
+    show_menu
+fi
