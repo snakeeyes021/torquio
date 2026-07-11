@@ -4,6 +4,41 @@ This document tracks known-good, tested "snapshots" of the entire system. It ser
 
 ---
 
+## **Release v0.3.0-alpha (CLI App & Compatibility Polish)**
+**Date:** 2026-07-11
+**Status:** Alpha / Milestone
+
+**Description:** Consolidated the framework into the `torquio` CLI manager, supporting both interactive text menus and command-line flags. Implemented key compatibility remedies, automatic scaling overrides, custom debugging utilities, and native DBus URL handoffs.
+
+**Key Improvements:**
+*   **Torquio CLI Manager:** A single console app `torquio` mapping interactive dashboards, setup utilities, and CLI flags.
+*   **Automatic Scaling & Auto-DPI:** Queries active host monitor specs on boot to automatically set target Wine DPI and adjust Wayland desktop compositor XWayland scaling.
+*   **Modal Focus Loss Mitigation:** Injects X11 Driver keys to force focus acquisition, avoiding dialog keyboard lockups.
+*   **Keyboard repeat rate tuning:** Fixes repeat delay lag inside the container.
+*   **Custom Debugger Suppressor:** Compiles a native Windows helper `torquio-winedbg.exe` to suppress Wine console debug alerts and cleanly silence background daemon exit crashes. This allows us to send both app logs and Wine debug logs to the same log file.
+*   **DBus browser integration:** Maps prefix HTTP/HTTPS protocol handlers directly to the host portal via `busctl`. This works around downstream effects of the debug suppression.
+*   **CUPS Spooler Bridge:** Added native printing dependencies (`libcups2`) inside container packages.
+*   **Folder Mapping:** Supports Zenity/KDialog interactive drive mappings.
+*   **Key Command Backups:** Zip-based import/export system for key bindings.
+
+**Build Environment Artifacts:**
+*   **Custom Wine Source (`zhiyi/wine`):** Commit `ae88a705b5aa544cc60153d48c1ca8849f32ee14`
+*   **Winetricks Version:** `20260125-next`
+*   **Wine-ICU MSI Version:** `72.1`
+
+**Verified Application Versions:**
+*   **Steinberg Download Assistant (SDA):** `1.39.3`
+*   **Steinberg Activation Manager (SAM):** `1.8.1.1383`
+*   **Steinberg Media Bay:** `1.3.80.59`
+*   **Dorico:** `6.2.30.6245`
+*   **NotePerformer (3rd Party):** `5.1.2`
+
+**Known Issues:**
+*   SDA attempts to update MediaBay automatically and fails due to `preinstall.ps1` block (Error 231).
+*   3rd-party Cantai VST testing is inconclusive. While it installs and the playback template loads and seems to load the correct amount of instances, license activation requires opening the VST window, which currently crashes Dorico in this build (and all previous builds).
+
+---
+
 ## **Release v0.2.0-alpha (Automated Installer)**
 **Date:** 2026-05-19
 **Status:** Alpha / Milestone
