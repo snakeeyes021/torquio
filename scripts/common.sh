@@ -44,7 +44,7 @@ get_config_val() {
         echo "$default"
         return
     fi
-    python3 -c "import json; d=json.load(open('$config_file')); v=d.get('$key', '$default'); print(str(v).lower() if isinstance(v, bool) else v)" 2>/dev/null || echo "$default"
+    python3 -c 'import sys, json; d=json.load(open(sys.argv[1])); v=d.get(sys.argv[2], sys.argv[3]); print(str(v).lower() if isinstance(v, bool) else v)' "$config_file" "$key" "$default" 2>/dev/null || echo "$default"
 }
 
 # Configuration Helper: Write value to ~/.config/torquio/config.json
