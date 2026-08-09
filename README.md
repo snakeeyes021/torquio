@@ -27,7 +27,7 @@ On many immutable distros, the above are included by default, so you're good to 
 > On the upstream Fedora Atomic family (Silverblue, Kinoite, etc.), by default Podman is available, but Distrobox is not, in favor of Toolbox. To install Distrobox, we recommend the sudo-free install to your user's local binary folder:
 >
 >```
->curl https://raw.githubusercontent.com/89luca89/distrobox/main/install | sh -s -- -p ~/.local/bin/
+>curl https://raw.githubusercontent.com/89luca89/distrobox/main/install | sh -s -- -P ~/.local/
 >```
 >
 >as suggested here: [https://fedoramagazine.org/run-distrobox-on-fedora-linux/](https://fedoramagazine.org/run-distrobox-on-fedora-linux/). This is the "custom directory" install detailed on Distrobox's [installation page](https://github.com/89luca89/distrobox#installation).
