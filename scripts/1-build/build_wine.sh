@@ -72,7 +72,18 @@ git fetch origin
 # Checkout the specific verified commit hash rather than the floating branch
 # The below hash comes from the bug-23698-react-native branch (2026-03-24)
 TARGET_COMMIT="883970826c62286c3da998072a5f49813d333a31"
-git checkout "$TARGET_COMMIT"
+git checkout -f "$TARGET_COMMIT"
+git reset --hard "$TARGET_COMMIT"
+
+PATCHES_DIR="$SCRIPT_DIR/patches"
+if [ -d "$PATCHES_DIR" ]; then
+    for patch_file in "$PATCHES_DIR"/*.patch; do
+        if [ -f "$patch_file" ]; then
+            echo "Applying $(basename "$patch_file")..."
+            git apply "$patch_file"
+        fi
+    done
+fi
 
 echo "Configuring and building..."
 cd ..
