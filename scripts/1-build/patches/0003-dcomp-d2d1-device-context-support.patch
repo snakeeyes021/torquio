@@ -1,0 +1,149 @@
+diff --git a/dlls/dcomp/dcomp_private.h b/dlls/dcomp/dcomp_private.h
+index e73c7b83e25..d2336388b0d 100644
+--- a/dlls/dcomp/dcomp_private.h
++++ b/dlls/dcomp/dcomp_private.h
+@@ -60,6 +60,8 @@ struct composition_surface
+     UINT height;
+     DXGI_FORMAT pixel_format;
+     DXGI_ALPHA_MODE alpha_mode;
++    ID2D1DeviceContext *d2d_context;
++    ID2D1Bitmap1 *d2d_target_bitmap;
+     LONG ref;
+ };
+ 
+diff --git a/dlls/dcomp/surface.c b/dlls/dcomp/surface.c
+index 1f2862e4d14..52223a19c22 100644
+--- a/dlls/dcomp/surface.c
++++ b/dlls/dcomp/surface.c
+@@ -71,6 +71,10 @@ static ULONG STDMETHODCALLTYPE surface_Release(IDCompositionSurfaceUnknown *ifac
+ 
+     if (!ref)
+     {
++        if (surface->d2d_target_bitmap)
++            ID2D1Bitmap1_Release(surface->d2d_target_bitmap);
++        if (surface->d2d_context)
++            ID2D1DeviceContext_Release(surface->d2d_context);
+         IUnknown_Release(surface->physical_surface);
+         IDCompositionSurfaceFactory_Release(surface->factory);
+         if (surface->draw_surface)
+@@ -104,11 +108,7 @@ static HRESULT STDMETHODCALLTYPE surface_BeginDraw(IDCompositionSurfaceUnknown *
+     TRACE("iface %p, rect %s, iid %s, object %p, offset %p.\n", iface, wine_dbgstr_rect(rect),
+             debugstr_guid(iid), object, offset);
+ 
+-    if (IsEqualGUID(iid, &IID_ID2D1DeviceContext))
+-    {
+-        FIXME("ID2D1DeviceContext draw surface is currently unsupported.\n");
+-        return E_NOTIMPL;
+-    }
++    /* ID2D1DeviceContext is handled below after draw surface creation */
+ 
+     if (!rect)
+     {
+@@ -182,9 +182,79 @@ static HRESULT STDMETHODCALLTYPE surface_BeginDraw(IDCompositionSurfaceUnknown *
+     device->drawing_surface = &surface->IDCompositionSurfaceUnknown_iface;
+     dcomp_unlock();
+ 
+-    hr = IUnknown_QueryInterface(surface->draw_surface, iid, object);
+-    if (FAILED(hr))
+-        return hr;
++    if (IsEqualGUID(iid, &IID_ID2D1DeviceContext))
++    {
++        ID2D1Device *d2d_device = NULL;
++        IDXGISurface *dxgi_surface = NULL;
++        D2D1_BITMAP_PROPERTIES1 bitmap_desc;
++
++        /* Get or create the ID2D1Device */
++        hr = IUnknown_QueryInterface(factory->rendering_device, &IID_ID2D1Device, (void **)&d2d_device);
++        if (FAILED(hr))
++        {
++            IDXGIDevice *dxgi_dev = get_dxgi_device_from_factory(factory);
++            if (dxgi_dev)
++            {
++                hr = D2D1CreateDevice(dxgi_dev, NULL, &d2d_device);
++                IDXGIDevice_Release(dxgi_dev);
++            }
++            if (FAILED(hr) || !d2d_device)
++            {
++                ERR("Failed to get or create ID2D1Device, hr %#lx.\n", hr);
++                return hr ? hr : E_FAIL;
++            }
++        }
++
++        /* Create the device context */
++        hr = ID2D1Device_CreateDeviceContext(d2d_device, D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &surface->d2d_context);
++        ID2D1Device_Release(d2d_device);
++        if (FAILED(hr))
++        {
++            ERR("Failed to create ID2D1DeviceContext, hr %#lx.\n", hr);
++            return hr;
++        }
++
++        /* Get the DXGI surface from the draw texture */
++        hr = ID3D11Texture2D_QueryInterface(surface->draw_surface, &IID_IDXGISurface, (void **)&dxgi_surface);
++        if (FAILED(hr))
++        {
++            ERR("Failed to get IDXGISurface from draw texture, hr %#lx.\n", hr);
++            ID2D1DeviceContext_Release(surface->d2d_context);
++            surface->d2d_context = NULL;
++            return hr;
++        }
++
++        /* Create a target bitmap from the DXGI surface */
++        memset(&bitmap_desc, 0, sizeof(bitmap_desc));
++        bitmap_desc.pixelFormat.format = surface->pixel_format;
++        bitmap_desc.pixelFormat.alphaMode = surface->alpha_mode == DXGI_ALPHA_MODE_PREMULTIPLIED
++                ? D2D1_ALPHA_MODE_PREMULTIPLIED : D2D1_ALPHA_MODE_IGNORE;
++        bitmap_desc.bitmapOptions = D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW;
++
++        hr = ID2D1DeviceContext_CreateBitmapFromDxgiSurface(surface->d2d_context, dxgi_surface,
++                &bitmap_desc, &surface->d2d_target_bitmap);
++        IDXGISurface_Release(dxgi_surface);
++        if (FAILED(hr))
++        {
++            ERR("Failed to create bitmap from DXGI surface, hr %#lx.\n", hr);
++            ID2D1DeviceContext_Release(surface->d2d_context);
++            surface->d2d_context = NULL;
++            return hr;
++        }
++
++        /* Set the bitmap as the render target and begin drawing */
++        ID2D1DeviceContext_SetTarget(surface->d2d_context, (ID2D1Image *)surface->d2d_target_bitmap);
++        ID2D1DeviceContext_BeginDraw(surface->d2d_context);
++
++        *object = surface->d2d_context;
++        ID2D1DeviceContext_AddRef(surface->d2d_context);
++    }
++    else
++    {
++        hr = IUnknown_QueryInterface(surface->draw_surface, iid, object);
++        if (FAILED(hr))
++            return hr;
++    }
+ 
+     offset->x = rect->left;
+     offset->y = rect->top;
+@@ -215,6 +285,24 @@ static HRESULT STDMETHODCALLTYPE surface_EndDraw(IDCompositionSurfaceUnknown *if
+     device->drawing_surface = NULL;
+     dcomp_unlock();
+ 
++    /* End the D2D drawing session if active */
++    if (surface->d2d_context)
++    {
++        HRESULT d2d_hr;
++        d2d_hr = ID2D1DeviceContext_EndDraw(surface->d2d_context, NULL, NULL);
++        if (FAILED(d2d_hr))
++            WARN("ID2D1DeviceContext_EndDraw failed, hr %#lx.\n", d2d_hr);
++
++        ID2D1DeviceContext_SetTarget(surface->d2d_context, NULL);
++        if (surface->d2d_target_bitmap)
++        {
++            ID2D1Bitmap1_Release(surface->d2d_target_bitmap);
++            surface->d2d_target_bitmap = NULL;
++        }
++        ID2D1DeviceContext_Release(surface->d2d_context);
++        surface->d2d_context = NULL;
++    }
++
+     /* TODO: Copy data after Commit() is called instead of doing it immediately here */
+ 
+     dxgi_device = get_dxgi_device_from_factory(factory);
