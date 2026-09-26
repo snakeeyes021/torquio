@@ -1351,6 +1351,33 @@ run_custom_exe() {
     echo "Execution completed."
 }
 
+rebuild_wine() {
+    local wine="\033[38;5;125m"
+    local reset="\033[0m"
+    local blue="\033[38;5;110m"
+    local red="\033[38;5;167m"
+    local yellow="\033[38;5;179m"
+
+    if ! distrobox list 2>/dev/null | grep -q "$TORQUIO_CONTAINER_NAME"; then
+        echo -e "${red}Error: Container '$TORQUIO_CONTAINER_NAME' does not exist.${reset}"
+        echo "Please install or initialize Torquio first."
+        return 1
+    fi
+
+    echo -e "${blue}=== Rebuilding Wine Engine ===${reset}"
+    echo "This will recompile the custom Wine binary inside the container and install it to /opt/wine-custom."
+    echo ""
+
+    echo "Terminating any running Wine instances..."
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wineserver -k 2>/dev/null || true; wineserver -w 2>/dev/null || true"
+
+    echo "Running build_wine.sh inside container..."
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$SCRIPT_DIR\" && ./scripts/1-build/build_wine.sh --rebuild"
+
+    echo ""
+    echo -e "${wine}Wine rebuild complete!${reset}"
+}
+
 manage_wine() {
     local wine="\033[38;5;125m"
     local reset="\033[0m"
@@ -1369,9 +1396,10 @@ manage_wine() {
         echo -e "  ${wine}8)${reset} Monitor XWayland Keyboard Events (xev)"
         echo -e "  ${wine}9)${reset} Run Custom Installer/Executable (.exe/.msi)"
         echo -e "  ${wine}10)${reset} Open C: Drive in Host File Manager"
-        echo -e "  ${wine}11)${reset} [Back to main menu]"
+        echo -e "  ${wine}11)${reset} Recompile / Rebuild Wine Engine"
+        echo -e "  ${wine}12)${reset} [Back to main menu]"
         echo ""
-        read -p "Select an option (1-11): " opt_wine
+        read -p "Select an option (1-12): " opt_wine
         local ft_int=$(get_config_val "freetype_interpreter" "40")
         local should_prompt=true
         case "$opt_wine" in
@@ -1429,6 +1457,9 @@ manage_wine() {
                 else
                     echo "Error: Wine prefix C: drive does not exist yet."
                 fi
+                ;;
+            11)
+                rebuild_wine
                 ;;
             *)
                 return
@@ -1613,6 +1644,9 @@ if [ $# -gt 0 ]; then
         -e|--execute|--run)
             run_custom_exe "$2"
             ;;
+        --rebuild-wine|--rebuild_wine)
+            rebuild_wine
+            ;;
         *)
             echo "Error: Unknown argument '$1'"
             echo "Usage: ./torquio [flags]"
@@ -1630,6 +1664,7 @@ if [ $# -gt 0 ]; then
             echo "  -k, --kill_wine             Shutdown all active Wine/Steinberg processes."
             echo "  -b, --reboot                Simulate a Windows reboot inside the prefix."
             echo "  -e, --execute, --run [file] Execute a custom .exe or .msi in the prefix."
+            echo "      --rebuild-wine          Recompile custom Wine engine inside container."
             exit 1
             ;;
     esac
