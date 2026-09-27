@@ -9,6 +9,15 @@ Welcome! This document outlines the established engineering principles, architec
 3. **Environment-Agnostic Scripting:** To ensure maximum transportability for users, scripts should rely on dynamic XDG directories (e.g., `~/.local/share/wineprefixes/dorico`) and relative paths, avoiding hardcoded paths to specific developer directories.
 4. **URI Handoff Architecture:** We solve Linux authentication by using `.desktop` handlers on the host OS to catch `net-steinberg-sam://` and `net-steinberg-sda://` login tokens, which are then passed into the containerized Windows binaries. This is our foundational solution for Steinberg licensing.
 
+## Git Branching & Integration Strategy
+
+To maintain repository stability and allow clean parallel development, follow this branching workflow:
+
+*   **`main` (Current Stable Release):** Represents the production-ready, release state of Torquio. Features and bug fixes do not merge directly into `main` (with the rare exception of urgent, isolated hotfix patches).
+*   **Feature & Fix Branches (`feat/*`, `fix/*`, `test/*`, etc.):** Dedicated topic branches used for developing **AND TESTING** individual features or fixes in isolation. Never implement new logic or bugfixes directly on integration branches; always work and test within the appropriate topic branch first.
+*   **`develop` (Feature Integration Testing):** A permanent integration branch used to test multiple merged features and fixes concurrently. This is where cross-feature compatibility, Wine build interactions, and system regressions are tested together.
+*   **Release Lifecycle:** Once all features and fixes merged into `develop` are verified to work seamlessly together across real-world testing with zero regressions, `develop` is merged into `main` to create a new stable release.
+
 ## Repository Context
 
 When joining a session, please reference the following documents to understand the current state of the project:
