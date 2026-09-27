@@ -65,6 +65,11 @@ cd wine-source
 # The below hash comes from the bug-23698-react-native-20251217 branch
 git checkout ae88a705b5aa544cc60153d48c1ca8849f32ee14
 
+# Re-enable /dev/ntsync in wineserver if disabled by upstream interim hack (e.g. c9bd766)
+if [ -f server/inproc_sync.c ]; then
+    sed -i '/get_inproc_device_fd/,/return -1/ s/#if 0/#if 1/' server/inproc_sync.c 2>/dev/null || true
+fi
+
 # Ensure linux/ntsync.h is present in the build environment so configure detects it
 if [ ! -f /usr/include/linux/ntsync.h ]; then
     echo "Injecting ntsync.h header for Wine compilation..."
