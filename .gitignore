@@ -30,3 +30,4 @@ installers/
 __pycache__/
 *.py[cod]
 *$py.class
+DCOMP_INVESTIGATION_JOURNAL.md
