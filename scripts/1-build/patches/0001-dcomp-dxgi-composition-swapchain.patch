@@ -1,0 +1,230 @@
+diff --git a/dlls/dcomp/device.c b/dlls/dcomp/device.c
+index f1162c644ad..f6074c763a4 100644
+--- a/dlls/dcomp/device.c
++++ b/dlls/dcomp/device.c
+@@ -552,7 +552,10 @@ static void do_composite_dxgi_surface(const struct composition_target *target,
+     if (!target->topmost)
+         style |= DCX_CLIPCHILDREN;
+     dst_dc = GetDCEx(target->hwnd, 0, style);
+-    GdiAlphaBlend(dst_dc, 0, 0, size.width, size.height, src_dc, 0, 0, size.width, size.height, blend_func);
++    if (GetWindowLongW(target->hwnd, GWL_EXSTYLE) & WS_EX_LAYERED)
++        GdiAlphaBlend(dst_dc, 0, 0, size.width, size.height, src_dc, 0, 0, size.width, size.height, blend_func);
++    else
++        BitBlt(dst_dc, 0, 0, size.width, size.height, src_dc, 0, 0, SRCCOPY);
+     ReleaseDC(target->hwnd, dst_dc);
+ 
+     ID2D1GdiInteropRenderTarget_ReleaseDC(visual->interop, NULL);
+@@ -642,10 +645,14 @@ static HRESULT do_composite(const struct composition_target *target, struct comp
+                 return hr;
+             }
+ 
+-            /* The front buffer is the last back buffer because the composition swapchain must
+-                     * be created with DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL */
+-            hr = IDXGISwapChain1_GetBuffer(swapchain, swapchain_desc.BufferCount - 1, &IID_IDXGISurface,
++            /* In Wine, FLIP_SEQUENTIAL is not implemented by WineD3D, so back buffer 0 is
++             * the primary render target containing rendered pixels. Query buffer 0 first,
++             * then fall back to BufferCount - 1 if buffer 0 fails. */
++            hr = IDXGISwapChain1_GetBuffer(swapchain, 0, &IID_IDXGISurface,
+                                            (void **)&dxgi_surface);
++            if (FAILED(hr))
++                hr = IDXGISwapChain1_GetBuffer(swapchain, swapchain_desc.BufferCount - 1, &IID_IDXGISurface,
++                                               (void **)&dxgi_surface);
+             IDXGISwapChain1_Release(swapchain);
+             if (FAILED(hr))
+             {
+diff --git a/dlls/dxgi/device.c b/dlls/dxgi/device.c
+index 46d252f2b67..5786d52b363 100644
+--- a/dlls/dxgi/device.c
++++ b/dlls/dxgi/device.c
+@@ -430,46 +430,54 @@ static HRESULT STDMETHODCALLTYPE dxgi_swapchain_factory_create_swapchain(IWineDX
+ {
+     struct dxgi_device *device = impl_from_IWineDXGISwapChainFactory(iface);
+     struct wined3d_swapchain_desc wined3d_desc;
+-    struct IDXGIOutput *containing_output;
++    struct IDXGIOutput *containing_output = NULL;
+     struct dxgi_factory *dxgi_factory;
+     struct d3d11_swapchain *object;
+     HRESULT hr;
+ 
+-    TRACE("iface %p, factory %p, window %p, desc %p, fullscreen_desc %p, output %p, swapchain %p.\n",
++    TRACE("iface %p, factory %p, window %p, desc %p, fullscreen_desc %p, output %p, swapchain %p\n",
+             iface, factory, window, desc, fullscreen_desc, output, swapchain);
+ 
+     if (!(dxgi_factory = unsafe_impl_from_IDXGIFactory(factory)))
+     {
+-        WARN("Factory %p is not a valid dxgi factory.\n", factory);
++        WARN("Factory %p is not a valid dxgi factory\n", factory);
+         return E_FAIL;
+     }
+ 
+     if (FAILED(hr = dxgi_get_output_from_window(&dxgi_factory->IWineDXGIFactory_iface, window, &containing_output)))
+     {
+-        WARN("Failed to get output from window %p, hr %#lx.\n", window, hr);
++        WARN("Failed to get output from window %p, hr %#lx\n", window, hr);
+         return hr;
+     }
+ 
+     hr = wined3d_swapchain_desc_from_dxgi(&wined3d_desc, containing_output, window, desc,
+             fullscreen_desc);
+-    IDXGIOutput_Release(containing_output);
++    if (containing_output)
++        IDXGIOutput_Release(containing_output);
+     if (FAILED(hr))
+         return hr;
+ 
+     if (!(object = calloc(1, sizeof(*object))))
+     {
+-        ERR("Failed to allocate swapchain memory.\n");
++        ERR("Failed to allocate swapchain memory\n");
+         return E_OUTOFMEMORY;
+     }
+ 
+     if (FAILED(hr = d3d11_swapchain_init(object, device, &wined3d_desc)))
+     {
+-        WARN("Failed to initialise swapchain, hr %#lx.\n", hr);
++        WARN("Failed to initialise swapchain, hr %#lx\n", hr);
+         free(object);
+         return hr;
+     }
+ 
+-    TRACE("Created swapchain %p.\n", object);
++    if (window)
++    {
++        static const WCHAR wine_window_non_topmost_composed[] =
++            {'w','i','n','e','_','w','i','n','d','o','w','_','n','o','n','_','t','o','p','m','o','s','t','_','c','o','m','p','o','s','e','d',0};
++        SetPropW(window, wine_window_non_topmost_composed, (HANDLE)1);
++    }
++
++    TRACE("Created swapchain %p\n", object);
+ 
+     *swapchain = (IDXGISwapChain1 *)&object->IDXGISwapChain4_iface;
+ 
+diff --git a/dlls/dxgi/factory.c b/dlls/dxgi/factory.c
+index ebdb42a3806..259c686adc9 100644
+--- a/dlls/dxgi/factory.c
++++ b/dlls/dxgi/factory.c
+@@ -377,14 +377,43 @@ static void STDMETHODCALLTYPE dxgi_factory_UnregisterOcclusionStatus(IWineDXGIFa
+ {
+     FIXME("iface %p, cookie %#lx stub!\n", iface, cookie);
+ }
+-
+ static HRESULT STDMETHODCALLTYPE dxgi_factory_CreateSwapChainForComposition(IWineDXGIFactory *iface,
+         IUnknown *device, const DXGI_SWAP_CHAIN_DESC1 *desc, IDXGIOutput *output, IDXGISwapChain1 **swapchain)
+ {
+-    FIXME("iface %p, device %p, desc %p, output %p, swapchain %p stub!\n",
++    IWineDXGISwapChainFactory *swapchain_factory;
++    HRESULT hr;
++
++    TRACE("iface %p, device %p, desc %p, output %p, swapchain %p\n",
+             iface, device, desc, output, swapchain);
+ 
+-    return E_NOTIMPL;
++    if (!device || !desc || !swapchain)
++    {
++        WARN("Invalid pointer\n");
++        return DXGI_ERROR_INVALID_CALL;
++    }
++
++    if (desc->Stereo)
++    {
++        FIXME("Stereo swapchains are not supported\n");
++        return DXGI_ERROR_UNSUPPORTED;
++    }
++
++    if (!dxgi_validate_swapchain_desc(desc))
++        return DXGI_ERROR_INVALID_CALL;
++
++    if (output)
++        FIXME("Ignoring output %p\n", output);
++
++    if (SUCCEEDED(IUnknown_QueryInterface(device, &IID_IWineDXGISwapChainFactory, (void **)&swapchain_factory)))
++    {
++        hr = IWineDXGISwapChainFactory_create_swapchain(swapchain_factory,
++                (IDXGIFactory *)iface, NULL, desc, NULL, output, swapchain);
++        IWineDXGISwapChainFactory_Release(swapchain_factory);
++        return hr;
++    }
++
++    FIXME("Device %p is not a supported swapchain factory\n", device);
++    return DXGI_ERROR_UNSUPPORTED;
+ }
+ 
+ static UINT STDMETHODCALLTYPE dxgi_factory_GetCreationFlags(IWineDXGIFactory *iface)
+diff --git a/dlls/dxgi/swapchain.c b/dlls/dxgi/swapchain.c
+index 5c49c7f2482..65a833db8d7 100644
+--- a/dlls/dxgi/swapchain.c
++++ b/dlls/dxgi/swapchain.c
+@@ -109,7 +109,7 @@ HRESULT dxgi_get_output_from_window(IWineDXGIFactory *factory, HWND window, IDXG
+     HMONITOR monitor;
+     HRESULT hr;
+ 
+-    if (!(monitor = MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST)))
++    if (!(monitor = MonitorFromWindow(window, window ? MONITOR_DEFAULTTONEAREST : MONITOR_DEFAULTTOPRIMARY)))
+     {
+         WARN("Failed to get monitor from window.\n");
+         return DXGI_ERROR_INVALID_CALL;
+diff --git a/dlls/dxgi/utils.c b/dlls/dxgi/utils.c
+index 35fcc076ccb..9d37755fce6 100644
+--- a/dlls/dxgi/utils.c
++++ b/dlls/dxgi/utils.c
+@@ -611,12 +611,12 @@ HRESULT wined3d_swapchain_desc_from_dxgi(struct wined3d_swapchain_desc *wined3d_
+         return DXGI_ERROR_INVALID_CALL;
+     }
+ 
+-    wined3d_desc->output = dxgi_output->wined3d_output;
++    wined3d_desc->output = dxgi_output ? dxgi_output->wined3d_output : NULL;
+     wined3d_desc->backbuffer_width = dxgi_desc->Width;
+     wined3d_desc->backbuffer_height = dxgi_desc->Height;
+     wined3d_desc->backbuffer_format = wined3dformat_from_dxgi_format(dxgi_desc->Format);
+     wined3d_desc->backbuffer_count = dxgi_desc->BufferCount;
+-    wined3d_desc->backbuffer_bind_flags = wined3d_bind_flags_from_dxgi_usage(dxgi_desc->BufferUsage);
++    wined3d_desc->backbuffer_bind_flags = wined3d_bind_flags_from_dxgi_usage(dxgi_desc->BufferUsage) | WINED3D_BIND_SHADER_RESOURCE;
+     wined3d_sample_desc_from_dxgi(&wined3d_desc->multisample_type,
+             &wined3d_desc->multisample_quality, &dxgi_desc->SampleDesc);
+     wined3d_desc->device_window = window;
+diff --git a/dlls/win32u/defwnd.c b/dlls/win32u/defwnd.c
+index dc3611a06ab..4491f932adf 100644
+--- a/dlls/win32u/defwnd.c
++++ b/dlls/win32u/defwnd.c
+@@ -2595,7 +2595,18 @@ LRESULT default_window_proc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam,
+         {
+             RECT rect;
+             HDC hdc = (HDC)wparam;
+-            HBRUSH hbr = UlongToHandle( get_class_long( hwnd, GCLP_HBRBACKGROUND, FALSE ));
++            HBRUSH hbr;
++
++            static const WCHAR wine_window_non_topmost_composed[] =
++                {'w','i','n','e','_','w','i','n','d','o','w','_','n','o','n','_','t','o','p','m','o','s','t','_','c','o','m','p','o','s','e','d',0};
++            static const WCHAR wine_window_topmost_composed[] =
++                {'w','i','n','e','_','w','i','n','d','o','w','_','t','o','p','m','o','s','t','_','c','o','m','p','o','s','e','d',0};
++
++            if (NtUserGetProp( hwnd, wine_window_non_topmost_composed ) ||
++                NtUserGetProp( hwnd, wine_window_topmost_composed ))
++                return 1;
++
++            hbr = UlongToHandle( get_class_long( hwnd, GCLP_HBRBACKGROUND, FALSE ));
+             if (!hbr) break;
+ 
+             if (get_class_long( hwnd, GCL_STYLE, FALSE ) & CS_PARENTDC)
+diff --git a/dlls/wined3d/directx.c b/dlls/wined3d/directx.c
+index 85eab01d711..523303c1801 100644
+--- a/dlls/wined3d/directx.c
++++ b/dlls/wined3d/directx.c
+@@ -1529,7 +1529,7 @@ HRESULT CDECL wined3d_output_get_display_mode(const struct wined3d_output *outpu
+     memset(&m, 0, sizeof(m));
+     m.dmSize = sizeof(m);
+ 
+-    EnumDisplaySettingsExW(output->device_name, ENUM_CURRENT_SETTINGS, &m, 0);
++    EnumDisplaySettingsExW(output ? output->device_name : NULL, ENUM_CURRENT_SETTINGS, &m, 0);
+     mode->width = m.dmPelsWidth;
+     mode->height = m.dmPelsHeight;
+     mode->refresh_rate = DEFAULT_REFRESH_RATE;
+@@ -1541,7 +1541,7 @@ HRESULT CDECL wined3d_output_get_display_mode(const struct wined3d_output *outpu
+      * are pretty angry if they SetDisplayMode from 24 to 16 bpp and find out
+      * that GetDisplayMode still returns 24 bpp. This should probably be
+      * handled in winex11 instead. */
+-    if (output->screen_format && output->screen_format != mode->format_id)
++    if (output && output->screen_format && output->screen_format != mode->format_id)
+     {
+         WARN("Overriding format %s with stored format %s.\n",
+                 debug_d3dformat(mode->format_id),
