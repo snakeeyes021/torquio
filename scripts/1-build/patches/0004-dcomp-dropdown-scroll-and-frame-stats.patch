@@ -1,8 +1,30 @@
 diff --git a/dlls/d2d1/device.c b/dlls/d2d1/device.c
-index 5e0688a5822..984cbc9a481 100644
+index 5e0688a5822..0130da9272d 100644
 --- a/dlls/d2d1/device.c
 +++ b/dlls/d2d1/device.c
-@@ -5404,6 +5404,15 @@ static HRESULT WINAPI d2d_device_QueryInterface(ID2D1Device6 *iface, REFIID iid,
+@@ -3278,9 +3278,19 @@ static HRESULT STDMETHODCALLTYPE d2d_device_context_CreateCommandList(ID2D1Devic
+ 
+ static BOOL STDMETHODCALLTYPE d2d_device_context_IsDxgiFormatSupported(ID2D1DeviceContext6 *iface, DXGI_FORMAT format)
+ {
+-    FIXME("iface %p, format %#x stub!\n", iface, format);
++    struct d2d_device_context *context = impl_from_ID2D1DeviceContext(iface);
++    UINT support = 0;
++    HRESULT hr;
+ 
+-    return FALSE;
++    TRACE("iface %p, format %#x.\n", iface, format);
++
++    if (!context->d3d_device)
++        return FALSE;
++
++    if (FAILED(hr = ID3D11Device1_CheckFormatSupport(context->d3d_device, format, &support)))
++        return FALSE;
++
++    return !!(support & D3D11_FORMAT_SUPPORT_RENDER_TARGET);
+ }
+ 
+ static BOOL STDMETHODCALLTYPE d2d_device_context_IsBufferPrecisionSupported(ID2D1DeviceContext6 *iface,
+@@ -5404,6 +5414,15 @@ static HRESULT WINAPI d2d_device_QueryInterface(ID2D1Device6 *iface, REFIID iid,
          FIXME("--- Querying undocumented interface %s -> %p.\n", wine_dbgstr_guid(iid), *out);
          return S_OK;
      }
@@ -79,7 +101,7 @@ index ad41d9d3630..98010c80a79 100644
  HRESULT create_target(struct composition_device *device, HWND hwnd, BOOL topmost, IDCompositionTarget **target);
  HRESULT create_target_from_shared_visual_handle(struct composition_device *device, HANDLE shared_visual_handle, void **new_target);
 diff --git a/dlls/dcomp/device.c b/dlls/dcomp/device.c
-index f1162c644ad..4579869927b 100644
+index f1162c644ad..f2d46decd5f 100644
 --- a/dlls/dcomp/device.c
 +++ b/dlls/dcomp/device.c
 @@ -113,7 +113,9 @@ static ULONG STDMETHODCALLTYPE device_Release(IDCompositionDevice *iface)
@@ -238,24 +260,37 @@ index f1162c644ad..4579869927b 100644
      }
  
      /* Render content */
-@@ -642,10 +693,13 @@ static HRESULT do_composite(const struct composition_target *target, struct comp
+@@ -626,6 +677,8 @@ static HRESULT do_composite(const struct composition_target *target, struct comp
+         {
+             DXGI_SWAP_CHAIN_DESC swapchain_desc;
+             IDXGISwapChain1 *swapchain;
++            UINT present_count = 0;
++            UINT buffer_idx = 0;
+ 
+             hr = IUnknown_QueryInterface(visual->content, &IID_IDXGISwapChain1, (void **)&swapchain);
+             if (FAILED(hr))
+@@ -642,10 +695,17 @@ static HRESULT do_composite(const struct composition_target *target, struct comp
                  return hr;
              }
  
 -            /* The front buffer is the last back buffer because the composition swapchain must
 -                     * be created with DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL */
 -            hr = IDXGISwapChain1_GetBuffer(swapchain, swapchain_desc.BufferCount - 1, &IID_IDXGISurface,
-+            /* In Wine, FLIP_SEQUENTIAL/FLIP_DISCARD rotates back buffer 0 to contain
-+             * the most recently presented frame. */
-+            hr = IDXGISwapChain1_GetBuffer(swapchain, 0, &IID_IDXGISurface,
++
++            if (SUCCEEDED(IDXGISwapChain1_GetLastPresentCount(swapchain, &present_count)) && present_count > 0)
++                buffer_idx = swapchain_desc.BufferCount - 1;
++            else
++                buffer_idx = 0;
++
++            hr = IDXGISwapChain1_GetBuffer(swapchain, buffer_idx, &IID_IDXGISurface,
                                             (void **)&dxgi_surface);
 +            if (FAILED(hr))
-+                hr = IDXGISwapChain1_GetBuffer(swapchain, swapchain_desc.BufferCount - 1, &IID_IDXGISurface,
++                hr = IDXGISwapChain1_GetBuffer(swapchain, 0, &IID_IDXGISurface,
 +                                               (void **)&dxgi_surface);
              IDXGISwapChain1_Release(swapchain);
              if (FAILED(hr))
              {
-@@ -666,6 +720,12 @@ static HRESULT do_composite(const struct composition_target *target, struct comp
+@@ -666,6 +726,12 @@ static HRESULT do_composite(const struct composition_target *target, struct comp
              }
  
              surface_impl = impl_from_IDCompositionSurface(surface);
@@ -268,7 +303,7 @@ index f1162c644ad..4579869927b 100644
              if (IsEqualGUID(&surface_impl->physical_surface_iid, &IID_IDXGISurface))
              {
                  dxgi_surface = (IDXGISurface *)surface_impl->physical_surface;
-@@ -686,13 +746,13 @@ static HRESULT do_composite(const struct composition_target *target, struct comp
+@@ -686,13 +752,13 @@ static HRESULT do_composite(const struct composition_target *target, struct comp
              return E_FAIL;
          }
  
@@ -284,7 +319,7 @@ index f1162c644ad..4579869927b 100644
      }
  
      return S_OK;
-@@ -732,22 +792,18 @@ static DWORD WINAPI composite_thread_proc(void *iface)
+@@ -732,22 +798,18 @@ static DWORD WINAPI composite_thread_proc(void *iface)
                  continue;
  
              visual = impl_from_IDCompositionVisual(target->root);
@@ -312,7 +347,7 @@ index f1162c644ad..4579869927b 100644
  
          Sleep(refresh_period);
      }
-@@ -758,9 +814,10 @@ static DWORD WINAPI composite_thread_proc(void *iface)
+@@ -758,9 +820,10 @@ static DWORD WINAPI composite_thread_proc(void *iface)
  static HRESULT STDMETHODCALLTYPE device_Commit(IDCompositionDevice *iface)
  {
      struct composition_device *device = impl_from_IDCompositionDevice(iface);
@@ -325,7 +360,7 @@ index f1162c644ad..4579869927b 100644
  
      dcomp_lock();
  
-@@ -769,8 +826,7 @@ static HRESULT STDMETHODCALLTYPE device_Commit(IDCompositionDevice *iface)
+@@ -769,8 +832,7 @@ static HRESULT STDMETHODCALLTYPE device_Commit(IDCompositionDevice *iface)
          if (device->thread)
          {
              device->exit_thread = TRUE;
@@ -335,7 +370,7 @@ index f1162c644ad..4579869927b 100644
          }
          device->thread_exited = FALSE;
          device->exit_thread = FALSE;
-@@ -779,20 +835,43 @@ static HRESULT STDMETHODCALLTYPE device_Commit(IDCompositionDevice *iface)
+@@ -779,20 +841,43 @@ static HRESULT STDMETHODCALLTYPE device_Commit(IDCompositionDevice *iface)
  
      dcomp_unlock();
  
@@ -384,7 +419,7 @@ index f1162c644ad..4579869927b 100644
  }
  
  static HRESULT STDMETHODCALLTYPE device_CreateTargetForHwnd(IDCompositionDevice *iface,
-@@ -1026,15 +1105,15 @@ static HRESULT STDMETHODCALLTYPE desktop_device_Commit(IDCompositionDeviceUnknow
+@@ -1026,15 +1111,15 @@ static HRESULT STDMETHODCALLTYPE desktop_device_Commit(IDCompositionDeviceUnknow
  
  static HRESULT STDMETHODCALLTYPE desktop_device_WaitForCommitCompletion(IDCompositionDeviceUnknown *iface)
  {
@@ -1523,7 +1558,7 @@ index fb429731f83..f908f2111ad 100644
      {
          HWND orig = msg->hwnd;
 diff --git a/dlls/win32u/opengl.c b/dlls/win32u/opengl.c
-index 6452ab019ed..0b93c0017d3 100644
+index 6452ab019ed..bf729ff8a8f 100644
 --- a/dlls/win32u/opengl.c
 +++ b/dlls/win32u/opengl.c
 @@ -1721,16 +1721,20 @@ static BOOL win32u_wglSetPixelFormatWINE( HDC hdc, int format )
@@ -1543,10 +1578,10 @@ index 6452ab019ed..0b93c0017d3 100644
      funcs->p_get_pixel_formats( NULL, 0, &total, &onscreen );
 -    if (format < 0 || format > total) return FALSE;
 -    if (format > onscreen) return FALSE;
-+    if (format < 0 || (total && format > total)) return FALSE;
++    if (format < 0) return FALSE;
  
      if (!set_dc_pixel_format_internal( hdc, format, &drawables )) return FALSE;
-+    if (format > onscreen) return TRUE;
++    if (format > onscreen || (total && format > total)) return TRUE;
      if (!(ptr = list_head( &drawables ))) drawable = NULL;
      else drawable = LIST_ENTRY( ptr, struct opengl_drawable, entry );
  
