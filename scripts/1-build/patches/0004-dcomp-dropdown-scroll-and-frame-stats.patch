@@ -1,8 +1,41 @@
 diff --git a/dlls/d2d1/device.c b/dlls/d2d1/device.c
-index 5e0688a5822..09f1f957470 100644
+index 5e0688a5822..da9f0fa860c 100644
 --- a/dlls/d2d1/device.c
 +++ b/dlls/d2d1/device.c
-@@ -3278,9 +3278,24 @@ static HRESULT STDMETHODCALLTYPE d2d_device_context_CreateCommandList(ID2D1Devic
+@@ -2143,6 +2143,9 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawTextLayout(ID2D1DeviceConte
+     struct d2d_draw_text_layout_ctx ctx;
+     HRESULT hr;
+ 
++    FIXME("DrawTextLayout: iface %p, origin (%f, %f), layout %p, brush %p\n",
++          iface, origin.x, origin.y, layout, brush);
++
+     TRACE("iface %p, origin %s, layout %p, brush %p, options %#x.\n",
+             iface, debug_d2d_point_2f(&origin), layout, brush, options);
+ 
+@@ -2481,6 +2484,10 @@ static void d2d_device_context_draw_glyph_run(struct d2d_device_context *context
+     DWRITE_RENDERING_MODE rendering_mode;
+     HRESULT hr;
+ 
++    FIXME("draw_glyph_run: context %p, baseline (%f, %f), glyphCount %u, fontFace %p, emSize %f\n",
++          context, baseline_origin.x, baseline_origin.y, glyph_run ? glyph_run->glyphCount : 0,
++          glyph_run ? glyph_run->fontFace : NULL, glyph_run ? glyph_run->fontEmSize : 0.0f);
++
+     if (FAILED(context->error.code))
+         return;
+ 
+@@ -2808,6 +2815,11 @@ static void STDMETHODCALLTYPE d2d_device_context_PushAxisAlignedClip(ID2D1Device
+     float x_scale, y_scale;
+     D2D1_POINT_2F point;
+ 
++    FIXME("PushAxisAlignedClip iface %p, clip_rect %s, aa %#x, dpi (%.1f, %.1f), transform [%.1f, %.1f, %.1f, %.1f, dx=%.1f, dy=%.1f]\n",
++          iface, debug_d2d_rect_f(clip_rect), antialias_mode, context->desc.dpiX, context->desc.dpiY,
++          context->drawing_state.transform._11, context->drawing_state.transform._12,
++          context->drawing_state.transform._21, context->drawing_state.transform._22,
++          context->drawing_state.transform._31, context->drawing_state.transform._32);
+     TRACE("iface %p, clip_rect %s, antialias_mode %#x.\n", iface, debug_d2d_rect_f(clip_rect), antialias_mode);
+ 
+     if (context->target.type == D2D_TARGET_COMMAND_LIST)
+@@ -3278,9 +3290,24 @@ static HRESULT STDMETHODCALLTYPE d2d_device_context_CreateCommandList(ID2D1Devic
  
  static BOOL STDMETHODCALLTYPE d2d_device_context_IsDxgiFormatSupported(ID2D1DeviceContext6 *iface, DXGI_FORMAT format)
  {
@@ -29,7 +62,7 @@ index 5e0688a5822..09f1f957470 100644
  }
  
  static BOOL STDMETHODCALLTYPE d2d_device_context_IsBufferPrecisionSupported(ID2D1DeviceContext6 *iface,
-@@ -5404,6 +5419,15 @@ static HRESULT WINAPI d2d_device_QueryInterface(ID2D1Device6 *iface, REFIID iid,
+@@ -5404,6 +5431,15 @@ static HRESULT WINAPI d2d_device_QueryInterface(ID2D1Device6 *iface, REFIID iid,
          FIXME("--- Querying undocumented interface %s -> %p.\n", wine_dbgstr_guid(iid), *out);
          return S_OK;
      }
@@ -1540,29 +1573,42 @@ index dc3611a06ab..4491f932adf 100644
  
              if (get_class_long( hwnd, GCL_STYLE, FALSE ) & CS_PARENTDC)
 diff --git a/dlls/win32u/message.c b/dlls/win32u/message.c
-index fb429731f83..8f68377639f 100644
+index fb429731f83..cca99ffae6f 100644
 --- a/dlls/win32u/message.c
 +++ b/dlls/win32u/message.c
-@@ -558,8 +558,17 @@ static inline BOOL is_mouse_message( UINT message )
+@@ -558,8 +558,30 @@ static inline BOOL is_mouse_message( UINT message )
  /* check whether message matches the specified hwnd filter */
  static inline BOOL check_hwnd_filter( const MSG *msg, HWND hwnd_filter )
  {
-+    HWND owner;
++    HWND root, owner;
 +
      if (!hwnd_filter || hwnd_filter == get_desktop_window()) return TRUE;
 -    return (msg->hwnd == hwnd_filter || is_child( hwnd_filter, msg->hwnd ));
 +    if (msg->hwnd == hwnd_filter || is_child( hwnd_filter, msg->hwnd )) return TRUE;
 +
-+    owner = msg->hwnd;
++    root = NtUserGetAncestor( msg->hwnd, GA_ROOT );
++    if (!root) root = msg->hwnd;
++    if (root == hwnd_filter || is_child( hwnd_filter, root )) return TRUE;
++
++    owner = root;
 +    while ((owner = get_window_relative( owner, GW_OWNER )))
 +    {
-+        if (owner == hwnd_filter) return TRUE;
++        if (owner == hwnd_filter || is_child( hwnd_filter, owner )) return TRUE;
 +    }
 +    return FALSE;
++}
++
++static BOOL is_popup_window( HWND hwnd )
++{
++    HWND root;
++    if (!hwnd) return FALSE;
++    root = NtUserGetAncestor( hwnd, GA_ROOT );
++    if (!root) root = hwnd;
++    return !!(get_window_long( root, GWL_STYLE ) & WS_POPUP);
  }
  
  /***********************************************************************
-@@ -2598,16 +2607,26 @@ static BOOL process_mouse_message( MSG *msg, UINT hw_id, ULONG_PTR extra_info, H
+@@ -2598,16 +2620,26 @@ static BOOL process_mouse_message( MSG *msg, UINT hw_id, ULONG_PTR extra_info, H
      MOUSEHOOKSTRUCTEX hook;
      BOOL eat_msg;
      WPARAM wparam;
@@ -1574,7 +1620,7 @@ index fb429731f83..8f68377639f 100644
      NtUserGetGUIThreadInfo( GetCurrentThreadId(), &info );
 -    if (info.hwndCapture)
 +    if ((top = window_from_point( 0, msg->pt, &hittest, TRUE )) && is_current_thread_window( top ) &&
-+        (top == info.hwndCapture || (get_window_long( top, GWL_STYLE ) & WS_POPUP)))
++        (top == info.hwndCapture || is_popup_window( top )))
 +    {
 +        msg->hwnd = top;
 +    }
@@ -1648,7 +1694,7 @@ index 35f73b64497..59553791ca8 100644
              cfg->doubleBuffer = values[9];
              cfg->auxBuffers = values[10];
 diff --git a/dlls/wined3d/context_gl.c b/dlls/wined3d/context_gl.c
-index e5b41ffc783..dd692a29f8a 100644
+index e5b41ffc783..52a6772706f 100644
 --- a/dlls/wined3d/context_gl.c
 +++ b/dlls/wined3d/context_gl.c
 @@ -1170,6 +1170,9 @@ static BOOL wined3d_context_gl_set_pixel_format(struct wined3d_context_gl *conte
@@ -1661,7 +1707,26 @@ index e5b41ffc783..dd692a29f8a 100644
      if (private && context_gl->dc_has_format)
          return TRUE;
  
-@@ -1307,6 +1310,13 @@ static void wined3d_context_gl_update_window(struct wined3d_context_gl *context_
+@@ -1189,9 +1192,16 @@ static BOOL wined3d_context_gl_set_pixel_format(struct wined3d_context_gl *conte
+     {
+         if (!GL_EXTCALL(wglSetPixelFormatWINE(dc, format)))
+         {
+-            ERR("wglSetPixelFormatWINE failed to set pixel format %d on device context %p.\n",
++            WARN("wglSetPixelFormatWINE failed to set pixel format %d on device context %p, attempting fallback.\n",
+                     format, dc);
+-            return FALSE;
++            if (current)
++                return TRUE;
++            if (!SetPixelFormat(dc, format, NULL))
++            {
++                WARN("Failed to set pixel format %d on device context %p, last error %#lx.\n",
++                        format, dc, GetLastError());
++                return FALSE;
++            }
+         }
+         context_gl->internal_format_set = 1;
+     }
+@@ -1307,6 +1317,13 @@ static void wined3d_context_gl_update_window(struct wined3d_context_gl *context_
      context_gl->dc = context_gl->c.swapchain->dc;
      context_gl->dc_is_private = FALSE;
      context_gl->dc_has_format = FALSE;
