@@ -1499,23 +1499,51 @@ index dc3611a06ab..4491f932adf 100644
              if (!hbr) break;
  
              if (get_class_long( hwnd, GCL_STYLE, FALSE ) & CS_PARENTDC)
+diff --git a/dlls/win32u/message.c b/dlls/win32u/message.c
+index fb429731f83..f908f2111ad 100644
+--- a/dlls/win32u/message.c
++++ b/dlls/win32u/message.c
+@@ -2598,6 +2598,7 @@ static BOOL process_mouse_message( MSG *msg, UINT hw_id, ULONG_PTR extra_info, H
+     MOUSEHOOKSTRUCTEX hook;
+     BOOL eat_msg;
+     WPARAM wparam;
++    HWND top;
+ 
+     /* find the window to dispatch this mouse message to */
+ 
+@@ -2608,6 +2609,10 @@ static BOOL process_mouse_message( MSG *msg, UINT hw_id, ULONG_PTR extra_info, H
+         hittest = HTCLIENT;
+         msg->hwnd = info.hwndCapture;
+     }
++    else if ((top = window_from_point( 0, msg->pt, &hittest, TRUE )) && is_current_thread_window( top ))
++    {
++        msg->hwnd = top;
++    }
+     else
+     {
+         HWND orig = msg->hwnd;
 diff --git a/dlls/win32u/opengl.c b/dlls/win32u/opengl.c
-index 6452ab019ed..6a73d4d90ec 100644
+index 6452ab019ed..0b93c0017d3 100644
 --- a/dlls/win32u/opengl.c
 +++ b/dlls/win32u/opengl.c
-@@ -1721,16 +1721,16 @@ static BOOL win32u_wglSetPixelFormatWINE( HDC hdc, int format )
+@@ -1721,16 +1721,20 @@ static BOOL win32u_wglSetPixelFormatWINE( HDC hdc, int format )
      UINT total, onscreen;
      HWND hwnd;
  
 -    if (!(hwnd = NtUserWindowFromDC( hdc )) || !is_cache_dc( hdc )) return FALSE;
-+    if (!(hwnd = NtUserWindowFromDC( hdc ))) return FALSE;
++    if (!(hwnd = NtUserWindowFromDC( hdc )))
++    {
++        if (!set_dc_pixel_format_internal( hdc, format, &drawables )) return FALSE;
++        return TRUE;
++    }
      if (format && get_window_pixel_format( hwnd ) == format) return TRUE;
  
      TRACE( "%p/%p format %d\n", hdc, hwnd, format );
  
      funcs->p_get_pixel_formats( NULL, 0, &total, &onscreen );
-     if (format < 0 || format > total) return FALSE;
+-    if (format < 0 || format > total) return FALSE;
 -    if (format > onscreen) return FALSE;
++    if (format < 0 || (total && format > total)) return FALSE;
  
      if (!set_dc_pixel_format_internal( hdc, format, &drawables )) return FALSE;
 +    if (format > onscreen) return TRUE;
