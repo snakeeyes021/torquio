@@ -1,5 +1,5 @@
 diff --git a/dlls/d2d1/device.c b/dlls/d2d1/device.c
-index 5e0688a5822..da9f0fa860c 100644
+index 5e0688a5822..a7a4ce095bd 100644
 --- a/dlls/d2d1/device.c
 +++ b/dlls/d2d1/device.c
 @@ -2143,6 +2143,9 @@ static void STDMETHODCALLTYPE d2d_device_context_DrawTextLayout(ID2D1DeviceConte
@@ -35,7 +35,17 @@ index 5e0688a5822..da9f0fa860c 100644
      TRACE("iface %p, clip_rect %s, antialias_mode %#x.\n", iface, debug_d2d_rect_f(clip_rect), antialias_mode);
  
      if (context->target.type == D2D_TARGET_COMMAND_LIST)
-@@ -3278,9 +3290,24 @@ static HRESULT STDMETHODCALLTYPE d2d_device_context_CreateCommandList(ID2D1Devic
+@@ -2857,6 +2869,9 @@ static void STDMETHODCALLTYPE d2d_device_context_Clear(ID2D1DeviceContext6 *ifac
+     D2D1_COLOR_F *c;
+     HRESULT hr;
+ 
++    FIXME("d2d Clear: iface %p, color (%f, %f, %f, %f)\n",
++          iface, colour ? colour->r : 0, colour ? colour->g : 0, colour ? colour->b : 0, colour ? colour->a : 0);
++
+     TRACE("iface %p, colour %p.\n", iface, colour);
+ 
+     if (FAILED(context->error.code))
+@@ -3278,9 +3293,24 @@ static HRESULT STDMETHODCALLTYPE d2d_device_context_CreateCommandList(ID2D1Devic
  
  static BOOL STDMETHODCALLTYPE d2d_device_context_IsDxgiFormatSupported(ID2D1DeviceContext6 *iface, DXGI_FORMAT format)
  {
@@ -62,7 +72,7 @@ index 5e0688a5822..da9f0fa860c 100644
  }
  
  static BOOL STDMETHODCALLTYPE d2d_device_context_IsBufferPrecisionSupported(ID2D1DeviceContext6 *iface,
-@@ -5404,6 +5431,15 @@ static HRESULT WINAPI d2d_device_QueryInterface(ID2D1Device6 *iface, REFIID iid,
+@@ -5404,6 +5434,15 @@ static HRESULT WINAPI d2d_device_QueryInterface(ID2D1Device6 *iface, REFIID iid,
          FIXME("--- Querying undocumented interface %s -> %p.\n", wine_dbgstr_guid(iid), *out);
          return S_OK;
      }
@@ -1573,7 +1583,7 @@ index dc3611a06ab..4491f932adf 100644
  
              if (get_class_long( hwnd, GCL_STYLE, FALSE ) & CS_PARENTDC)
 diff --git a/dlls/win32u/message.c b/dlls/win32u/message.c
-index fb429731f83..cca99ffae6f 100644
+index fb429731f83..f5fc6882878 100644
 --- a/dlls/win32u/message.c
 +++ b/dlls/win32u/message.c
 @@ -558,8 +558,30 @@ static inline BOOL is_mouse_message( UINT message )
@@ -1636,6 +1646,31 @@ index fb429731f83..cca99ffae6f 100644
      else
      {
          HWND orig = msg->hwnd;
+@@ -2784,14 +2816,21 @@ static BOOL process_mouse_message( MSG *msg, UINT hw_id, ULONG_PTR extra_info, H
+         }
+         else
+         {
+-            /* coordinates don't get translated while tracking a menu */
+-            /* FIXME: should differentiate popups and top-level menus */
+-            if (!(info.flags & GUI_INMENUMODE))
++            /* coordinates don't get translated while tracking a built-in user32 menu,
++             * but popup windows and application controls always receive client coordinates */
++            if (!(info.flags & GUI_INMENUMODE) || is_popup_window( msg->hwnd ))
+                 screen_to_client( msg->hwnd, &pt );
+         }
+     }
+     msg->lParam = MAKELONG( pt.x, pt.y );
+ 
++    if (msg->message == WM_MOUSEMOVE || msg->message == WM_LBUTTONDOWN || msg->message == WM_LBUTTONUP)
++    {
++        FIXME("mouse_msg: msg=%#x raw_pt=(%d,%d) client_pt=(%d,%d) in_menu=%d is_popup=%d -> hwnd=%p hittest=%d\n",
++              msg->message, msg->pt.x, msg->pt.y, (short)LOWORD(msg->lParam), (short)HIWORD(msg->lParam),
++              !!(info.flags & GUI_INMENUMODE), is_popup_window(msg->hwnd), msg->hwnd, hittest);
++    }
++
+     /* translate double clicks */
+ 
+     if (msg->message == WM_LBUTTONDOWN ||
 diff --git a/dlls/win32u/opengl.c b/dlls/win32u/opengl.c
 index 6452ab019ed..bf729ff8a8f 100644
 --- a/dlls/win32u/opengl.c
@@ -1762,6 +1797,20 @@ index 85eab01d711..523303c1801 100644
      {
          WARN("Overriding format %s with stored format %s.\n",
                  debug_d3dformat(mode->format_id),
+diff --git a/dlls/wined3d/texture.c b/dlls/wined3d/texture.c
+index ef9703f6665..a35a6b2b896 100644
+--- a/dlls/wined3d/texture.c
++++ b/dlls/wined3d/texture.c
+@@ -579,6 +579,9 @@ static void wined3d_texture_destroy_dc(void *object)
+     dc_info->dc = NULL;
+     dc_info->bitmap = NULL;
+ 
++    wined3d_texture_validate_location(texture, sub_resource_idx, WINED3D_LOCATION_SYSMEM);
++    wined3d_texture_invalidate_location(texture, sub_resource_idx, ~WINED3D_LOCATION_SYSMEM);
++
+     wined3d_texture_get_bo_address(texture, sub_resource_idx, &data, texture->resource.map_binding);
+     if (data.buffer_object)
+     {
 diff --git a/dlls/winex11.drv/opengl.c b/dlls/winex11.drv/opengl.c
 index 895d3815e7c..90c12d54c68 100644
 --- a/dlls/winex11.drv/opengl.c

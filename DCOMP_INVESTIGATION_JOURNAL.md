@@ -227,3 +227,62 @@ This journal tracks all experiments, hypotheses, confirmed fixes, and discovered
    - Prefix cleanly rebooted via `wineboot -r`.
    - Unified patch updated at `scripts/1-build/patches/0004-dcomp-dropdown-scroll-and-frame-stats.patch`.
 
+---
+
+## 11. Coordinate Translation & GDI Sysmem Dirtying Fixes (Round 16)
+
+### Round 15 Results & Critical Discoveries
+1. **Zero OpenGL Failures:** The fallback in `wined3d_context_gl_set_pixel_format` completely eliminated the 56 `wglSetPixelFormatWINE failed to set pixel format 81` errors per run.
+2. **D2D Text Diagnostics Findings:**
+   - In Round 15, `PushAxisAlignedClip` logged Dorico clipping down to `(3,2)-(width-3, 13)` (~15px height, matching tooltip dimensions).
+   - However, Dorico executed zero `DrawTextLayout` or `draw_glyph_run` calls on that Direct2D context!
+   - This confirmed Dorico draws tooltip text using GDI DC interoperability (`ID2D1GdiInteropRenderTarget` / `dxgi_surface_GetDC` / `ReleaseDC`).
+
+### Root Cause Analysis & Implementations (Round 16)
+
+1. **Dropdown / Submenu Hover & Click Failure (`dlls/win32u/message.c`):**
+   - **Root Cause:** In Wine's `process_mouse_message` (lines 2806–2820):
+     ```c
+     else
+     {
+         /* coordinates don't get translated while tracking a menu */
+         /* FIXME: should differentiate popups and top-level menus */
+         if (!(info.flags & GUI_INMENUMODE))
+             screen_to_client( msg->hwnd, &pt );
+     }
+     msg->lParam = MAKELONG( pt.x, pt.y );
+     ```
+   - When Dorico opened any dropdown or submenu, `info.flags & GUI_INMENUMODE` was set.
+   - Wine **skipped `screen_to_client(msg->hwnd, &pt)`** and packed raw **SCREEN coordinates** (e.g. `x=1150, y=650`) into `msg->lParam`!
+   - Qt's popup widget expects **client coordinates** (e.g. `0 <= x <= 200, 0 <= y <= 300`).
+   - Because `(1150, 650)` lies completely outside the popup's local geometry, Qt evaluated the cursor as outside all items:
+     - Hover highlights never activated.
+     - Submenu leaves (Leaf 2) never received focus.
+     - Mouse clicks on dropdown items were ignored or misrouted.
+   - **Fix:** In `process_mouse_message`, ensure popups and child controls always undergo coordinate translation:
+     ```c
+     if (!(info.flags & GUI_INMENUMODE) || is_popup_window( msg->hwnd ))
+         screen_to_client( msg->hwnd, &pt );
+     ```
+     Added diagnostic logging showing raw screen coordinates vs converted client coordinates and `is_popup` status.
+
+2. **Tooltip Missing Text / Flat Box Failure (`dlls/wined3d/texture.c`):**
+   - **Root Cause:** When GDI text rendering completes on a DXGI surface, `ReleaseDC` invokes `wined3d_texture_destroy_dc(void *object)`.
+   - While `dxgi_surface_GetDC` properly sets up the GDI sysmem bitmap, `wined3d_texture_destroy_dc` **failed to validate `WINED3D_LOCATION_SYSMEM`** or invalidate `~WINED3D_LOCATION_SYSMEM`.
+   - As a result, WineD3D never marked the texture dirty in sysmem. When DirectComposition subsequently presented the surface or bound it to the visual tree, the GPU never re-uploaded the GDI text rendering from host memory. DirectComposition displayed the initial un-rendered white background.
+   - **Fix:** In `wined3d_texture_destroy_dc`:
+     ```c
+     wined3d_texture_validate_location(texture, sub_resource_idx, WINED3D_LOCATION_SYSMEM);
+     wined3d_texture_invalidate_location(texture, sub_resource_idx, ~WINED3D_LOCATION_SYSMEM);
+     ```
+     This forces WineD3D to mark host sysmem as the authoritative source and invalidates the stale GPU copy so GDI rendered text is re-uploaded to the GPU immediately.
+
+3. **Direct2D `Clear` Instrumentation & C89 Fix (`dlls/d2d1/device.c`):**
+   - Added diagnostic FIXME in `d2d_device_context_Clear` to log clear colors and interface pointers.
+   - Preserved strict C89 declaration order (`-Wdeclaration-after-statement`).
+
+4. **Build, Verification & Deployment:**
+   - Both 64-bit and 32-bit (`wine64` and `wine32`) `win32u.so`, `wined3d.dll`, and `d2d1.dll` recompiled cleanly with zero warnings/errors.
+   - Binaries deployed to `/opt/wine-custom/lib/wine/` (`x86_64-unix`, `i386-unix`, `x86_64-windows`, `i386-windows`) and prefix `system32`.
+   - Wine prefix cleanly rebooted via `wineboot -r`.
+   - Unified patch updated at `scripts/1-build/patches/0004-dcomp-dropdown-scroll-and-frame-stats.patch`.
