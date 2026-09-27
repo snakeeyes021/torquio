@@ -239,6 +239,30 @@ if [ "$CREATE_CONTAINER" = true ]; then
         echo "Please install one of them to use with distrobox."
         exit 1
     fi
+
+    # NTsync kernel module availability check
+    if [ ! -e "/dev/ntsync" ] && modinfo ntsync >/dev/null 2>&1; then
+        echo ""
+        echo -e "${blue}Kernel Fast Sync (NTsync) Detected:${reset}"
+        echo "NTsync is supported by your kernel and can significantly speed up some UI operations in Dorico."
+        if [ "$AUTO_ACCEPT" = true ]; then
+            echo "Auto-accept enabled: Attempting to activate NTsync..."
+            sudo modprobe ntsync 2>/dev/null && echo "ntsync" | sudo tee /etc/modules-load.d/ntsync.conf >/dev/null 2>&1 || true
+        else
+            read -p "Would you like to activate and persist it across reboots? (We ask because it requires sudo) [Y/n]: " ntsync_confirm
+            if [[ -z "$ntsync_confirm" ]] || [[ "$ntsync_confirm" =~ ^[Yy]$ ]]; then
+                echo "Activating NTsync module..."
+                if sudo modprobe ntsync && echo "ntsync" | sudo tee /etc/modules-load.d/ntsync.conf >/dev/null; then
+                    echo -e "${green}NTsync successfully activated and persisted across reboots.${reset}"
+                else
+                    echo -e "${yellow}Could not activate NTsync. Torquio will continue with standard wineserver sync.${reset}"
+                fi
+            else
+                echo -e "${gray}Skipping NTsync activation. Torquio will use standard wineserver sync.${reset}"
+            fi
+        fi
+        echo ""
+    fi
 fi
 
 # 2. Interactive Settings Wizard
