@@ -65,6 +65,20 @@ cd wine-source
 # The below hash comes from the bug-23698-react-native-20251217 branch
 git checkout ae88a705b5aa544cc60153d48c1ca8849f32ee14
 
+# Ensure linux/ntsync.h is present in the build environment so configure detects it
+if [ ! -f /usr/include/linux/ntsync.h ]; then
+    echo "Injecting ntsync.h header for Wine compilation..."
+    sudo mkdir -p /usr/include/linux
+    if [ -f "$SCRIPT_DIR/include/linux/ntsync.h" ]; then
+        sudo cp "$SCRIPT_DIR/include/linux/ntsync.h" /usr/include/linux/ntsync.h
+    elif [ -d /run/host/usr/src ]; then
+        HOST_NTSYNC=$(find /run/host/usr/src -name ntsync.h 2>/dev/null | head -n 1)
+        if [ -n "$HOST_NTSYNC" ]; then
+            sudo cp "$HOST_NTSYNC" /usr/include/linux/ntsync.h
+        fi
+    fi
+fi
+
 echo "Configuring and building..."
 cd ..
 mkdir -p wine32 wine64

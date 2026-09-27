@@ -795,6 +795,15 @@ show_status() {
     else
         echo -e "  - Wine Prefix: ${red}Not Initialized${reset} (Run installation to create)"
     fi
+    
+    # Check ntsync availability
+    local ntsync_status="${gray}Disabled (wineserver fallback)${reset}"
+    if [ -e "/dev/ntsync" ]; then
+        ntsync_status="${green}Available (/dev/ntsync active)${reset}"
+    elif [ -c "/run/host/dev/ntsync" ]; then
+        ntsync_status="${green}Available (/run/host/dev/ntsync active)${reset}"
+    fi
+    echo -e "  - Kernel Fast Sync (ntsync):   $ntsync_status"
     echo ""
     
     # 3. Active Preferences Profile
