@@ -403,3 +403,43 @@ A comprehensive trace of the 16,793-line `/var/home/matt/.local/share/torquio/do
    - Deployed to `/opt/wine-custom/lib/wine/` and prefix `system32`/`syswow64`.
    - Updated unified patch at `scripts/1-build/patches/0004-dcomp-dropdown-scroll-and-frame-stats.patch`.
    - Cleanly updated Wine prefix with `wineboot -u`.
+
+---
+
+## 15. Round 19 Telemetry Analysis & Win32 Menu Coordinate Correction (Round 20)
+
+### Telemetry Findings from Round 19 Log Analysis (`torquio_dorico_2026-09-27_22-15-38.log` & `22-18-25.log`)
+
+1. **DirectComposition Event-Driven Dirty Tracking Succeeded:**
+   - On dropdown creation (`0x400e8`), `do_composite` blitted initial frames at `present_count 1` and `present_count 2`.
+   - Once open, as mouse events moved over `0x400e8` (`client_pt=(90,5)` down to `(78,1)`), `do_composite` was not invoked a single time. DirectComposition successfully stopped blitting stale frames over the window.
+
+2. **Root Cause of Item 7 Regression (Top Bar Pulldowns Not Updating on Hover):**
+   - The dropdown menus in the instrument window top bar are standard Win32 popup menus (`#32768` class, e.g. `hwnd=0x2012c` in log 1 and `hwnd=0x301f0` in log 2) tracked by Wine's built-in `MENU_TrackMenu` (`info.flags & GUI_INMENUMODE` = 1, `in_menu=1`).
+   - In `process_mouse_message` (`dlls/win32u/message.c`), the check `if (!(info.flags & GUI_INMENUMODE) || is_popup_window(msg->hwnd))` evaluated `is_popup_window` as TRUE because `0x2012c` is a `WS_POPUP` window.
+   - This forcibly converted `msg->lParam` to client coordinates (`client_pt=(16,-10)` in log 1, `(39,20)` in log 2).
+   - However, Wine's internal menu tracking loop in `dlls/win32u/menu.c` explicitly requires `msg->lParam` to be in **SCREEN coordinates**:
+     ```c
+     mt.pt.x = (short)LOWORD( msg.lParam );
+     mt.pt.y = (short)HIWORD( msg.lParam );
+     hmenu = menu_from_point( mt.hTopMenu, mt.pt );
+     ```
+   - Because `lParam` was overwritten with client coordinates, `menu_from_point` evaluated coordinates near (0, 0) on the entire screen, returning `hmenu = NULL`. Thus, `menu_mouse_move` never updated the selected/highlighted item during hover.
+   - Qt dropdowns (`0x400e8`, etc.) never run under `GUI_INMENUMODE` (`in_menu=0` across all logs). Wine's standard `!(info.flags & GUI_INMENUMODE)` was already translating client coordinates for Qt dropdowns without `is_popup_window`.
+
+3. **Instrument Window Header Initial Draw Flash:**
+   - In Round 19, `create_surface` and `create_virtual_surface` fell back to `DXGI_ALPHA_MODE_PREMULTIPLIED` when `DXGI_ALPHA_MODE_UNSPECIFIED` was passed.
+   - Target `0x200cc` (the instrument window) was created and `device_Commit` was called before the first Direct2D draw finished (`dst_before=0x00000000`).
+   - With premultiplied alpha on an uninitialized texture, alpha = 0 is fully transparent, causing `BitBlt` to temporarily flash the desktop/background through the top bar area until Direct2D finished drawing (`dst_after=0xff242629`).
+   - Reverting the fallback alpha mode to `DXGI_ALPHA_MODE_IGNORE` ensures the surface defaults to opaque and eliminates the transparent flash.
+
+### Fixes Applied in Round 20
+1. **`dlls/win32u/message.c`:**
+   - Restored standard menu tracking check `if (!(info.flags & GUI_INMENUMODE))` so `lParam` retains screen coordinates during `GUI_INMENUMODE`, fully restoring item hover updates in standard Win32 pulldown menus.
+2. **`dlls/dcomp/surface.c`:**
+   - Reverted `DXGI_ALPHA_MODE_UNSPECIFIED` fallback to `DXGI_ALPHA_MODE_IGNORE` in both `create_surface` and `create_virtual_surface` to prevent transparent initialization flicker.
+3. **Build & Deployment:**
+   - Recompiled both 64-bit and 32-bit (`wine64` and `wine32`) `win32u.so` and `dcomp.dll` cleanly in `torquio-env` with zero warnings.
+   - Deployed to `/opt/wine-custom/lib/wine/` and prefix `system32`/`syswow64`.
+   - Updated unified patch at `scripts/1-build/patches/0004-dcomp-dropdown-scroll-and-frame-stats.patch`.
+

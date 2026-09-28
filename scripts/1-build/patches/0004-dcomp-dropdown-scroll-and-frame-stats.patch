@@ -625,7 +625,7 @@ index f1162c644ad..a35c67c0184 100644
      device->IDCompositionDeviceUnknown_iface.lpVtbl = &desktop_device_vtbl;
      device->version = version;
 diff --git a/dlls/dcomp/surface.c b/dlls/dcomp/surface.c
-index 74f5131afe9..8e132c02ccc 100644
+index 74f5131afe9..bb0bd47303a 100644
 --- a/dlls/dcomp/surface.c
 +++ b/dlls/dcomp/surface.c
 @@ -28,6 +28,8 @@ WINE_DEFAULT_DEBUG_CHANNEL(dcomp);
@@ -1142,13 +1142,7 @@ index 74f5131afe9..8e132c02ccc 100644
      HRESULT hr;
  
      if (!width || !height)
-@@ -1051,12 +1353,13 @@ HRESULT create_surface(struct composition_surface_factory *factory, UINT width,
-         return E_INVALIDARG;
- 
-     if (alpha_mode == DXGI_ALPHA_MODE_UNSPECIFIED)
--        alpha_mode = DXGI_ALPHA_MODE_IGNORE;
-+        alpha_mode = DXGI_ALPHA_MODE_PREMULTIPLIED;
- 
+@@ -1056,7 +1358,8 @@ HRESULT create_surface(struct composition_surface_factory *factory, UINT width,
      if (alpha_mode != DXGI_ALPHA_MODE_PREMULTIPLIED && alpha_mode != DXGI_ALPHA_MODE_IGNORE)
          return E_INVALIDARG;
  
@@ -1214,7 +1208,7 @@ index 74f5131afe9..8e132c02ccc 100644
 +        return E_INVALIDARG;
 +
 +    if (alpha_mode == DXGI_ALPHA_MODE_UNSPECIFIED)
-+        alpha_mode = DXGI_ALPHA_MODE_PREMULTIPLIED;
++        alpha_mode = DXGI_ALPHA_MODE_IGNORE;
 +
 +    if (alpha_mode != DXGI_ALPHA_MODE_PREMULTIPLIED && alpha_mode != DXGI_ALPHA_MODE_IGNORE)
 +        return E_INVALIDARG;
@@ -1793,7 +1787,7 @@ index 2319cb5cc6a..f4f112122d4 100644
             info->cbSize, info->dwFlags, info->hwndTrack, info->dwHoverTime );
  
 diff --git a/dlls/win32u/message.c b/dlls/win32u/message.c
-index fb429731f83..2fb1344211e 100644
+index fb429731f83..f4ba3d056c2 100644
 --- a/dlls/win32u/message.c
 +++ b/dlls/win32u/message.c
 @@ -558,8 +558,32 @@ static inline BOOL is_mouse_message( UINT message )
@@ -1849,16 +1843,14 @@ index fb429731f83..2fb1344211e 100644
      else
      {
          HWND orig = msg->hwnd;
-@@ -2784,14 +2813,21 @@ static BOOL process_mouse_message( MSG *msg, UINT hw_id, ULONG_PTR extra_info, H
+@@ -2784,14 +2813,20 @@ static BOOL process_mouse_message( MSG *msg, UINT hw_id, ULONG_PTR extra_info, H
          }
          else
          {
 -            /* coordinates don't get translated while tracking a menu */
 -            /* FIXME: should differentiate popups and top-level menus */
--            if (!(info.flags & GUI_INMENUMODE))
-+            /* coordinates don't get translated while tracking a built-in user32 menu,
-+             * but popup windows and application controls always receive client coordinates */
-+            if (!(info.flags & GUI_INMENUMODE) || is_popup_window( msg->hwnd ))
++            /* coordinates don't get translated while tracking a built-in user32 menu */
+             if (!(info.flags & GUI_INMENUMODE))
                  screen_to_client( msg->hwnd, &pt );
          }
      }
