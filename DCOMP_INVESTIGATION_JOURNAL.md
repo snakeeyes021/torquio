@@ -350,3 +350,56 @@ Analysis of `/var/home/matt/.local/share/torquio/dorico_wine.log` revealed criti
    - Both 64-bit and 32-bit (`wine64` and `wine32`) `dcomp.dll` and `win32u.so` recompiled cleanly with zero warnings/errors.
    - Binaries deployed to `/opt/wine-custom/lib/wine/` and prefix updated.
    - Unified patch updated at `scripts/1-build/patches/0004-dcomp-dropdown-scroll-and-frame-stats.patch`.
+
+---
+
+## 14. Round 18 Telemetry Analysis & DirectComposition Non-Destructive Dirty Tracking (Round 19)
+
+### Telemetry Findings from Round 18 Log Analysis
+A comprehensive trace of the 16,793-line `/var/home/matt/.local/share/torquio/dorico_wine.log` from Round 18 resolved the mystery of why dropdowns, checkboxes, scrolls, and nested trees freeze on hover despite perfect mouse coordinate routing:
+
+1. **Qt Uses GDI `BitBlt` for Widget Repaints, NOT Swapchain Presents:**
+   - Dorico's UI widgets (menus, dropdowns, combo boxes, checkboxes, scrollbars) are standard QtWidgets managed by `qwindows.dll`.
+   - When a dropdown window (e.g., `0x6009E`) opens, Steinberg's `graphics2d.dll` initializes a DirectComposition target and swapchain (`0x4C266ED0`), presenting frames 0 and 1 to draw the initial static background.
+   - Once open, Qt's internal `QBackingStore` handles mouse hover highlights, checkbox toggles, selection changes, and scrollbar movement by directly painting dirty rectangles to the window device context via GDI (`GetDC` / `BitBlt` / `ReleaseDC`).
+   - During the 121 `WM_MOUSEMOVE` events logged to `0x6009E`, Dorico called `IDXGISwapChain::Present()` **zero times** (`present_count` remained static at 2).
+
+2. **The 60 FPS Compositor Blit Stomp:**
+   - In upstream Wine's `dlls/dcomp/device.c`, `composite_thread_proc` ran an unconditional, periodic 60 Hz loop:
+     ```c
+     while (TRUE) {
+         LIST_FOR_EACH_ENTRY(target, &device->targets, ...)
+             do_composite(target, visual, 0, 0); // calls BitBlt(dst_dc, ..., src_dc, ..., SRCCOPY)
+         Sleep(refresh_period); // 16ms
+     }
+     ```
+   - Every 16 milliseconds, `do_composite_dxgi_surface` fetched buffer 0 of the swapchain (containing only the static initial image) and executed `BitBlt(dst_dc, 0, 0, width, height, src_dc, 0, 0, SRCCOPY)` over the entire target window.
+   - **Consequently, whenever Qt painted a hover highlight, toggled a checkbox, or scrolled content via GDI, the background DirectComposition thread wiped it out within 0–16 milliseconds with the stale buffer 0.**
+
+3. **Nested Tree Menus (Leaf 1 vs Leaf 2 Collision):**
+   - Targets `0x2013E` (Leaf 1) and `0x3013E` (Leaf 2) shared the same device. The unconditional 60 FPS loop continuously blitted `0x24EDFDC0` into `0x3013E` while the mouse was moving over it, completely suppressing Qt's hover rendering on Leaf 2.
+
+4. **Surface Alpha Transparency in Virtual Surfaces:**
+   - In `dlls/dcomp/surface.c`, `create_virtual_surface` fell back to `DXGI_ALPHA_MODE_IGNORE` when `DXGI_ALPHA_MODE_UNSPECIFIED` was passed. In Direct2D, `ALPHA_MODE_IGNORE` forces transparent clears (`Clear(1, 1, 1, 0)`) to opaque white (`0xffffffff`), causing transient surfaces (tooltips) to lose alpha blending.
+
+### Architecture Fixes Applied in Round 19
+1. **Target-Level Dirty State & Swapchain Monotonic Tracking:**
+   - Added `BOOL is_dirty;` and `UINT last_present_count;` to `struct composition_target` in `dlls/dcomp/dcomp_private.h`.
+   - Initialized `is_dirty = TRUE; last_present_count = 0;` on target creation and `target_SetRoot`.
+   - In `device_Commit`, all targets on the committing device are marked `is_dirty = TRUE;`.
+   - Added `target_check_swapchain_dirty()` to detect whether any swapchain in the visual tree has presented a new frame (`present_count != target->last_present_count`).
+
+2. **Non-Destructive Composite Execution in `composite_thread_proc`:**
+   - Modified `composite_thread_proc` in `dlls/dcomp/device.c` to only execute `do_composite` when `target->is_dirty || swapchain_dirty` is true.
+   - After a composite pass, resets `target->is_dirty = FALSE;` and records `target->last_present_count = new_present_count;`.
+   - When no visual tree commit or swapchain present has occurred, DirectComposition does **not** touch the window DC, allowing Qt's GDI backingstore painting (hover highlights, checkbox ticks, scroll positions) to persist undisturbed.
+   - Replaced passive `Sleep(refresh_period)` with an event-driven `WaitForSingleObject(device->commit_event, refresh_period)`, ensuring transactional visual changes and transient windows composite immediately (< 1ms) rather than waiting out a sleep interval.
+
+3. **Preserve Premultiplied Alpha on Unspecified Mode:**
+   - In `dlls/dcomp/surface.c`, changed `DXGI_ALPHA_MODE_UNSPECIFIED` fallback to `DXGI_ALPHA_MODE_PREMULTIPLIED` for both `create_surface` and `create_virtual_surface`.
+
+4. **Build & Deployment:**
+   - Recompiled both 64-bit and 32-bit `dcomp.dll` cleanly in `torquio-env` with zero warnings.
+   - Deployed to `/opt/wine-custom/lib/wine/` and prefix `system32`/`syswow64`.
+   - Updated unified patch at `scripts/1-build/patches/0004-dcomp-dropdown-scroll-and-frame-stats.patch`.
+   - Cleanly updated Wine prefix with `wineboot -u`.
