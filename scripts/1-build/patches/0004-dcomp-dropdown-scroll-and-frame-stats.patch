@@ -149,7 +149,7 @@ index ad41d9d3630..98010c80a79 100644
  HRESULT create_target(struct composition_device *device, HWND hwnd, BOOL topmost, IDCompositionTarget **target);
  HRESULT create_target_from_shared_visual_handle(struct composition_device *device, HANDLE shared_visual_handle, void **new_target);
 diff --git a/dlls/dcomp/device.c b/dlls/dcomp/device.c
-index f1162c644ad..978be1da23a 100644
+index f1162c644ad..95b976daed6 100644
 --- a/dlls/dcomp/device.c
 +++ b/dlls/dcomp/device.c
 @@ -113,7 +113,9 @@ static ULONG STDMETHODCALLTYPE device_Release(IDCompositionDevice *iface)
@@ -325,8 +325,8 @@ index f1162c644ad..978be1da23a 100644
 -                     * be created with DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL */
 -            hr = IDXGISwapChain1_GetBuffer(swapchain, swapchain_desc.BufferCount - 1, &IID_IDXGISurface,
 +
-+            if (SUCCEEDED(IDXGISwapChain1_GetLastPresentCount(swapchain, &present_count)) && present_count > 0)
-+                buffer_idx = swapchain_desc.BufferCount - 1;
++            if (SUCCEEDED(IDXGISwapChain1_GetLastPresentCount(swapchain, &present_count)))
++                buffer_idx = 0;
 +            else
 +                buffer_idx = 0;
 +
@@ -1627,10 +1627,10 @@ index 2319cb5cc6a..f4f112122d4 100644
             info->cbSize, info->dwFlags, info->hwndTrack, info->dwHoverTime );
  
 diff --git a/dlls/win32u/message.c b/dlls/win32u/message.c
-index fb429731f83..f5fc6882878 100644
+index fb429731f83..2fb1344211e 100644
 --- a/dlls/win32u/message.c
 +++ b/dlls/win32u/message.c
-@@ -558,8 +558,30 @@ static inline BOOL is_mouse_message( UINT message )
+@@ -558,8 +558,32 @@ static inline BOOL is_mouse_message( UINT message )
  /* check whether message matches the specified hwnd filter */
  static inline BOOL check_hwnd_filter( const MSG *msg, HWND hwnd_filter )
  {
@@ -1658,11 +1658,13 @@ index fb429731f83..f5fc6882878 100644
 +    if (!hwnd) return FALSE;
 +    root = NtUserGetAncestor( hwnd, GA_ROOT );
 +    if (!root) root = hwnd;
-+    return !!(get_window_long( root, GWL_STYLE ) & WS_POPUP);
++    return !!(get_window_long( root, GWL_STYLE ) & WS_POPUP) &&
++           (get_window_relative( root, GW_OWNER ) != NULL ||
++            !(get_window_long( root, GWL_STYLE ) & (WS_MINIMIZEBOX | WS_MAXIMIZEBOX)));
  }
  
  /***********************************************************************
-@@ -2598,16 +2620,26 @@ static BOOL process_mouse_message( MSG *msg, UINT hw_id, ULONG_PTR extra_info, H
+@@ -2598,6 +2622,7 @@ static BOOL process_mouse_message( MSG *msg, UINT hw_id, ULONG_PTR extra_info, H
      MOUSEHOOKSTRUCTEX hook;
      BOOL eat_msg;
      WPARAM wparam;
@@ -1670,27 +1672,18 @@ index fb429731f83..f5fc6882878 100644
  
      /* find the window to dispatch this mouse message to */
  
-     info.cbSize = sizeof(info);
-     NtUserGetGUIThreadInfo( GetCurrentThreadId(), &info );
--    if (info.hwndCapture)
-+    if ((top = window_from_point( 0, msg->pt, &hittest, TRUE )) && is_current_thread_window( top ) &&
-+        (top == info.hwndCapture || is_popup_window( top )))
-+    {
-+        msg->hwnd = top;
-+    }
-+    else if (info.hwndCapture)
-     {
+@@ -2608,6 +2633,10 @@ static BOOL process_mouse_message( MSG *msg, UINT hw_id, ULONG_PTR extra_info, H
          hittest = HTCLIENT;
          msg->hwnd = info.hwndCapture;
      }
-+    else if (top && is_current_thread_window( top ))
++    else if ((top = window_from_point( 0, msg->pt, &hittest, TRUE )) && is_current_thread_window( top ))
 +    {
 +        msg->hwnd = top;
 +    }
      else
      {
          HWND orig = msg->hwnd;
-@@ -2784,14 +2816,21 @@ static BOOL process_mouse_message( MSG *msg, UINT hw_id, ULONG_PTR extra_info, H
+@@ -2784,14 +2813,21 @@ static BOOL process_mouse_message( MSG *msg, UINT hw_id, ULONG_PTR extra_info, H
          }
          else
          {
