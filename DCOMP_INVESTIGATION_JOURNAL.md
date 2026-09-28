@@ -310,4 +310,43 @@ Following Round 16's telemetry proving mouse events reach the popup window handl
    - Both 64-bit and 32-bit (`wine64` and `wine32`) `win32u.so`, `dxgi.dll`, and `dcomp.dll` recompiled cleanly.
    - Installed to `/opt/wine-custom/lib/wine/` and prefix `system32`.
    - Wine prefix cleanly rebooted via `wineboot -r`.
+
+---
+
+## 13. Round 17 Telemetry Analysis & DirectComposition Buffer Alignment Fix (Round 18)
+
+### Telemetry Findings from Round 17 Log Analysis
+Analysis of `/var/home/matt/.local/share/torquio/dorico_wine.log` revealed critical insights across the rendering and presentation pipelines:
+
+1. **DirectComposition Compositor Loop is Fully Active:**
+   - `composite_thread_proc` runs continuously every 16ms (60 FPS), calling `do_composite` and blitting surfaces onto target window handles.
+
+2. **The Buffer Mismatch Defect in `do_composite` (`dlls/dcomp/device.c`):**
+   - In Direct3D 11 under Wine, windowless/DirectComposition swapchains use WineD3D's GDI/D3D11 presentation path (`swapchain_blit_gdi`), which maintains back buffer 0 as the active rendered surface and does **not** rotate texture handles.
+   - Qt's Direct3D 11 backend creates its primary render target view on `GetBuffer(0)` and renders into buffer 0.
+   - However, in `dlls/dcomp/device.c`, `do_composite` had hardcoded logic:
+     ```c
+     if (SUCCEEDED(IDXGISwapChain1_GetLastPresentCount(swapchain, &present_count)) && present_count > 0)
+         buffer_idx = swapchain_desc.BufferCount - 1;
+     else
+         buffer_idx = 0;
+     ```
+   - For any 2-buffer swapchain once `present_count > 0`, `buffer_idx` was hardcoded to `2 - 1 = 1`.
+   - As a result, DirectComposition was blitting **buffer 1** repeatedly at 60 FPS, while Qt was rendering every new frame into **buffer 0**.
+   - This directly explains why tooltips (which called `Present` 30 times in thread 0674) and dropdowns displayed only the static/initial flat background, with all subsequent text and hover updates frozen.
+
+3. **Window Classification & Mouse Capture in `process_mouse_message` (`dlls/win32u/message.c`):**
+   - Dorico's main window (`0x10192`) was created with `WS_POPUP | WS_THICKFRAME` (custom dark titlebar), causing `is_popup_window` to classify it as a popup.
+   - Overriding `info.hwndCapture` in `process_mouse_message` when `is_popup_window(top)` was true broke Win32 mouse capture semantics whenever the mouse cursor moved near the main window.
+   - Refined `is_popup_window` to require `GW_OWNER != NULL` or the absence of `WS_MINIMIZEBOX | WS_MAXIMIZEBOX`, correctly distinguishing transient popups/menus/tooltips from main application windows.
+   - Restored standard mouse capture priority (`if (info.hwndCapture) msg->hwnd = info.hwndCapture`).
+
+### Fixes Applied in Round 18
+1. **`dlls/dcomp/device.c`:**
+   - Explicitly sample `buffer_idx = 0` in `do_composite` so DirectComposition blits the active rendered surface from Direct3D 11.
+2. **`dlls/win32u/message.c`:**
+   - Corrected `is_popup_window` filtering and restored proper `info.hwndCapture` routing.
+3. **Build & Deployment:**
+   - Both 64-bit and 32-bit (`wine64` and `wine32`) `dcomp.dll` and `win32u.so` recompiled cleanly with zero warnings/errors.
+   - Binaries deployed to `/opt/wine-custom/lib/wine/` and prefix updated.
    - Unified patch updated at `scripts/1-build/patches/0004-dcomp-dropdown-scroll-and-frame-stats.patch`.
