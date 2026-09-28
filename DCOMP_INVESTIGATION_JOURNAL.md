@@ -443,3 +443,54 @@ A comprehensive trace of the 16,793-line `/var/home/matt/.local/share/torquio/do
    - Deployed to `/opt/wine-custom/lib/wine/` and prefix `system32`/`syswow64`.
    - Updated unified patch at `scripts/1-build/patches/0004-dcomp-dropdown-scroll-and-frame-stats.patch`.
 
+---
+
+## 16. Round 20 Telemetry Analysis & Swapchain Front-Buffer Sampling Correction (Round 21)
+
+### Test Results from Round 20
+- **Item 7 (Play mode instrument window in general):** **Regression completely fixed!** The system-style grey pulldown menu mouseover highlighting works reliably. The only minor observation was that when opening the instrument window, the top bar content area was briefly blank white before the rendered controls appeared.
+- **Items 1–5 (Dropdowns - single, checkbox, multi-item, scroll, nested tree):** No change; Behavior #3 persists. Content displays on initial open, but mouseovers and interactions do not update the visual display. In item 4 (scroll dropdown), initial draw shows a thin white rectangle at the top where a scroller chevron would be. In item 5 (nested tree), leaf 2 is displayed but mouse interactions act as if leaf 1 is under cursor.
+- **Item 6 (Tooltips):** Tooltips display background but no text glyphs, appearing flatter than expected.
+
+### Telemetry & Root Cause Breakthrough from Round 20 Log (`torquio_dorico_2026-09-27_23-46-41.log`)
+
+1. **Root Cause of Item 7 Top-Bar Initial Blank White Delay:**
+   - On instrument window creation (`hwnd=0x40110`), `create_target` creates target `0x074c4f80` with virtual surface `0x39cd3020`.
+   - `target_SetRoot` and `device_Commit` initialized `target->is_dirty = TRUE;`.
+   - The composition thread woke immediately on `device->commit_event` and executed `do_composite` at line 3617.
+   - However, Direct2D had not yet begun drawing (`surface_BeginDraw` was called at line 3623 and `surface_EndDraw` finished at line 3699).
+   - Because fallback alpha mode was `DXGI_ALPHA_MODE_IGNORE` (opaque), `BitBlt` blitted the uninitialized (0x00000000 / blank white) surface buffer to the window DC.
+   - Direct2D drawing completed 80ms later and committed, replacing the white rectangle with the drawn controls.
+   - **Resolution:** Surfaces must never composite until their initial `surface_EndDraw` has executed. Added `draw_count` tracking to `struct composition_surface`. If `surface_impl->draw_count == 0`, `do_composite` skips blitting and returns `S_OK`. Upon completion of `surface_EndDraw`, device targets are marked dirty and `device->commit_event` is signaled, compositing the fully rendered controls immediately with zero blank white flash.
+
+2. **Root Cause of Item 6 (Tooltips Lacking Text) and Items 1–5 (Stale Dropdown Frames):**
+   - In commit `b598505`, `buffer_idx = 0;` was hardcoded in `do_composite`:
+     ```c
+     if (SUCCEEDED(IDXGISwapChain1_GetLastPresentCount(swapchain, &present_count)))
+         buffer_idx = 0;
+     ```
+   - In Wine's D3D11 swapchain implementation (`dlls/wined3d/swapchain.c`):
+     - When `wined3d_swapchain_present` executes, `wined3d_swapchain_gl_rotate` rotates `back_buffers[0]` into `back_buffers[desc.backbuffer_count - 1]`!
+     - In double-buffered composition swapchains (`BufferCount == 2`), `back_buffers[1]` (`swapchain_desc.BufferCount - 1`) **always contains the most recently presented frame**.
+     - `back_buffers[0]` becomes the scratch back buffer for the *next* frame!
+   - By hardcoding `buffer_idx = 0`, DirectComposition was **always reading the scratch back buffer**, completely ignoring the presented frame in buffer 1!
+   - **Effect on Tooltips (Item 6):** Tooltips present exactly two frames: frame 0 (background shape) and frame 1 (text glyphs on background). At `present_count = 2`, the text frame was in buffer 1, but `do_composite` sampled buffer 0 (the empty background without text), rendering a flat box devoid of glyphs!
+   - **Effect on Dropdowns (Items 1–5):** Subsequent frames (scroller chevrons, hover states, submenus) presented to the swapchain rotated into buffer 1, but DirectComposition continuously sampled buffer 0, causing the visual display to appear frozen at the initial un-hovered frame.
+   - **Premature Composition at `present_count == 0`:** When dropdown `0x500e6` was created, `target->is_dirty = TRUE` triggered `do_composite` when `present_count == 0`, blitting an uninitialized buffer before Dorico even presented frame 1.
+
+### Fixes Applied in Round 21
+1. **`dlls/dcomp/device.c`:**
+   - In `do_composite`, if `present_count == 0`, the swapchain has not presented any frames yet; skip compositing and return `S_OK`.
+   - When `present_count > 0`, set `buffer_idx = swapchain_desc.BufferCount - 1;` so DirectComposition samples the true front buffer containing the newly presented frame.
+   - In `target_check_swapchain_dirty`, require `present_count > 0 && present_count != target->last_present_count`.
+   - For `IDCompositionSurface`, check `if (surface_impl->draw_count == 0) return S_OK;`.
+2. **`dlls/dcomp/dcomp_private.h` & `surface.c`:**
+   - Added `UINT draw_count;` to `struct composition_surface`.
+   - In `surface_EndDraw`, increment `surface->draw_count++`. If `surface->factory`, mark all device targets `is_dirty = TRUE;` and signal `device->commit_event`.
+3. **Build & Deployment:**
+   - Recompiled both 64-bit and 32-bit (`wine64` and `wine32`) `dcomp.dll` cleanly with zero warnings/errors.
+   - Deployed binaries to `/opt/wine-custom/lib/wine/` and prefix `system32`/`syswow64`.
+   - Updated unified patch at `scripts/1-build/patches/0004-dcomp-dropdown-scroll-and-frame-stats.patch`.
+   - Updated Wine prefix configurations via `wineboot -u`.
+
+
