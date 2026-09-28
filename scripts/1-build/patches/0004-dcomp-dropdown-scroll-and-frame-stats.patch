@@ -149,7 +149,7 @@ index ad41d9d3630..98010c80a79 100644
  HRESULT create_target(struct composition_device *device, HWND hwnd, BOOL topmost, IDCompositionTarget **target);
  HRESULT create_target_from_shared_visual_handle(struct composition_device *device, HANDLE shared_visual_handle, void **new_target);
 diff --git a/dlls/dcomp/device.c b/dlls/dcomp/device.c
-index f1162c644ad..f2d46decd5f 100644
+index f1162c644ad..978be1da23a 100644
 --- a/dlls/dcomp/device.c
 +++ b/dlls/dcomp/device.c
 @@ -113,7 +113,9 @@ static ULONG STDMETHODCALLTYPE device_Release(IDCompositionDevice *iface)
@@ -317,7 +317,7 @@ index f1162c644ad..f2d46decd5f 100644
  
              hr = IUnknown_QueryInterface(visual->content, &IID_IDXGISwapChain1, (void **)&swapchain);
              if (FAILED(hr))
-@@ -642,10 +695,17 @@ static HRESULT do_composite(const struct composition_target *target, struct comp
+@@ -642,10 +695,20 @@ static HRESULT do_composite(const struct composition_target *target, struct comp
                  return hr;
              }
  
@@ -330,6 +330,9 @@ index f1162c644ad..f2d46decd5f 100644
 +            else
 +                buffer_idx = 0;
 +
++            FIXME("do_composite: target %p (hwnd %p), swapchain %p, present_count %u, buffer_idx %u/%u\n",
++                  target, target->hwnd, swapchain, present_count, buffer_idx, swapchain_desc.BufferCount);
++
 +            hr = IDXGISwapChain1_GetBuffer(swapchain, buffer_idx, &IID_IDXGISurface,
                                             (void **)&dxgi_surface);
 +            if (FAILED(hr))
@@ -338,7 +341,7 @@ index f1162c644ad..f2d46decd5f 100644
              IDXGISwapChain1_Release(swapchain);
              if (FAILED(hr))
              {
-@@ -666,6 +726,12 @@ static HRESULT do_composite(const struct composition_target *target, struct comp
+@@ -666,6 +729,12 @@ static HRESULT do_composite(const struct composition_target *target, struct comp
              }
  
              surface_impl = impl_from_IDCompositionSurface(surface);
@@ -351,7 +354,7 @@ index f1162c644ad..f2d46decd5f 100644
              if (IsEqualGUID(&surface_impl->physical_surface_iid, &IID_IDXGISurface))
              {
                  dxgi_surface = (IDXGISurface *)surface_impl->physical_surface;
-@@ -686,13 +752,13 @@ static HRESULT do_composite(const struct composition_target *target, struct comp
+@@ -686,13 +755,13 @@ static HRESULT do_composite(const struct composition_target *target, struct comp
              return E_FAIL;
          }
  
@@ -367,7 +370,7 @@ index f1162c644ad..f2d46decd5f 100644
      }
  
      return S_OK;
-@@ -732,22 +798,18 @@ static DWORD WINAPI composite_thread_proc(void *iface)
+@@ -732,22 +801,18 @@ static DWORD WINAPI composite_thread_proc(void *iface)
                  continue;
  
              visual = impl_from_IDCompositionVisual(target->root);
@@ -395,7 +398,7 @@ index f1162c644ad..f2d46decd5f 100644
  
          Sleep(refresh_period);
      }
-@@ -758,9 +820,10 @@ static DWORD WINAPI composite_thread_proc(void *iface)
+@@ -758,9 +823,10 @@ static DWORD WINAPI composite_thread_proc(void *iface)
  static HRESULT STDMETHODCALLTYPE device_Commit(IDCompositionDevice *iface)
  {
      struct composition_device *device = impl_from_IDCompositionDevice(iface);
@@ -408,7 +411,7 @@ index f1162c644ad..f2d46decd5f 100644
  
      dcomp_lock();
  
-@@ -769,8 +832,7 @@ static HRESULT STDMETHODCALLTYPE device_Commit(IDCompositionDevice *iface)
+@@ -769,8 +835,7 @@ static HRESULT STDMETHODCALLTYPE device_Commit(IDCompositionDevice *iface)
          if (device->thread)
          {
              device->exit_thread = TRUE;
@@ -418,7 +421,7 @@ index f1162c644ad..f2d46decd5f 100644
          }
          device->thread_exited = FALSE;
          device->exit_thread = FALSE;
-@@ -779,20 +841,43 @@ static HRESULT STDMETHODCALLTYPE device_Commit(IDCompositionDevice *iface)
+@@ -779,20 +844,43 @@ static HRESULT STDMETHODCALLTYPE device_Commit(IDCompositionDevice *iface)
  
      dcomp_unlock();
  
@@ -467,7 +470,7 @@ index f1162c644ad..f2d46decd5f 100644
  }
  
  static HRESULT STDMETHODCALLTYPE device_CreateTargetForHwnd(IDCompositionDevice *iface,
-@@ -1026,15 +1111,15 @@ static HRESULT STDMETHODCALLTYPE desktop_device_Commit(IDCompositionDeviceUnknow
+@@ -1026,15 +1114,15 @@ static HRESULT STDMETHODCALLTYPE desktop_device_Commit(IDCompositionDeviceUnknow
  
  static HRESULT STDMETHODCALLTYPE desktop_device_WaitForCommitCompletion(IDCompositionDeviceUnknown *iface)
  {
@@ -1396,7 +1399,7 @@ index ebdb42a3806..259c686adc9 100644
  
  static UINT STDMETHODCALLTYPE dxgi_factory_GetCreationFlags(IWineDXGIFactory *iface)
 diff --git a/dlls/dxgi/swapchain.c b/dlls/dxgi/swapchain.c
-index 5c49c7f2482..b4edeb551ef 100644
+index 5c49c7f2482..6e7599f2a30 100644
 --- a/dlls/dxgi/swapchain.c
 +++ b/dlls/dxgi/swapchain.c
 @@ -109,7 +109,7 @@ HRESULT dxgi_get_output_from_window(IWineDXGIFactory *factory, HWND window, IDXG
@@ -1408,7 +1411,17 @@ index 5c49c7f2482..b4edeb551ef 100644
      {
          WARN("Failed to get monitor from window.\n");
          return DXGI_ERROR_INVALID_CALL;
-@@ -324,7 +324,11 @@ static HRESULT d3d11_swapchain_present(struct d3d11_swapchain *swapchain,
+@@ -306,6 +306,9 @@ static HRESULT d3d11_swapchain_present(struct d3d11_swapchain *swapchain,
+ {
+     HRESULT hr;
+ 
++    FIXME("d3d11_swapchain_present: swapchain %p (hwnd %p), sync %u, flags %#x, count %lu\n",
++          swapchain, d3d11_swapchain_get_hwnd(swapchain), sync_interval, flags, swapchain->present_count);
++
+     if (sync_interval > 4)
+     {
+         WARN("Invalid sync interval %u.\n", sync_interval);
+@@ -324,7 +327,11 @@ static HRESULT d3d11_swapchain_present(struct d3d11_swapchain *swapchain,
      }
  
      if (SUCCEEDED(hr = wined3d_swapchain_present(swapchain->wined3d_swapchain, NULL, NULL, NULL, sync_interval, 0)))
@@ -1420,7 +1433,7 @@ index 5c49c7f2482..b4edeb551ef 100644
      return hr;
  }
  
-@@ -538,8 +542,7 @@ static HRESULT STDMETHODCALLTYPE d3d11_swapchain_ResizeBuffers(IDXGISwapChain4 *
+@@ -538,8 +545,7 @@ static HRESULT STDMETHODCALLTYPE d3d11_swapchain_ResizeBuffers(IDXGISwapChain4 *
          IUnknown_AddRef(parent);
          if (IUnknown_Release(parent))
          {
@@ -1430,7 +1443,7 @@ index 5c49c7f2482..b4edeb551ef 100644
          }
      }
      if (format != DXGI_FORMAT_UNKNOWN)
-@@ -590,9 +593,22 @@ static HRESULT STDMETHODCALLTYPE d3d11_swapchain_GetContainingOutput(IDXGISwapCh
+@@ -590,9 +596,22 @@ static HRESULT STDMETHODCALLTYPE d3d11_swapchain_GetContainingOutput(IDXGISwapCh
  static HRESULT STDMETHODCALLTYPE d3d11_swapchain_GetFrameStatistics(IDXGISwapChain4 *iface,
          DXGI_FRAME_STATISTICS *stats)
  {
@@ -1455,7 +1468,7 @@ index 5c49c7f2482..b4edeb551ef 100644
  }
  
  static HRESULT STDMETHODCALLTYPE d3d11_swapchain_GetLastPresentCount(IDXGISwapChain4 *iface,
-@@ -781,23 +797,27 @@ static HRESULT STDMETHODCALLTYPE d3d11_swapchain_GetSourceSize(IDXGISwapChain4 *
+@@ -781,23 +800,27 @@ static HRESULT STDMETHODCALLTYPE d3d11_swapchain_GetSourceSize(IDXGISwapChain4 *
  
  static HRESULT STDMETHODCALLTYPE d3d11_swapchain_SetMaximumFrameLatency(IDXGISwapChain4 *iface, UINT max_latency)
  {
@@ -1481,15 +1494,15 @@ index 5c49c7f2482..b4edeb551ef 100644
  {
 -    FIXME("iface %p stub!\n", iface);
 +    struct d3d11_swapchain *swapchain = d3d11_swapchain_from_IDXGISwapChain4(iface);
++
++    TRACE("iface %p, returning %p.\n", iface, swapchain->latency_event);
  
 -    return NULL;
-+    TRACE("iface %p, returning %p.\n", iface, swapchain->latency_event);
-+
 +    return swapchain->latency_event;
  }
  
  static HRESULT STDMETHODCALLTYPE d3d11_swapchain_SetMatrixTransform(IDXGISwapChain4 *iface,
-@@ -820,7 +840,7 @@ static HRESULT STDMETHODCALLTYPE d3d11_swapchain_GetMatrixTransform(IDXGISwapCha
+@@ -820,7 +843,7 @@ static HRESULT STDMETHODCALLTYPE d3d11_swapchain_GetMatrixTransform(IDXGISwapCha
  
  static UINT STDMETHODCALLTYPE d3d11_swapchain_GetCurrentBackBufferIndex(IDXGISwapChain4 *iface)
  {
@@ -1498,7 +1511,7 @@ index 5c49c7f2482..b4edeb551ef 100644
  
      return 0;
  }
-@@ -920,6 +940,8 @@ static void STDMETHODCALLTYPE d3d11_swapchain_wined3d_object_released(void *pare
+@@ -920,6 +943,8 @@ static void STDMETHODCALLTYPE d3d11_swapchain_wined3d_object_released(void *pare
  {
      struct d3d11_swapchain *swapchain = parent;
  
@@ -1507,7 +1520,7 @@ index 5c49c7f2482..b4edeb551ef 100644
      wined3d_private_store_cleanup(&swapchain->private_store);
      free(parent);
  }
-@@ -1009,6 +1031,7 @@ HRESULT d3d11_swapchain_init(struct d3d11_swapchain *swapchain, struct dxgi_devi
+@@ -1009,6 +1034,7 @@ HRESULT d3d11_swapchain_init(struct d3d11_swapchain *swapchain, struct dxgi_devi
      swapchain->IDXGISwapChain4_iface.lpVtbl = &d3d11_swapchain_vtbl;
      swapchain->state_parent.ops = &d3d11_swapchain_state_parent_ops;
      swapchain->refcount = 1;
@@ -1515,7 +1528,7 @@ index 5c49c7f2482..b4edeb551ef 100644
      wined3d_mutex_lock();
      wined3d_private_store_init(&swapchain->private_store);
  
-@@ -2689,9 +2712,21 @@ static HRESULT STDMETHODCALLTYPE d3d12_swapchain_GetContainingOutput(IDXGISwapCh
+@@ -2689,9 +2715,21 @@ static HRESULT STDMETHODCALLTYPE d3d12_swapchain_GetContainingOutput(IDXGISwapCh
  static HRESULT STDMETHODCALLTYPE d3d12_swapchain_GetFrameStatistics(IDXGISwapChain4 *iface,
          DXGI_FRAME_STATISTICS *stats)
  {
@@ -1558,6 +1571,23 @@ index 35fcc076ccb..9d37755fce6 100644
      wined3d_sample_desc_from_dxgi(&wined3d_desc->multisample_type,
              &wined3d_desc->multisample_quality, &dxgi_desc->SampleDesc);
      wined3d_desc->device_window = window;
+diff --git a/dlls/win32u/dce.c b/dlls/win32u/dce.c
+index cf641c4ec2b..e8e4a240529 100644
+--- a/dlls/win32u/dce.c
++++ b/dlls/win32u/dce.c
+@@ -1804,6 +1804,12 @@ BOOL WINAPI NtUserRedrawWindow( HWND hwnd, const RECT *rect, HRGN hrgn, UINT fla
+     static const RECT empty;
+     BOOL ret;
+ 
++    if (hwnd && (get_window_long( hwnd, GWL_STYLE ) & WS_POPUP))
++    {
++        FIXME("popup_redraw: hwnd %p, flags %#x, rect %s\n",
++              hwnd, flags, rect ? wine_dbgstr_rect(rect) : "whole");
++    }
++
+     if (TRACE_ON(win))
+     {
+         if (hrgn)
 diff --git a/dlls/win32u/defwnd.c b/dlls/win32u/defwnd.c
 index dc3611a06ab..4491f932adf 100644
 --- a/dlls/win32u/defwnd.c
@@ -1582,6 +1612,20 @@ index dc3611a06ab..4491f932adf 100644
              if (!hbr) break;
  
              if (get_class_long( hwnd, GCL_STYLE, FALSE ) & CS_PARENTDC)
+diff --git a/dlls/win32u/input.c b/dlls/win32u/input.c
+index 2319cb5cc6a..f4f112122d4 100644
+--- a/dlls/win32u/input.c
++++ b/dlls/win32u/input.c
+@@ -1786,6 +1786,9 @@ BOOL WINAPI NtUserTrackMouseEvent( TRACKMOUSEEVENT *info )
+     HWND hwnd;
+     POINT pos;
+ 
++    FIXME("TrackMouseEvent: hwnd %p, flags %#x, hover_time %u\n",
++          info ? info->hwndTrack : NULL, info ? info->dwFlags : 0, info ? info->dwHoverTime : 0);
++
+     TRACE( "size %u, flags %#x, hwnd %p, time %u\n",
+            info->cbSize, info->dwFlags, info->hwndTrack, info->dwHoverTime );
+ 
 diff --git a/dlls/win32u/message.c b/dlls/win32u/message.c
 index fb429731f83..f5fc6882878 100644
 --- a/dlls/win32u/message.c

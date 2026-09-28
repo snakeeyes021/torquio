@@ -286,3 +286,28 @@ This journal tracks all experiments, hypotheses, confirmed fixes, and discovered
    - Binaries deployed to `/opt/wine-custom/lib/wine/` (`x86_64-unix`, `i386-unix`, `x86_64-windows`, `i386-windows`) and prefix `system32`.
    - Wine prefix cleanly rebooted via `wineboot -r`.
    - Unified patch updated at `scripts/1-build/patches/0004-dcomp-dropdown-scroll-and-frame-stats.patch`.
+
+---
+
+## 12. Targeted Tracing Deployed for Presentation & Event Pipelines (Round 17)
+
+### Investigation Objectives
+Following Round 16's telemetry proving mouse events reach the popup window handles in client coordinates, targeted diagnostic hooks were deployed across both the rendering/presentation pipeline and the window invalidation/event tracking pipeline to isolate why the visuals do not refresh:
+
+1. **Presentation & Swapchain Telemetry (`dlls/dxgi/swapchain.c`):**
+   - Added `FIXME` logging in `d3d11_swapchain_present` to capture whether Qt invokes `Present` on the popup swapchain when hover events occur, including swapchain address, HWND, sync interval, present flags, and monotonic `present_count`.
+
+2. **Composition Front Buffer Sampling Telemetry (`dlls/dcomp/device.c`):**
+   - Added `FIXME` logging in `do_composite` for `IDXGISwapChain1` content to verify which buffer (`buffer_idx` vs `BufferCount`) the composition thread is blitting to the target window and whether `present_count` is changing.
+
+3. **Window Invalidation & Redraw Telemetry (`dlls/win32u/dce.c`):**
+   - Added `FIXME` logging in `NtUserRedrawWindow` specifically filtering for `WS_POPUP` windows to detect whether Qt requests invalidation (`RDW_INVALIDATE`, `RDW_ERASE`, `RDW_UPDATENOW`) during mouse movements.
+
+4. **Mouse Tracking Telemetry (`dlls/win32u/input.c`):**
+   - Added `FIXME` logging in `NtUserTrackMouseEvent` to determine whether Qt requests hover or leave tracking (`TME_HOVER`, `TME_LEAVE`) on popup windows or child controls.
+
+5. **Build & Deployment:**
+   - Both 64-bit and 32-bit (`wine64` and `wine32`) `win32u.so`, `dxgi.dll`, and `dcomp.dll` recompiled cleanly.
+   - Installed to `/opt/wine-custom/lib/wine/` and prefix `system32`.
+   - Wine prefix cleanly rebooted via `wineboot -r`.
+   - Unified patch updated at `scripts/1-build/patches/0004-dcomp-dropdown-scroll-and-frame-stats.patch`.
