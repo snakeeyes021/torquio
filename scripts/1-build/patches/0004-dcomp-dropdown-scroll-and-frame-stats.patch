@@ -1,3 +1,32 @@
+diff --git a/dlls/advapi32/advapi.c b/dlls/advapi32/advapi.c
+index 2284e92b263..30f8adccd13 100644
+--- a/dlls/advapi32/advapi.c
++++ b/dlls/advapi32/advapi.c
+@@ -306,6 +306,11 @@ HWCT WINAPI OpenThreadWaitChainSession(DWORD flags, PWAITCHAINCALLBACK callback)
+     return NULL;
+ }
+ 
++VOID WINAPI CloseThreadWaitChainSession(HWCT handle)
++{
++    FIXME("handle %p stub!\n", handle);
++}
++
+ BOOL WINAPI GetThreadWaitChain(HWCT handle, DWORD_PTR ctx, DWORD flags, DWORD thread_id, DWORD *node_count,
+     WAITCHAIN_NODE_INFO *node_info_arr, BOOL *is_cycle)
+ {
+diff --git a/dlls/advapi32/advapi32.spec b/dlls/advapi32/advapi32.spec
+index 273f382c5e6..b8be898345a 100644
+--- a/dlls/advapi32/advapi32.spec
++++ b/dlls/advapi32/advapi32.spec
+@@ -101,7 +101,7 @@
+ @ stdcall CloseEncryptedFileRaw(ptr)
+ @ stdcall CloseEventLog (long)
+ @ stdcall -import CloseServiceHandle(long)
+-# @ stub CloseThreadWaitChainSession
++@ stdcall CloseThreadWaitChainSession(ptr)
+ @ stdcall -import CloseTrace(int64)
+ @ stdcall CommandLineFromMsiDescriptor(wstr ptr ptr)
+ # @ stub ComputeAccessTokenFromCodeAuthzLevel
 diff --git a/dlls/d2d1/device.c b/dlls/d2d1/device.c
 index 5e0688a5822..a7a4ce095bd 100644
 --- a/dlls/d2d1/device.c
@@ -168,7 +197,7 @@ index ad41d9d3630..96885d24fcf 100644
  HRESULT create_target(struct composition_device *device, HWND hwnd, BOOL topmost, IDCompositionTarget **target);
  HRESULT create_target_from_shared_visual_handle(struct composition_device *device, HANDLE shared_visual_handle, void **new_target);
 diff --git a/dlls/dcomp/device.c b/dlls/dcomp/device.c
-index f1162c644ad..8a89de136ac 100644
+index f1162c644ad..571cf4c41ff 100644
 --- a/dlls/dcomp/device.c
 +++ b/dlls/dcomp/device.c
 @@ -113,9 +113,15 @@ static ULONG STDMETHODCALLTYPE device_Release(IDCompositionDevice *iface)
@@ -356,7 +385,7 @@ index f1162c644ad..8a89de136ac 100644
 +                {
 +                    /* Swapchain has not presented any frames yet; skip compositing unrendered content */
 +                    IDXGISwapChain1_Release(swapchain);
-+                    return S_OK;
++                    return S_FALSE;
 +                }
 +                target->last_present_count = present_count;
 +                buffer_idx = swapchain_desc.BufferCount - 1;
@@ -391,7 +420,7 @@ index f1162c644ad..8a89de136ac 100644
 +            {
 +                /* Surface has not yet completed its initial EndDraw; do not blit uninitialized content */
 +                IDCompositionSurface_Release(surface);
-+                return S_OK;
++                return S_FALSE;
 +            }
              if (IsEqualGUID(&surface_impl->physical_surface_iid, &IID_IDXGISurface))
              {
@@ -451,7 +480,12 @@ index f1162c644ad..8a89de136ac 100644
  static DWORD WINAPI composite_thread_proc(void *iface)
  {
      struct composition_device *device = impl_from_IDCompositionDevice(iface);
-@@ -710,7 +833,7 @@ static DWORD WINAPI composite_thread_proc(void *iface)
+@@ -706,11 +829,12 @@ static DWORD WINAPI composite_thread_proc(void *iface)
+     struct composition_target *target;
+     struct composition_visual *visual;
+     HDC hdc;
++    HRESULT hr;
+ 
      /* TODO: Implement and use D3DKMTWaitForVerticalBlankEvent() */
      hdc = GetDC(0);
      frequency = GetDeviceCaps(hdc, VREFRESH);
@@ -460,7 +494,7 @@ index f1162c644ad..8a89de136ac 100644
      ReleaseDC(0, hdc);
  
      while (TRUE)
-@@ -720,36 +843,51 @@ static DWORD WINAPI composite_thread_proc(void *iface)
+@@ -720,36 +844,57 @@ static DWORD WINAPI composite_thread_proc(void *iface)
          count = 0;
          LIST_FOR_EACH_ENTRY(target, &device->targets, struct composition_target, entry)
          {
@@ -496,11 +530,17 @@ index f1162c644ad..8a89de136ac 100644
 -            break;
 +            if (target->is_dirty || swapchain_dirty)
 +            {
-+                if (SUCCEEDED(do_composite(target, visual, 0.0f, 0.0f)))
++                hr = do_composite(target, visual, 0.0f, 0.0f);
++                if (hr == S_OK)
 +                {
 +                    if (swapchain_dirty)
 +                        target->last_present_count = new_present_count;
 +                    target->is_dirty = FALSE;
++                    count++;
++                }
++                else if (hr == S_FALSE)
++                {
++                    /* Content not ready yet (draw_count == 0 or present_count == 0); keep target dirty */
 +                    count++;
 +                }
 +            }
@@ -523,7 +563,7 @@ index f1162c644ad..8a89de136ac 100644
      }
  
      return 0;
-@@ -758,41 +896,77 @@ static DWORD WINAPI composite_thread_proc(void *iface)
+@@ -758,41 +903,77 @@ static DWORD WINAPI composite_thread_proc(void *iface)
  static HRESULT STDMETHODCALLTYPE device_Commit(IDCompositionDevice *iface)
  {
      struct composition_device *device = impl_from_IDCompositionDevice(iface);
@@ -610,7 +650,7 @@ index f1162c644ad..8a89de136ac 100644
  }
  
  static HRESULT STDMETHODCALLTYPE device_CreateTargetForHwnd(IDCompositionDevice *iface,
-@@ -1026,15 +1200,15 @@ static HRESULT STDMETHODCALLTYPE desktop_device_Commit(IDCompositionDeviceUnknow
+@@ -1026,15 +1207,15 @@ static HRESULT STDMETHODCALLTYPE desktop_device_Commit(IDCompositionDeviceUnknow
  
  static HRESULT STDMETHODCALLTYPE desktop_device_WaitForCommitCompletion(IDCompositionDeviceUnknown *iface)
  {
@@ -630,7 +670,7 @@ index f1162c644ad..8a89de136ac 100644
  }
  
  static HRESULT STDMETHODCALLTYPE desktop_device_CreateVisual(IDCompositionDeviceUnknown *iface,
-@@ -2002,6 +2176,7 @@ static HRESULT create_device(int version, REFIID iid, void **out)
+@@ -2002,6 +2183,7 @@ static HRESULT create_device(int version, REFIID iid, void **out)
          return E_OUTOFMEMORY;
  
      list_init(&device->targets);
@@ -2029,10 +2069,35 @@ index 85eab01d711..523303c1801 100644
          WARN("Overriding format %s with stored format %s.\n",
                  debug_d3dformat(mode->format_id),
 diff --git a/dlls/wined3d/texture.c b/dlls/wined3d/texture.c
-index ef9703f6665..a35a6b2b896 100644
+index ef9703f6665..1bc6a2a3d79 100644
 --- a/dlls/wined3d/texture.c
 +++ b/dlls/wined3d/texture.c
-@@ -579,6 +579,9 @@ static void wined3d_texture_destroy_dc(void *object)
+@@ -456,6 +456,24 @@ void wined3d_texture_sub_resources_destroyed(struct wined3d_texture *texture)
+     }
+ }
+ 
++static void wined3d_texture_sync_dc(void *object)
++{
++    const struct wined3d_texture_idx *idx = object;
++    struct wined3d_texture *texture = idx->texture;
++    unsigned int sub_resource_idx = idx->sub_resource_idx;
++    struct wined3d_context *context = NULL;
++
++    if (!(texture->sub_resources[sub_resource_idx].locations & texture->resource.map_binding))
++    {
++        FIXME("wined3d_texture_sync_dc: syncing texture %p sub_resource %u to map_binding %#x\n",
++              texture, sub_resource_idx, texture->resource.map_binding);
++        context = context_acquire(texture->resource.device, NULL, 0);
++        wined3d_texture_load_location(texture, sub_resource_idx, context, texture->resource.map_binding);
++        if (context)
++            context_release(context);
++    }
++}
++
+ static void wined3d_texture_create_dc(void *object)
+ {
+     const struct wined3d_texture_idx *idx = object;
+@@ -579,6 +597,9 @@ static void wined3d_texture_destroy_dc(void *object)
      dc_info->dc = NULL;
      dc_info->bitmap = NULL;
  
@@ -2042,6 +2107,22 @@ index ef9703f6665..a35a6b2b896 100644
      wined3d_texture_get_bo_address(texture, sub_resource_idx, &data, texture->resource.map_binding);
      if (data.buffer_object)
      {
+@@ -1919,6 +1940,15 @@ HRESULT CDECL wined3d_texture_get_dc(struct wined3d_texture *texture, unsigned i
+         if (!(dc_info = texture->dc_info) || !dc_info[sub_resource_idx].dc)
+             return WINED3DERR_INVALIDCALL;
+     }
++    else if (!(sub_resource->locations & texture->resource.map_binding))
++    {
++        struct wined3d_texture_idx texture_idx;
++        texture_idx.texture = texture;
++        texture_idx.sub_resource_idx = sub_resource_idx;
++
++        wined3d_cs_init_object(device->cs, wined3d_texture_sync_dc, &texture_idx);
++        wined3d_cs_finish(device->cs, WINED3D_CS_QUEUE_DEFAULT);
++    }
+ 
+     if (!(texture->flags & WINED3D_TEXTURE_GET_DC_LENIENT))
+         texture->flags |= WINED3D_TEXTURE_DC_IN_USE;
 diff --git a/dlls/winex11.drv/opengl.c b/dlls/winex11.drv/opengl.c
 index 895d3815e7c..90c12d54c68 100644
 --- a/dlls/winex11.drv/opengl.c

@@ -492,5 +492,43 @@ A comprehensive trace of the 16,793-line `/var/home/matt/.local/share/torquio/do
    - Deployed binaries to `/opt/wine-custom/lib/wine/` and prefix `system32`/`syswow64`.
    - Updated unified patch at `scripts/1-build/patches/0004-dcomp-dropdown-scroll-and-frame-stats.patch`.
    - Updated Wine prefix configurations via `wineboot -u`.
+---
 
+## 17. Round 21 Telemetry Analysis, Missing GPU-to-DC Sync Root Cause & ADVAPI32 Fix (Round 22)
+
+### Test Results from Round 21
+- **Items 1–5 (Dropdowns) & Item 6 (Tooltips):** Behavior #3 persists. Content renders on initial open, but mouseovers, scroll chevrons, and submenus do not update the visual display. Tooltips remain flat and lack text glyphs.
+- **Item 7 (Instrument window top-bar area):** Regression observed where top-bar area remained blank white or black until moused over.
+- **Startup Crash / Error Messages:** Unhandled exception on unimplemented API `ADVAPI32.dll.CloseThreadWaitChainSession` causing rundll32/process crash.
+
+### Breakthrough Findings from Round 21 Telemetry (`torquio_dorico_2026-09-28_00-59-41.log`)
+
+1. **The Root Cause of Stale Visuals (Items 1–6): Missing GPU-to-DC SYSMEM Reload in `wined3d_texture_get_dc`:**
+   - In `dlls/dcomp/device.c`, DirectComposition reads swapchain surfaces via `IDXGISurface_GetDC(dxgi_surface, FALSE, &src_dc)` and `BitBlt`s to the window DC.
+   - `IDXGISurface_GetDC` routes to `wined3d_texture_get_dc(texture, sub_resource_idx, &dc)` in `dlls/wined3d/texture.c`.
+   - On the very first call, `dc_info[sub_resource_idx].dc` is NULL. Wine calls `wined3d_texture_create_dc`, which downloads the GPU texture to system memory (`WINED3D_LOCATION_SYSMEM`) and wraps it in a DIB section DC.
+   - On all subsequent calls (when Dorico draws text onto a tooltip, renders a hover highlight in a dropdown, or rotates the swapchain), `dc_info[sub_resource_idx].dc` is **already non-NULL**.
+   - **The Critical Flaw:** `wined3d_texture_get_dc` NEVER checked whether `WINED3D_LOCATION_SYSMEM` was valid!
+   - When the GPU draws a new frame or `wined3d_swapchain_gl_rotate` rotates textures, `WINED3D_LOCATION_SYSMEM` is invalidated because the newest pixels reside in `WINED3D_LOCATION_TEXTURE_RGB`.
+   - Because `wined3d_texture_get_dc` omitted any location validation for existing DCs, it handed DirectComposition the **same stale DIB section memory from frame 1 over and over again**!
+   - Even though Dorico presented 33 frames to the dropdown swapchain, DirectComposition was blitting the stale initial DC on every single frame!
+   - **Resolution:** Added `wined3d_texture_sync_dc`. When `dc_info` already exists but `!(sub_resource->locations & texture->resource.map_binding)`, `wined3d_texture_sync_dc` executes `wined3d_texture_load_location(texture, sub_resource_idx, context, texture->resource.map_binding)`, downloading the fresh OpenGL texture into the DC's memory before returning it.
+
+2. **The Root Cause of Item 7 Top-Bar Blank Delay:**
+   - In Round 21, when `do_composite` encountered `draw_count == 0`, it returned `S_OK`.
+   - In `composite_thread_proc`, `SUCCEEDED(hr)` caused `target->is_dirty = FALSE;` to execute, marking the target clean before it had ever composited!
+   - If GDI erased the window (`RDW_ERASE`) before Direct2D completed drawing, the window displayed default background (white or black) and remained uncomposited until mouseover triggered a new commit.
+   - **Resolution:** In `do_composite`, return `S_FALSE` when unready (`draw_count == 0` or `present_count == 0`). In `composite_thread_proc`, if `hr == S_FALSE`, keep `target->is_dirty = TRUE;` so composition executes immediately on the next pass once drawing is complete.
+
+3. **ADVAPI32 Unimplemented Function Crash:**
+   - Dorico and startup processes call `CloseThreadWaitChainSession`.
+   - Implemented stub `CloseThreadWaitChainSession(HWCT handle)` in `dlls/advapi32/advapi.c` and exported in `advapi32.spec`.
+
+### Code Changes Applied & Deployed
+1. `dlls/wined3d/texture.c`: Added `wined3d_texture_sync_dc` and hooked into `wined3d_texture_get_dc`.
+2. `dlls/dcomp/device.c`: Return `S_FALSE` from `do_composite` on unready surfaces; preserve `target->is_dirty` until drawn.
+3. `dlls/advapi32/advapi.c` & `advapi32.spec`: Added `CloseThreadWaitChainSession` stub.
+4. Compiled 64-bit and 32-bit `wined3d.dll`, `advapi32.dll`, and `dcomp.dll`.
+5. Deployed to `/opt/wine-custom/lib/wine/` and prefix `system32`/`syswow64`.
+6. Regenerated unified patch `scripts/1-build/patches/0004-dcomp-dropdown-scroll-and-frame-stats.patch`.
 
