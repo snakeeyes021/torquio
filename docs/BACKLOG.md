@@ -9,6 +9,9 @@ This section tracks epics that have been broken down into concrete, actionable s
 ## Undefined Work (Backlog)
 This section tracks high-level goals and ideas that have not yet been broken down into concrete subtasks.
 
+*   [ ] **Dorico "Activate for playback" window is white:** When opening a second project (at least from a dragged MIDI import), the "Activate for playback" window renders completely white.
+*   [ ] **MIDI drag-and-drop opens new project instead of inserting onto current staff:** Dragging a MIDI file in does not drop it onto the currently selected staff; instead, it opens a new project. Investigate if this is default Dorico behavior, a setting/modifier requirement, or a Wine drag-and-drop/OLE integration quirk.
+
 *   [ ] **Suppression of `rundll32` Errors:** During prefix initialization and `winetricks` execution, some `rundll32` errors may occur. Investigate their cause and implement suppression (e.g., via `WINEDEBUG=-all` for specific phases) to avoid confusing users.
     *   *Update (Active Research)*: Evaluated native Wayland drivers and determined that `winewayland.drv` introduces major window management regressions (missing titlebars, buggy snapping under GNOME). Confirmed the optimal scaling bypass is setting GNOME's `xwayland-scaling-factor` to `1` (which disables compositor overscaling and renders 1:1, a setting KDE Plasma already defaults to via "Apply scaling themselves"), and then scaling Dorico internally using Wine's DPI (e.g. 120 DPI). Investigating integrating a dynamic GSettings trap/wrapper in the launchers and an automated display DPI detection profile.
 *   [ ] **Version Manifest Generation:** Programmatically extract and record the exact version numbers of every piece of installed Steinberg software to create a reproducible manifest.
