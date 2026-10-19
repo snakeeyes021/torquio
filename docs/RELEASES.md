@@ -4,6 +4,40 @@ This document tracks known-good, tested "snapshots" of the entire system. It ser
 
 ---
 
+## **Release v0.3.5-alpha (ntsync & DirectComposition Fixes)**
+**Date:** 2026-10-19
+**Status:** Alpha / Milestone
+
+**Description:** Enabled kernel fast sync (ntsync) in the custom Wine build, bringing large-score UI operations in line with Windows performance. Bumped the `zhiyi/wine` target commit and added DirectComposition patches that resolve the blank-dropdown regression. Verified with a from-scratch install on a fresh Fedora Silverblue VM.
+
+**Key Improvements:**
+*   **Kernel Fast Sync (ntsync):** `build_wine.sh` injects `linux/ntsync.h` (vendored in `scripts/1-build/include/`, with fallback to host kernel headers) so Wine's `configure` no longer silently disables ntsync in the ubuntu:24.04 container. Also re-enables the wineserver in-process ntsync device handle. Reported in #5: Select All on a 23-page score dropped from 108 s to 6.2 s.
+*   **ntsync Activation:** The installer prompts to load and persist the `ntsync` kernel module (requires sudo). Also available via `./torquio --enable-ntsync` and the interactive menu. The status dashboard reports whether ntsync is active, supported but dormant, or unavailable.
+*   **DirectComposition Patches:** Added three patches on top of `zhiyi/wine`: composition swapchain (dcomp/dxgi), `IDCompositionVirtualSurface` + D2D device interop, and `ID2D1DeviceContext` draw surface support. Dropdowns no longer render blank white on re-open (#6).
+*   **Wine Rebuild Flag:** Added `--rebuild-wine` to recompile the custom Wine engine inside the container.
+*   **Prerequisite Docs:** Corrected the Fedora Atomic distrobox install command and clarified that traditional distros should install Distrobox/Podman from their package manager (#4).
+
+**Build Environment Artifacts:**
+*   **Custom Wine Source (`zhiyi/wine`):** Commit `883970826c62286c3da998072a5f49813d333a31`
+*   **Torquio Wine Patches:** `0001-dcomp-dxgi-composition-swapchain`, `0002-dcomp-virtual-surface`, `0003-dcomp-d2d1-device-context-support`
+*   **Winetricks Version:** `20240105`
+*   **Wine-ICU MSI Version:** `72.1`
+
+**Verified Application Versions:**
+*   **Steinberg Download Assistant (SDA):** `1.40.1`
+*   **Steinberg Activation Manager (SAM):** `1.10.0.1489`
+*   **Steinberg Media Bay:** `1.4.10.19`
+*   **Dorico:** `6.2.30.6245`
+*   **NotePerformer (3rd Party):** `5.1.2`
+
+**Known Issues:**
+*   Dropdown content is not yet fully correct (#6). Dropdowns now render consistently on repeated opens, but work to fully resolve them continues on a follow-up branch.
+*   ntsync requires a host kernel 6.14+ with `CONFIG_NTSYNC`. On older kernels Wine falls back to the wineserver path.
+*   SDA attempts to update MediaBay automatically and fails due to `preinstall.ps1` block (Error 231).
+*   3rd-party Cantai VST testing has not been successful. The initial work to patch DComp to fix the instrument window has been successfully completed (that window no longer crashes Dorico and is confirmed to work with Noteperformer), but attempting to launch that window with Cantai is not successful.
+
+---
+
 ## **Release v0.3.0-alpha (CLI App & Compatibility Polish)**
 **Date:** 2026-07-11
 **Status:** Alpha / Milestone
@@ -23,7 +57,7 @@ This document tracks known-good, tested "snapshots" of the entire system. It ser
 
 **Build Environment Artifacts:**
 *   **Custom Wine Source (`zhiyi/wine`):** Commit `ae88a705b5aa544cc60153d48c1ca8849f32ee14`
-*   **Winetricks Version:** `20260125-next`
+*   **Winetricks Version:** `20240105`
 *   **Wine-ICU MSI Version:** `72.1`
 
 **Verified Application Versions:**
@@ -53,7 +87,7 @@ This document tracks known-good, tested "snapshots" of the entire system. It ser
 
 **Build Environment Artifacts:**
 *   **Custom Wine Source (`zhiyi/wine`):** Commit `ae88a705b5aa544cc60153d48c1ca8849f32ee14`
-*   **Winetricks Version:** `20260125-next`
+*   **Winetricks Version:** `20240105`
 *   **Wine-ICU MSI Version:** `72.1`
 
 **Verified Application Versions:**
@@ -79,7 +113,7 @@ This document tracks known-good, tested "snapshots" of the entire system. It ser
 
 **Build Environment Artifacts:**
 *   **Custom Wine Source (`zhiyi/wine`):** Commit `ae88a705b5aa544cc60153d48c1ca8849f32ee14`
-*   **Winetricks Version:** `20260125-next` (SHA256: `8f07319f32e96a7ad92f786bf8ee2e00d3c65f82debd33b6884e681b825ae67a`)
+*   **Winetricks Version:** `20240105`
 *   **Wine-ICU MSI Version:** `72.1`
 
 **Verified Application Versions:**
@@ -107,7 +141,7 @@ This document tracks known-good, tested "snapshots" of the entire system. It ser
 
 **Build Environment Artifacts:**
 *   **Custom Wine Source (`zhiyi/wine`):** Commit `ae88a705b5aa544cc60153d48c1ca8849f32ee14`
-*   **Winetricks Version:** `20260125-next` (SHA256: `8f07319f32e96a7ad92f786bf8ee2e00d3c65f82debd33b6884e681b825ae67a`)
+*   **Winetricks Version:** `20240105`
 *   **Wine-ICU MSI Version:** `72.1`
 
 **Verified Application Versions:**
@@ -132,7 +166,7 @@ This document tracks known-good, tested "snapshots" of the entire system. It ser
 
 **Build Environment Artifacts:**
 *   **Custom Wine Source (`zhiyi/wine`):** Commit `ae88a705b5aa544cc60153d48c1ca8849f32ee14`
-*   **Winetricks Version:** `20260125-next` (SHA256: `8f07319f32e96a7ad92f786bf8ee2e00d3c65f82debd33b6884e681b825ae67a`)
+*   **Winetricks Version:** `20240105`
 *   **Wine-ICU MSI Version:** `72.1`
 
 **Verified Application Versions:**

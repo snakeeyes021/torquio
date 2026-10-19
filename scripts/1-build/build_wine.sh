@@ -4,7 +4,12 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../common.sh"
 
-if [ -f "/opt/wine-custom/.torquio_wine_build_complete" ]; then
+REBUILD=false
+if [ "$1" = "--rebuild" ] || [ "$1" = "-f" ] || [ "$1" = "--force" ]; then
+    REBUILD=true
+fi
+
+if [ -f "/opt/wine-custom/.torquio_wine_build_complete" ] && [ "$REBUILD" = false ]; then
     echo "Custom Wine engine is already compiled and installed at /opt/wine-custom. Skipping build."
     exit 0
 fi
@@ -52,7 +57,7 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
     libcups2 libcups2:i386 \
     x11-xserver-utils
 
-echo "Cloning zhiyi wine branch..."
+echo "Cloning or updating zhiyi wine branch..."
 mkdir -p "$TORQUIO_BUILD_DIR"
 cd "$TORQUIO_BUILD_DIR"
 
@@ -61,12 +66,52 @@ if [ ! -d "wine-source" ]; then
 fi
 
 cd wine-source
+# Fetch in case the repository was already cloned previously
+git fetch origin
+
 # Checkout the specific verified commit hash rather than the floating branch
-# The below hash comes from the bug-23698-react-native-20251217 branch
-git checkout ae88a705b5aa544cc60153d48c1ca8849f32ee14
+# The below hash comes from the bug-23698-react-native branch (2026-03-24)
+TARGET_COMMIT="883970826c62286c3da998072a5f49813d333a31"
+git checkout -f "$TARGET_COMMIT"
+git reset --hard "$TARGET_COMMIT"
+
+PATCHES_DIR="$SCRIPT_DIR/patches"
+if [ -d "$PATCHES_DIR" ]; then
+    for patch_file in "$PATCHES_DIR"/*.patch; do
+        if [ -f "$patch_file" ]; then
+            echo "Applying $(basename "$patch_file")..."
+            git apply "$patch_file"
+        fi
+    done
+fi
+
+# Re-enable /dev/ntsync in wineserver if disabled by upstream interim hack (e.g. c9bd766)
+if [ -f server/inproc_sync.c ]; then
+    sed -i '/get_inproc_device_fd/,/return -1/ s/#if 0/#if 1/' server/inproc_sync.c 2>/dev/null || true
+fi
+
+# Ensure linux/ntsync.h is present in the build environment so configure detects it
+if [ ! -f /usr/include/linux/ntsync.h ]; then
+    echo "Injecting ntsync.h header for Wine compilation..."
+    sudo mkdir -p /usr/include/linux
+    if [ -f "$SCRIPT_DIR/include/linux/ntsync.h" ]; then
+        sudo cp "$SCRIPT_DIR/include/linux/ntsync.h" /usr/include/linux/ntsync.h
+    elif [ -d /run/host/usr/src ]; then
+        HOST_NTSYNC=$(find /run/host/usr/src -name ntsync.h 2>/dev/null | head -n 1)
+        if [ -n "$HOST_NTSYNC" ]; then
+            sudo cp "$HOST_NTSYNC" /usr/include/linux/ntsync.h
+        fi
+    fi
+fi
 
 echo "Configuring and building..."
 cd ..
+
+if [ "$REBUILD" = true ]; then
+    echo "Cleaning previous build directories..."
+    rm -rf wine32 wine64
+fi
+
 mkdir -p wine32 wine64
 
 cd wine64

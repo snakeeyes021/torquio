@@ -17,6 +17,12 @@ Before running the installer, ensure your host system has the following installe
 2.  **Docker** or **Podman**
     - If you don't know which one to get, go with Podman. It's in the major repos and is therefore easier to install, and for most people they're functionally identical (the only people for whom the differences are material are people who already know which one they need).  
 
+On traditional (non-immutable) distros, these generally aren't installed by default, so just install them from your distro's package manager. For example:
+
+* **Fedora Workstation / KDE Plasma Desktop** (Podman is already included): `sudo dnf install distrobox`
+* **Ubuntu / Debian**: `sudo apt install distrobox podman`
+* **Arch**: `sudo pacman -S distrobox podman`
+
 On many immutable distros, the above are included by default, so you're good to go. That includes:
 
 * **The Universal Blue family** (Bazzite, Bluefin, Aurora, and most, if not all, custom downstream images)
@@ -31,6 +37,8 @@ On many immutable distros, the above are included by default, so you're good to 
 >```
 >
 >as suggested here: [https://fedoramagazine.org/run-distrobox-on-fedora-linux/](https://fedoramagazine.org/run-distrobox-on-fedora-linux/). This is the "custom directory" install detailed on Distrobox's [installation page](https://github.com/89luca89/distrobox#installation).
+>
+> Again, this method is only needed on immutable distros that don't ship Distrobox. If you're on regular Fedora Workstation or KDE, just use `sudo dnf install distrobox`.
 
 
 
