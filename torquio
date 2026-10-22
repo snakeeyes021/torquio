@@ -1791,9 +1791,6 @@ if [ $# -gt 0 ]; then
                 show_menu
             fi
             ;;
-        --update-mediabay|--update_mediabay)
-            "$SCRIPT_DIR/scripts/2-install/update_mediabay.sh"
-            ;;
         -d|--map_folder)
             map_folder "$2" "$3"
             ;;
@@ -1840,7 +1837,6 @@ if [ $# -gt 0 ]; then
             echo "  -g, --graphics              Interact with display scaling configs."
             echo "  -s, --status                Display status dashboard."
             echo "  -u, --update                Update Torquio to the latest version."
-            echo "      --update-mediabay       Update MediaBay."
             echo "  -d, --map_folder [p] [l]    Map folder positional/interactively."
             echo "  -l, --export-logs           Zip up logs for a bug report (personal data removed)."
             echo "  -x, --export_key_commands   Export key commands to zip."
