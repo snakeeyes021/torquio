@@ -42,7 +42,7 @@ case "$LICENSE_STATE" in
     active*)
         echo -e "⚠️  ${red}These Steinberg licenses are still activated in this installation:${reset}"
         echo ""
-        echo "${LICENSE_STATE#active$'\n'}"
+        echo -e "${yellow}${LICENSE_STATE#active$'\n'}${reset}"
         echo ""
         echo "Deactivate them in the Steinberg Activation Manager, then run the uninstall again. If you delete them while they're activated, you can no longer deactivate them from this computer."
         echo ""
