@@ -755,7 +755,7 @@ refresh_launchers() {
     chmod +x "$HOME/.local/bin/"torquio*
     echo -e "${green}Launchers and icons successfully refreshed!${reset}"
     echo ""
-    read -p "Press [Enter] to return to the main menu..." temp
+    [ "$1" = "--no-pause" ] || read -p "Press [Enter] to return to the main menu..." temp
 }
 
 show_status() {
@@ -1248,6 +1248,88 @@ export_keycommands() {
     echo "Successfully compressed and exported key commands to: $zip_file"
 }
 
+update_torquio() {
+    local blue="\033[38;5;110m"
+    local green="\033[38;5;108m"
+    local red="\033[38;5;167m"
+    local reset="\033[0m"
+    local git=(git -C "$SCRIPT_DIR")
+
+    echo -e "${blue}=== Update Torquio ===${reset}"
+    echo ""
+    if ! "${git[@]}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        echo -e "${red}This copy of Torquio can't update itself (it wasn't installed with 'git clone').${reset}"
+        echo "Download the latest version from https://github.com/snakeeyes021/torquio instead."
+        return 1
+    fi
+    if ! "${git[@]}" rev-parse --abbrev-ref "@{u}" >/dev/null 2>&1; then
+        echo -e "${red}This copy of Torquio isn't following a branch on GitHub, so it can't update itself.${reset}"
+        echo "In $SCRIPT_DIR, switch back to the main branch ('git checkout main') and try again."
+        return 1
+    fi
+    echo "Checking for updates..."
+    if ! "${git[@]}" fetch --quiet; then
+        echo -e "${red}Couldn't reach GitHub. Check your internet connection and try again.${reset}"
+        return 1
+    fi
+    local count
+    count=$("${git[@]}" rev-list --count "HEAD..@{u}")
+    if [ "$count" -eq 0 ]; then
+        echo -e "${green}Torquio is up to date.${reset}"
+        return 0
+    fi
+    if [ -n "$("${git[@]}" status --porcelain --untracked-files=no)" ] || [ "$("${git[@]}" rev-list --count "@{u}..HEAD")" -ne 0 ]; then
+        echo -e "${red}Torquio's files have been changed on this computer, so the update can't be applied automatically.${reset}"
+        echo "Your changes haven't been touched. In $SCRIPT_DIR, keep or discard them, then run the update again."
+        return 1
+    fi
+    echo ""
+    echo "$count update(s) available:"
+    "${git[@]}" log --format='  - %s' "HEAD..@{u}" | head -n 20
+    [ "$count" -gt 20 ] && echo "  ...and $((count - 20)) more"
+    echo ""
+    read -p "Install now? [Y/n]: " confirm
+    if [[ "$confirm" =~ ^[Nn]$ ]]; then
+        echo "Update cancelled."
+        return 0
+    fi
+    local old_head
+    old_head=$("${git[@]}" rev-parse HEAD)
+    if ! "${git[@]}" merge --ff-only --quiet "@{u}"; then
+        echo -e "${red}The update couldn't be applied. Nothing was changed.${reset}"
+        return 1
+    fi
+    echo -e "${green}Torquio updated.${reset}"
+    echo ""
+    # Finish with the updated copy of this script, which may refresh things the old one doesn't know about.
+    exec "$SCRIPT_DIR/torquio" --post-update "$old_head" "$@"
+}
+
+# Runs from the freshly updated script after update_torquio: refresh launchers and prefix settings, and offer
+# a Wine engine rebuild when the update changed the Wine build (patches, build script).
+post_update() {
+    local old_head="$1"
+    local yellow="\033[38;5;179m"
+    local reset="\033[0m"
+    local changed
+    changed=$(git -C "$SCRIPT_DIR" diff --name-only "$old_head" HEAD 2>/dev/null)
+
+    if distrobox list 2>/dev/null | grep -q "$TORQUIO_CONTAINER_NAME" && [ -f "$TORQUIO_PREFIX_DIR/.torquio_core_installed" ]; then
+        refresh_launchers --no-pause
+        if echo "$changed" | grep -q '^scripts/1-build/'; then
+            echo -e "${yellow}This update includes changes to Torquio's Wine engine. Rebuilding it takes 20-40 minutes; until then, Dorico keeps running on the current engine.${reset}"
+            read -p "Rebuild the Wine engine now? [y/N]: " confirm || true
+            if [[ "$confirm" =~ ^[Yy]$ ]]; then
+                rebuild_wine
+            else
+                echo "You can rebuild it later from Wine Tools & Maintenance > Recompile / Rebuild Wine Engine."
+            fi
+        fi
+    else
+        echo "Torquio isn't installed yet, so there's nothing else to refresh."
+    fi
+}
+
 export_logs() {
     echo "=== Export Logs ==="
     echo "Collecting logs..."
@@ -1563,7 +1645,7 @@ show_menu() {
         local reset="\033[0m"
         
         if [ "$env_active" = "true" ]; then
-            echo -e "  ${wine}1)${reset} Reinstall/Update Torquio Environment"
+            echo -e "  ${wine}1)${reset} Reinstall/Repair Torquio Environment"
             echo -e "  ${wine}2)${reset} Uninstall/Wipe Torquio"
             echo -e "  ${wine}3)${reset} Status Dashboard"
             echo -e "  ${wine}4)${reset} Configure Graphics & Scaling"
@@ -1571,10 +1653,11 @@ show_menu() {
             echo -e "  ${wine}6)${reset} Manage Folder Mappings (Map/Unmap)"
             echo -e "  ${wine}7)${reset} Manage Dorico Key Commands"
             echo -e "  ${wine}8)${reset} Wine Tools & Maintenance"
-            echo -e "  ${wine}9)${reset} Export Logs (for bug reports)"
-            echo -e "  ${wine}10)${reset} Exit"
+            echo -e "  ${wine}9)${reset} Update Torquio"
+            echo -e "  ${wine}10)${reset} Export Logs (for bug reports)"
+            echo -e "  ${wine}11)${reset} Exit"
             echo ""
-            read -p "Select an option (1-10): " choice
+            read -p "Select an option (1-11): " choice
             echo ""
             case "$choice" in
                 1)
@@ -1614,18 +1697,20 @@ show_menu() {
                 6)  manage_folder_mappings; clear; continue ;;
                 7)  manage_keycommands; clear; continue ;;
                 8)  manage_wine; clear; continue ;;
-                9)  export_logs ;;
-                10) exit 0 ;;
-                *)  echo "Invalid option. Please choose 1-10." ;;
+                9)  update_torquio --menu || true ;;
+                10) export_logs ;;
+                11) exit 0 ;;
+                *)  echo "Invalid option. Please choose 1-11." ;;
             esac
         else
             echo -e "  ${wine}1)${reset} Install Torquio Environment"
             echo -e "  ${wine}2)${reset} Clean/Remove Torquio"
             echo -e "  ${wine}3)${reset} Status Dashboard"
-            echo -e "  ${wine}4)${reset} Export Logs (for bug reports)"
-            echo -e "  ${wine}5)${reset} Exit"
+            echo -e "  ${wine}4)${reset} Update Torquio"
+            echo -e "  ${wine}5)${reset} Export Logs (for bug reports)"
+            echo -e "  ${wine}6)${reset} Exit"
             echo ""
-            read -p "Select an option (1-5): " choice
+            read -p "Select an option (1-6): " choice
             echo ""
             case "$choice" in
                 1)
@@ -1660,9 +1745,10 @@ show_menu() {
                     fi
                     ;;
                 3)  show_status ;;
-                4)  export_logs ;;
-                5)  exit 0 ;;
-                *)  echo "Invalid option. Please choose 1-5." ;;
+                4)  update_torquio --menu || true ;;
+                5)  export_logs ;;
+                6)  exit 0 ;;
+                *)  echo "Invalid option. Please choose 1-6." ;;
             esac
         fi
         
@@ -1694,6 +1780,18 @@ if [ $# -gt 0 ]; then
             show_status
             ;;
         -u|--update)
+            update_torquio
+            ;;
+        --post-update)
+            post_update "$2"
+            if [ "$3" = "--menu" ]; then
+                echo ""
+                read -p "Press [Enter] to return to the main menu..." temp
+                clear
+                show_menu
+            fi
+            ;;
+        --update-mediabay|--update_mediabay)
             "$SCRIPT_DIR/scripts/2-install/update_mediabay.sh"
             ;;
         -d|--map_folder)
@@ -1741,7 +1839,8 @@ if [ $# -gt 0 ]; then
             echo "  -f, --fix-icons             Refresh host desktop icons."
             echo "  -g, --graphics              Interact with display scaling configs."
             echo "  -s, --status                Display status dashboard."
-            echo "  -u, --update                Update MediaBay."
+            echo "  -u, --update                Update Torquio to the latest version."
+            echo "      --update-mediabay       Update MediaBay."
             echo "  -d, --map_folder [p] [l]    Map folder positional/interactively."
             echo "  -l, --export-logs           Zip up logs for a bug report (personal data removed)."
             echo "  -x, --export_key_commands   Export key commands to zip."
