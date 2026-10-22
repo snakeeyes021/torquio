@@ -42,7 +42,9 @@ EMAIL = re.compile(rb"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 REDACTIONS = [
     (re.compile(rb"eyJ[A-Za-z0-9_-]{8,}(?:\.[A-Za-z0-9_-]+){0,2}"), b"<token>"),
     (re.compile(rb"(?i)(bearer\s+)[A-Za-z0-9._~+/=-]+"), rb"\1<token>"),
-    (re.compile(rb"(?i)((?:access|refresh|id)[ _]token[\"']?\s*[:=]\s*[\"']?)[^\s\"',}]{20,}"), rb"\1<token>"),
+    (re.compile(rb"(?i)((?:access|refresh|id)[ _]token[\"']?\s*[:=]\s*[\"']?)[^\s\"',}&<]{20,}"), rb"\1<token>"),
+    # One-time sign-in codes and tokens passed in web addresses (e.g. a login redirect), should one be logged
+    (re.compile(rb"(?i)([?&#](?:code|code_verifier|access_token|id_token|refresh_token|token)=)[^&\s\"'<>]+"), rb"\1<token>"),
     (re.compile(rb"(?i)(hardware ID:\s*)[0-9a-f]+"), rb"\1<hardware-id>"),
     (re.compile(rb"(?i)(grant(?:ID)?:?\s*)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"), rb"\1<grant-id>"),
 ]
