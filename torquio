@@ -1386,6 +1386,10 @@ rebuild_wine() {
     echo "Running build_wine.sh inside container..."
     distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$SCRIPT_DIR\" && ./scripts/1-build/build_wine.sh --rebuild"
 
+    # Bring existing prefixes up to date with prefix settings added after their install.
+    # Steinberg's plug-in host UI only draws text in "Segoe UI"; alias it to Tahoma.
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine reg add \"HKCU\\Software\\Wine\\Fonts\\Replacements\" /v \"Segoe UI\" /t REG_SZ /d \"Tahoma\" /f" >/dev/null 2>&1 || true
+
     echo ""
     echo -e "${wine}Wine rebuild complete!${reset}"
 }
