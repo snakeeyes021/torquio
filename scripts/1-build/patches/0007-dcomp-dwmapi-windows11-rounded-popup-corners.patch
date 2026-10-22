@@ -1,0 +1,91 @@
+diff --git a/dlls/dcomp/device.c b/dlls/dcomp/device.c
+index 78e4beafa4b..647d8745b1a 100644
+--- a/dlls/dcomp/device.c
++++ b/dlls/dcomp/device.c
+@@ -19,6 +19,7 @@
+ #include <assert.h>
+ #include <stdarg.h>
+ #include <stdlib.h>
++#include <math.h>
+ #include <assert.h>
+ 
+ #include "ntstatus.h"
+@@ -433,6 +434,23 @@ static void target_clear_region(struct composition_target *target)
+     target->region_dirty = TRUE;
+ }
+ 
++/* Corner radius Windows 11 would apply: small rounding for popups unless the application set
++ * DWMWA_WINDOW_CORNER_PREFERENCE (recorded by dwmapi as a window property). */
++static int target_corner_radius(struct composition_target *target)
++{
++    UINT_PTR preference = (UINT_PTR)GetPropW(target->hwnd, L"__wine_dwm_corner_preference");
++    int radius;
++
++    /* Stored as DWM_WINDOW_CORNER_PREFERENCE + 1: DONOTROUND = 1, ROUND = 2, ROUNDSMALL = 3. */
++    switch (preference)
++    {
++    case 1 + 1: return 0;
++    case 2 + 1: radius = 8; break;
++    default: radius = 4; break;
++    }
++    return MulDiv(radius, GetDpiForWindow(target->hwnd), USER_DEFAULT_SCREEN_DPI);
++}
++
+ static void target_update_region(struct composition_target *target, HDC src_dc, UINT width, UINT height)
+ {
+     HBITMAP bitmap = GetCurrentObject(src_dc, OBJ_BITMAP);
+@@ -440,6 +458,7 @@ static void target_update_region(struct composition_target *target, HDC src_dc,
+     RECT *rects;
+     UINT x, y, count = 0;
+     DIBSECTION dib;
++    int radius;
+ 
+     if (!bitmap || GetObjectW(bitmap, sizeof(dib), &dib) != sizeof(dib) || !dib.dsBm.bmBits
+             || dib.dsBm.bmBitsPixel != 32)
+@@ -448,6 +467,7 @@ static void target_update_region(struct composition_target *target, HDC src_dc,
+     height = min(height, dib.dsBm.bmHeight);
+     if (!(rects = malloc(max(height, 1) * sizeof(*rects))))
+         return;
++    radius = target_corner_radius(target);
+ 
+     for (y = 0; y < height; ++y)
+     {
+@@ -474,6 +494,18 @@ static void target_update_region(struct composition_target *target, HDC src_dc,
+             }
+         }
+ 
++        /* Windows 11 rounds the corners of top-level windows. */
++        if (radius && (y < radius || y >= height - radius))
++        {
++            float d = radius - (y < radius ? y : height - 1 - y) - 0.5f;
++            int inset = (int)(radius - sqrtf(radius * radius - d * d) + 0.5f);
++
++            left = max(left, inset);
++            right = min(right, (int)width - inset);
++            if (left >= right)
++                continue;
++        }
++
+         if (count && rects[count - 1].bottom == origin.y + y && rects[count - 1].left == origin.x + left
+                 && rects[count - 1].right == origin.x + right)
+             ++rects[count - 1].bottom;
+diff --git a/dlls/dwmapi/dwmapi_main.c b/dlls/dwmapi/dwmapi_main.c
+index 49e05cd207e..65ff41a9c61 100644
+--- a/dlls/dwmapi/dwmapi_main.c
++++ b/dlls/dwmapi/dwmapi_main.c
+@@ -102,6 +102,15 @@ HRESULT WINAPI DwmSetWindowAttribute(HWND hwnd, DWORD attributenum, LPCVOID attr
+ {
+     static BOOL once;
+ 
++    TRACE("(%p, %lu, %p, %lu)\n", hwnd, attributenum, attribute, size);
++
++    /* Record the corner preference so that composition can round the window like Windows 11. */
++    if (attributenum == DWMWA_WINDOW_CORNER_PREFERENCE && attribute && size >= sizeof(DWORD))
++    {
++        SetPropW(hwnd, L"__wine_dwm_corner_preference", (HANDLE)(UINT_PTR)(*(const DWORD *)attribute + 1));
++        return S_OK;
++    }
++
+     if (!once++) FIXME("(%p, %lx, %p, %lx) stub\n", hwnd, attributenum, attribute, size);
+ 
+     return S_OK;
