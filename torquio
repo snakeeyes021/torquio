@@ -1256,8 +1256,11 @@ export_logs() {
     echo ""
     echo "Saved: $zip_file"
     echo ""
-    echo "Find the exported log file at the above path. Your email address, username, computer name and"
-    echo "license details have been removed, but the names of projects you've opened in Dorico are still in it."
+    local yellow="\033[38;5;179m"
+    local reset="\033[0m"
+    echo "Find the exported log file at the above path. Your email address, username, computer name and license details have been removed."
+    echo ""
+    echo -e "${yellow}Project names are still in it, so have a quick look before posting it publicly. GitHub issues and forum posts are usually permanent; if you can, consider sending it by email instead.${reset}"
 }
 
 import_keycommands() {
