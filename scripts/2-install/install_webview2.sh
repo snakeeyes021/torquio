@@ -19,8 +19,7 @@ set_environment() {
     local version
     version=$(basename "$(ls -d "$DEST_ROOT"/*/ | sort -V | tail -n 1)")
     echo "Pointing the Dorico prefix at WebView2 $version..."
-    # Chromium's sandbox doesn't work under Wine.
-    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export WINEDEBUG=-all; wine reg add 'HKCU\\Environment' /v WEBVIEW2_BROWSER_EXECUTABLE_FOLDER /t REG_SZ /d 'C:\\Program Files\\Torquio\\WebView2\\$version' /f && wine reg add 'HKCU\\Environment' /v WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS /t REG_SZ /d '--no-sandbox' /f" >/dev/null
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export WINEDEBUG=-all; wine reg add 'HKCU\\Environment' /v WEBVIEW2_BROWSER_EXECUTABLE_FOLDER /t REG_SZ /d 'C:\\Program Files\\Torquio\\WebView2\\$version' /f" >/dev/null
 }
 
 if [ "$1" != "--force" ] && ls "$DEST_ROOT"/*/msedgewebview2.exe >/dev/null 2>&1; then
