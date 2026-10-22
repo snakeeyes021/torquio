@@ -1256,8 +1256,8 @@ export_logs() {
     echo ""
     echo "Saved: $zip_file"
     echo ""
-    echo "Find the exported log file at the above path. Email addresses and license details have been"
-    echo "removed, but the names of projects you've opened in Dorico are still in it."
+    echo "Find the exported log file at the above path. Your email address, username, computer name and"
+    echo "license details have been removed, but the names of projects you've opened in Dorico are still in it."
 }
 
 import_keycommands() {

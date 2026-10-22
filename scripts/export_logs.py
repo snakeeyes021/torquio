@@ -9,10 +9,12 @@ Usage: export_logs.py [OUTPUT_DIR]   (default: the XDG download directory)
 Prints the path of the zip it wrote.
 """
 import datetime
+import getpass
 import glob
 import os
 import platform
 import re
+import socket
 import subprocess
 import sys
 import zipfile
@@ -36,8 +38,8 @@ PREFIX_LOGS = [
     ("other", "AppData/Local/Temp/NotePerformer64.log"),
 ]
 
+EMAIL = re.compile(rb"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 REDACTIONS = [
-    (re.compile(rb"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"), b"<email>"),
     (re.compile(rb"eyJ[A-Za-z0-9_-]{8,}(?:\.[A-Za-z0-9_-]+){0,2}"), b"<token>"),
     (re.compile(rb"(?i)(bearer\s+)[A-Za-z0-9._~+/=-]+"), rb"\1<token>"),
     (re.compile(rb"(?i)((?:access|refresh|id)[ _]token[\"']?\s*[:=]\s*[\"']?)[^\s\"',}]{20,}"), rb"\1<token>"),
@@ -53,8 +55,40 @@ LICENSE_LOGS = ("activation-manager", "audio-engine", "download-assistant")
 GUID = re.compile(rb"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b")
 
 
+# Stock computer names that also appear in logs for other reasons (e.g. "OS: Bazzite"); left alone.
+COMMON_HOSTNAMES = {"localhost", "linux", "fedora", "bazzite", "nobara", "ubuntu", "debian", "mint", "arch",
+                    "archlinux", "manjaro", "endeavouros", "cachyos", "opensuse", "pop-os", "steamdeck"}
+PATH_SEP = rb"(?:/|\\+)"
+
+
+def personal_patterns(texts):
+    """Patterns for this user's own identifiers: full email addresses, the first half of any address
+    found (when it is a whole folder or file name, e.g. a cloud-sync folder), the username in paths and
+    after labels like "UserName:", and the computer name. Email halves are only matched as path parts so that a common word like
+    "info" is never blanked from ordinary log text."""
+    patterns = [(EMAIL, b"<email>")]
+    names = {m.split(b"@")[0] for text in texts for m in EMAIL.findall(text)}
+    for name in sorted(names, key=len, reverse=True):
+        if len(name) >= 3:
+            patterns.append((re.compile(rb"(?i)(?<=[/\\])" + re.escape(name) + rb"(?=[/\\\"']|$)", re.M), b"<email-name>"))
+    users = {getpass.getuser(), os.path.basename(HOME)}
+    users |= {os.path.basename(d) for d in glob.glob(os.path.join(PREFIX, "drive_c/users/*"))}
+    for user in sorted(users - {"Public", "public", ""}, key=len, reverse=True):
+        patterns.append((re.compile(rb"(?i)(" + PATH_SEP + rb"(?:home|users)" + PATH_SEP + rb")" + re.escape(user.encode())
+                                    + rb"(?![A-Za-z0-9._-])"), rb"\1<user>"))
+        patterns.append((re.compile(rb"(?i)((?:user ?name|user)\s*[:=]\s*|started by\s+)" + re.escape(user.encode())
+                                    + rb"(?![A-Za-z0-9._-])"), rb"\1<user>"))
+    host = socket.gethostname().split(".")[0]
+    if len(host) >= 3 and host.lower() not in COMMON_HOSTNAMES:
+        patterns.append((re.compile(rb"(?i)(?<![A-Za-z0-9])" + re.escape(host.encode()) + rb"(?![A-Za-z0-9])"), b"<computer>"))
+    return patterns
+
+
+PERSONAL = []  # filled in by main() once all logs are read
+
+
 def redact(data, folder=""):
-    for pattern, replacement in REDACTIONS:
+    for pattern, replacement in PERSONAL + REDACTIONS:
         data = pattern.sub(replacement, data)
     if folder.startswith(LICENSE_LOGS):
         data = GUID.sub(b"<id>", data)
@@ -136,7 +170,7 @@ def system_info():
     lines.append("== Crash dumps (not included, listed only; newest first)")
     lines += [f"{datetime.datetime.fromtimestamp(os.path.getmtime(d)):%Y-%m-%d %H:%M}  {os.path.getsize(d):>9} bytes  {os.path.basename(d)}"
               for d in dumps[:20]] or ["(none)"]
-    return redact("\n".join(lines).encode() + b"\n")
+    return "\n".join(lines).encode() + b"\n"
 
 
 README = b"""Torquio log export
@@ -146,7 +180,8 @@ torquio/          Torquio's own logs (these include Wine's output while Dorico r
 dorico/, audio-engine/, activation-manager/, steinberg-runtime/, download-assistant/, other/
                   logs written by Dorico and the Steinberg tools inside the Wine prefix
 
-Removed from every file: email addresses, sign-in tokens, the Steinberg hardware ID and license grant IDs.
+Removed from every file: email addresses (and their first half where it is a folder or file name), your
+username in paths, your computer's name, sign-in tokens, the Steinberg hardware ID and license IDs.
 Never included: license data, Wine registry files, crash dumps (listed in system-info.txt only).
 Still present: names and folder paths of projects opened in Dorico.
 """
@@ -158,21 +193,26 @@ def main():
         out_dir = os.path.join(HOME, "Downloads")
     os.makedirs(out_dir, exist_ok=True)
     zip_path = os.path.join(out_dir, f"torquio-logs-{datetime.datetime.now():%Y-%m-%d_%H-%M-%S}.zip")
+    logs = []  # (folder in the zip, file name, contents)
+    for path in sorted(glob.glob(os.path.join(DATA_DIR, "logs", "*.log")) + glob.glob(os.path.join(DATA_DIR, "*.log"))):
+        logs.append(("torquio", os.path.basename(path), read_log(path)))
+    for user_dir in sorted(glob.glob(os.path.join(PREFIX, "drive_c/users/*"))):
+        for folder, pattern in PREFIX_LOGS:
+            for path in sorted(glob.glob(os.path.join(user_dir, pattern))):
+                if os.path.isfile(path):
+                    # Name Dorico's logs after their version folder ("Dorico 6 - application.log")
+                    version_dir = {"dorico": 1, "audio-engine": 2}.get(folder)
+                    name = os.path.basename(path)
+                    if version_dir:
+                        name = f"{os.path.basename(os.path.dirname(path) if version_dir == 1 else os.path.dirname(os.path.dirname(path)))} - {name}"
+                    logs.append((folder, name, read_log(path)))
+    info = system_info()
+    PERSONAL.extend(personal_patterns([data for _, _, data in logs] + [info]))
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("README.txt", README)
-        z.writestr("system-info.txt", system_info())
-        for path in sorted(glob.glob(os.path.join(DATA_DIR, "logs", "*.log")) + glob.glob(os.path.join(DATA_DIR, "*.log"))):
-            z.writestr("torquio/" + os.path.basename(path), redact(read_log(path)))
-        for user_dir in sorted(glob.glob(os.path.join(PREFIX, "drive_c/users/*"))):
-            for folder, pattern in PREFIX_LOGS:
-                for path in sorted(glob.glob(os.path.join(user_dir, pattern))):
-                    if os.path.isfile(path):
-                        # Name Dorico's logs after their version folder ("Dorico 6 - application.log")
-                        version_dir = {"dorico": 1, "audio-engine": 2}.get(folder)
-                        name = os.path.basename(path)
-                        if version_dir:
-                            name = f"{os.path.basename(os.path.dirname(path) if version_dir == 1 else os.path.dirname(os.path.dirname(path)))} - {name}"
-                        z.writestr(f"{folder}/{name}", redact(read_log(path), folder))
+        z.writestr("system-info.txt", redact(info))
+        for folder, name, data in logs:
+            z.writestr(f"{folder}/{name}", redact(data, folder))
     print(zip_path)
 
 
