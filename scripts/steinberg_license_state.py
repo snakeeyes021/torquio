@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Report whether any Steinberg licence is activated in a Torquio Wine prefix.
+"""Report whether any Steinberg license is activated in a Torquio Wine prefix.
 
 The Steinberg Activation Manager keeps each product package and its licensed items in activation.dat.
-An item activated on this computer carries a licence token ("jwt"); deactivating (or signing out of the
+An item activated on this computer carries a license token ("jwt"); deactivating (or signing out of the
 Activation Manager, which deactivates everything) empties the tokens or the package list.
 
 Usage: steinberg_license_state.py PREFIX
-Prints one line:
-    active <package>[, <package>...]   at least one licence is activated
-    inactive                           nothing is activated
-    unknown <reason>                   the state couldn't be determined
+Prints one of:
+    active             at least one license is activated; followed by one product name per line
+    inactive           nothing is activated
+    unknown <reason>   the state couldn't be determined
 """
 import glob
 import json
@@ -41,7 +41,7 @@ def main(prefix):
                 name = package.get("ProductPackage") or package.get("GrantID") or "unnamed product"
                 if name not in active:
                     active.append(name)
-    return "active " + ", ".join(active) if active else "inactive"
+    return "\n".join(["active"] + active) if active else "inactive"
 
 
 if __name__ == "__main__":

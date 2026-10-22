@@ -25,9 +25,6 @@ reset="\033[0m"
 echo ""
 echo -e "${red}### W A R N I N G ###${reset}"
 echo ""
-echo -e "⚠️  ${red}If you have not already deactivated your license(s), you will PERMANENTLY lose access!${reset}"
-echo -e "   ${gray}(Signing out of the Steinberg Activation Manager also deactivates all your Steinberg licences.)${reset}"
-echo ""
 echo -e "⚠️  ${red}If you store your Dorico projects inside the data directory (as opposed to somewhere in your user folder) and have not already backed them up, you will PERMANENTLY lose access!${reset}"
 echo ""
 echo ""
@@ -38,15 +35,16 @@ echo -e " - Cache directory:     ${gray}$TORQUIO_CACHE_DIR${reset} (includes Win
 echo " - Host integration scripts and .desktop files"
 echo " - Extracted desktop icons"
 echo ""
-# Licence check: refuse to delete a prefix that still holds activated Steinberg licences unless the user
+# License check: refuse to delete a prefix that still holds activated Steinberg licenses unless the user
 # explicitly accepts it (e.g. they can't deactivate and will do it from their Steinberg account online).
-LICENSE_STATE=$(python3 "$SCRIPT_DIR/steinberg_license_state.py" "$TORQUIO_PREFIX_DIR" 2>/dev/null || echo "unknown the licence check failed to run")
+LICENSE_STATE=$(python3 "$SCRIPT_DIR/steinberg_license_state.py" "$TORQUIO_PREFIX_DIR" 2>/dev/null || echo "unknown the license check failed to run")
 case "$LICENSE_STATE" in
     active*)
-        echo -e "${red}These Steinberg licences are still activated in this installation: ${LICENSE_STATE#active }${reset}"
-        echo "Deactivate them first in the Steinberg Activation Manager (deactivating each product, or signing"
-        echo "out, which deactivates all of them), then run the uninstall again. If you delete them while"
-        echo "activated, you can no longer deactivate them from this computer."
+        echo -e "⚠️  ${red}These Steinberg licenses are still activated in this installation:${reset}"
+        echo ""
+        echo "${LICENSE_STATE#active$'\n'}"
+        echo ""
+        echo "Deactivate them in the Steinberg Activation Manager, then run the uninstall again. If you delete them while they're activated, you can no longer deactivate them from this computer."
         echo ""
         override="yes, I'm aware my license is active and deleting it will prevent me from ever deactivating it. proceed anyways"
         read -p "To uninstall anyway, type '$override': " confirm
@@ -56,15 +54,15 @@ case "$LICENSE_STATE" in
         fi
         ;;
     inactive)
-        echo -e "${green}No activated Steinberg licences found in this installation.${reset}"
-        read -p "Have you deactivated any third-party plug-in licences (e.g. Cantai)? (y/N): " confirm
+        echo -e "${green}No activated Steinberg licenses found in this installation.${reset}"
+        read -p "Have you deactivated any third-party plug-in licenses (e.g. Cantai)? (y/N): " confirm
         if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
             echo "Cleanup cancelled."
             exit 10
         fi
         ;;
     *)
-        echo -e "${yellow}Torquio couldn't determine whether your Steinberg licences are deactivated (${LICENSE_STATE#unknown }).${reset}"
+        echo -e "⚠️  ${yellow}Torquio couldn't determine whether your Steinberg licenses are deactivated (${LICENSE_STATE#unknown }).${reset}"
         echo "Open the Steinberg Activation Manager and make sure every product is deactivated before continuing."
         echo ""
         override="no, I promise, I've deactivated my license"
