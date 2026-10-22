@@ -55,3 +55,5 @@ else
     
     distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine \"$EXTRACTED_EXE\"" || true
 fi
+# Cantai's editor is a web view; provision the WebView2 runtime it needs.
+"$SCRIPT_DIR/install_webview2.sh"

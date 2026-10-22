@@ -275,6 +275,25 @@ if [ -d "\$STAGED_DIR" ] && [ \$(ls -A "\$STAGED_DIR" 2>/dev/null | wc -l) -gt 0
     rm -rf "\$STAGED_DIR"
 fi
 
+# Plug-ins installed "for this user only" (e.g. Cantai) land in the per-user VST3 folder, which
+# Dorico's audio engine doesn't scan; link them into the system-wide VST3 folder.
+COMMON_VST3="\$WINEPREFIX/drive_c/Program Files/Common Files/VST3"
+for USER_VST3 in "\$WINEPREFIX"/drive_c/users/*/AppData/Local/Programs/Common/VST3/*.vst3; do
+    [ -e "\$USER_VST3" ] || continue
+    if [ ! -e "\$COMMON_VST3/\$(basename "\$USER_VST3")" ]; then
+        mkdir -p "\$COMMON_VST3"
+        ln -s "\$USER_VST3" "\$COMMON_VST3/\$(basename "\$USER_VST3")"
+    fi
+done
+
+# Plug-ins with web-based editors (e.g. Cantai) need the WebView2 runtime that install_webview2.sh
+# provisions. Chromium's sandbox doesn't work under Wine.
+WEBVIEW2_DIR=\$(ls -d "\$WINEPREFIX/drive_c/Program Files/Torquio/WebView2"/*/ 2>/dev/null | sort -V | tail -n 1)
+if [ -n "\$WEBVIEW2_DIR" ] && [ -f "\${WEBVIEW2_DIR}msedgewebview2.exe" ]; then
+    export WEBVIEW2_BROWSER_EXECUTABLE_FOLDER=\$(export WINEDEBUG=-all; winepath -w "\$WEBVIEW2_DIR" | tr -d '\r')
+    export WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS="--no-sandbox"
+fi
+
 cd "\$DORICO_DIR"
 if [ -n "\$WIN_PATH" ]; then
     wine "\$DORICO_NAME" "\$WIN_PATH"
