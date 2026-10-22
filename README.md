@@ -131,7 +131,21 @@ Occasionally, Wine servers hang, applications lock up in the background, or you'
     * **Reboot Prefix**: `torquio -b` or `torquio --reboot` (Simulates a Windows system reboot in the prefix).
     * **Wine Configuration**: `torquio -w` or `torquio --winecfg` (Opens the standard `winecfg` graphical control panel for library overrides).
     * **Execute Installer**: `torquio -e [file.exe/msi]` or `torquio --execute [file.exe/msi]` (Executes custom Windows installers or tools inside the environment prefix).
-    * **Fix Icons**: `torquio -f` or `torquio --fix-icons` (Refreshes desktop icons and launcher shortcuts on the host system). This can also be useful when following a ```git pull```; at the moment, this is how you'd update Torquio.
+    * **Fix Icons**: `torquio -f` or `torquio --fix-icons` (Refreshes desktop icons and launcher shortcuts on the host system).
+
+### 6. Updating Torquio
+Torquio can update itself from GitHub. It shows what's new and asks before installing, then refreshes your launchers, icons and Wine prefix settings. If an update changes Torquio's Wine engine, it offers to rebuild it (20-40 minutes) or lets you do that later. It won't overwrite Torquio files you've changed yourself.
+
+**How to Use**:
+  * **Interactive**: Option `9` (Update Torquio) in the main menu.
+  * **CLI Flag**: `torquio -u` or `torquio --update`
+
+### 7. Exporting Logs for Bug Reports
+If something goes wrong, Torquio can collect its own logs, Wine's output and the Dorico and Steinberg logs into a single zip in your `~/Downloads` folder, along with a short summary of your system. Your email address, username, computer name and license details are removed first; the names of projects you've opened in Dorico are still in it.
+
+**How to Use**:
+  * **Interactive**: Option `10` (Export Logs) in the main menu.
+  * **CLI Flag**: `torquio -l` or `torquio --export-logs`
 
 ---
 
