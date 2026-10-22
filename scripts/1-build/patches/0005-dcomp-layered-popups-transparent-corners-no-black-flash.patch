@@ -1,0 +1,358 @@
+diff --git a/dlls/dcomp/dcomp_private.h b/dlls/dcomp/dcomp_private.h
+index d2336388b0d..ac5d7029fdf 100644
+--- a/dlls/dcomp/dcomp_private.h
++++ b/dlls/dcomp/dcomp_private.h
+@@ -75,8 +75,24 @@ struct composition_target
+     HANDLE shared_visual_handle;
+     struct list entry;
+     LONG ref;
++
++    /* Layered windows can't show per-pixel alpha on X11. Fully transparent pixels are cut
++     * out with a window region, and the window is kept invisible until its first frame. */
++    BOOL layered;
++    BOOL content_drawn;     /* content was drawn to the window during the current pass */
++    BOOL hidden;
++    DWORD hidden_time;
++    COLORREF saved_key;
++    BYTE saved_alpha;
++    DWORD saved_flags;
++    RECT *region_rects;     /* region computed by the last pass, in window coordinates */
++    UINT region_count;
++    BOOL region_dirty;
++    BOOL region_applied;    /* a region is set on the window, clear it if no longer wanted */
+ };
+ 
++void target_show(struct composition_target *target);
++
+ struct composition_visual
+ {
+     IDCompositionVisualUnknown IDCompositionVisualUnknown_iface;
+diff --git a/dlls/dcomp/device.c b/dlls/dcomp/device.c
+index f40958538c4..78e4beafa4b 100644
+--- a/dlls/dcomp/device.c
++++ b/dlls/dcomp/device.c
+@@ -404,7 +404,96 @@ done:
+     return hr;
+ }
+ 
+-static void do_composite_dxgi_surface(const struct composition_target *target,
++/* Record, for each row of the frame, the span of pixels that aren't fully transparent.
++ * X11 windows have no alpha channel, so those pixels are cut out with a window region. */
++/* Only cut layered windows without a non-client area (e.g. popups); windows may also stop
++ * being layered after the target was created. */
++static BOOL target_wants_region(struct composition_target *target)
++{
++    RECT window_rect, client_rect;
++    POINT origin = {0, 0};
++
++    if (!target->layered || !(GetWindowLongW(target->hwnd, GWL_EXSTYLE) & WS_EX_LAYERED))
++        return FALSE;
++    if (!GetWindowRect(target->hwnd, &window_rect) || !GetClientRect(target->hwnd, &client_rect)
++            || !ClientToScreen(target->hwnd, &origin))
++        return FALSE;
++    return origin.x == window_rect.left && origin.y == window_rect.top
++            && client_rect.right == window_rect.right - window_rect.left
++            && client_rect.bottom == window_rect.bottom - window_rect.top;
++}
++
++static void target_clear_region(struct composition_target *target)
++{
++    if (!target->region_applied)
++        return;
++    free(target->region_rects);
++    target->region_rects = NULL;
++    target->region_count = 0;
++    target->region_dirty = TRUE;
++}
++
++static void target_update_region(struct composition_target *target, HDC src_dc, UINT width, UINT height)
++{
++    HBITMAP bitmap = GetCurrentObject(src_dc, OBJ_BITMAP);
++    POINT origin = {0, 0};
++    RECT *rects;
++    UINT x, y, count = 0;
++    DIBSECTION dib;
++
++    if (!bitmap || GetObjectW(bitmap, sizeof(dib), &dib) != sizeof(dib) || !dib.dsBm.bmBits
++            || dib.dsBm.bmBitsPixel != 32)
++        return;
++    width = min(width, dib.dsBm.bmWidth);
++    height = min(height, dib.dsBm.bmHeight);
++    if (!(rects = malloc(max(height, 1) * sizeof(*rects))))
++        return;
++
++    for (y = 0; y < height; ++y)
++    {
++        UINT row_index = dib.dsBmih.biHeight > 0 ? dib.dsBm.bmHeight - 1 - y : y;
++        const DWORD *row = (const DWORD *)((const BYTE *)dib.dsBm.bmBits + row_index * dib.dsBm.bmWidthBytes);
++        int left = -1, right = -1;
++
++        for (x = 0; x < width; ++x)
++        {
++            if (row[x] >> 24)
++            {
++                left = x;
++                break;
++            }
++        }
++        if (left < 0)
++            continue;
++        for (x = width; x > left; --x)
++        {
++            if (row[x - 1] >> 24)
++            {
++                right = x;
++                break;
++            }
++        }
++
++        if (count && rects[count - 1].bottom == origin.y + y && rects[count - 1].left == origin.x + left
++                && rects[count - 1].right == origin.x + right)
++            ++rects[count - 1].bottom;
++        else
++            SetRect(&rects[count++], origin.x + left, origin.y + y, origin.x + right, origin.y + y + 1);
++    }
++
++    if (target->region_applied && count == target->region_count
++            && (!count || !memcmp(rects, target->region_rects, count * sizeof(*rects))))
++    {
++        free(rects);
++        return;
++    }
++    free(target->region_rects);
++    target->region_rects = rects;
++    target->region_count = count;
++    target->region_dirty = TRUE;
++}
++
++static void do_composite_dxgi_surface(struct composition_target *target,
+                                       const struct composition_visual *visual,
+                                       IDXGISurface *dxgi_surface)
+ {
+@@ -552,10 +641,30 @@ static void do_composite_dxgi_surface(const struct composition_target *target,
+     if (!target->topmost)
+         style |= DCX_CLIPCHILDREN;
+     dst_dc = GetDCEx(target->hwnd, 0, style);
+-    if (GetWindowLongW(target->hwnd, GWL_EXSTYLE) & WS_EX_LAYERED)
+-        GdiAlphaBlend(dst_dc, 0, 0, size.width, size.height, src_dc, 0, 0, size.width, size.height, blend_func);
++    if (target_wants_region(target))
++    {
++        if (target->content_drawn)
++        {
++            GdiAlphaBlend(dst_dc, 0, 0, size.width, size.height, src_dc, 0, 0, size.width, size.height, blend_func);
++        }
++        else
++        {
++            /* Blending over whatever the window last showed would leave stale pixels where the
++             * content is transparent; copy the premultiplied pixels instead and cut the fully
++             * transparent ones out with the window region. */
++            BitBlt(dst_dc, 0, 0, size.width, size.height, src_dc, 0, 0, SRCCOPY);
++            target_update_region(target, src_dc, size.width, size.height);
++        }
++    }
+     else
+-        BitBlt(dst_dc, 0, 0, size.width, size.height, src_dc, 0, 0, SRCCOPY);
++    {
++        target_clear_region(target);
++        if (GetWindowLongW(target->hwnd, GWL_EXSTYLE) & WS_EX_LAYERED)
++            GdiAlphaBlend(dst_dc, 0, 0, size.width, size.height, src_dc, 0, 0, size.width, size.height, blend_func);
++        else
++            BitBlt(dst_dc, 0, 0, size.width, size.height, src_dc, 0, 0, SRCCOPY);
++    }
++    target->content_drawn = TRUE;
+     ReleaseDC(target->hwnd, dst_dc);
+ 
+     ID2D1GdiInteropRenderTarget_ReleaseDC(visual->interop, NULL);
+@@ -609,7 +718,7 @@ static struct composition_visual * shared_visual_target_get_root(HANDLE shared_v
+     return visual;
+ }
+ 
+-static HRESULT do_composite(const struct composition_target *target, struct composition_visual *visual)
++static HRESULT do_composite(struct composition_target *target, struct composition_visual *visual)
+ {
+     struct composition_visual *child_visual;
+     IDXGISurface *dxgi_surface;
+@@ -709,10 +818,86 @@ static HRESULT do_composite(const struct composition_target *target, struct comp
+ }
+ 
+ 
++/* Window updates that may send messages to the window's thread; they are applied after
++ * releasing the dcomp lock so that the composition thread can't deadlock with it. */
++struct window_update
++{
++    HWND hwnd;
++    HRGN region;
++    BOOL clear_region;
++    BOOL show;
++    COLORREF key;
++    BYTE alpha;
++    DWORD flags;
++};
++
++static void queue_window_update(struct composition_target *target, struct window_update **updates,
++        unsigned int *count, unsigned int *capacity)
++{
++    struct window_update *update;
++    RGNDATA *data;
++    BOOL show;
++
++    /* Show the window once its first frame is in place, or after a while if the
++     * application never provides one. */
++    show = target->hidden && (target->content_drawn || GetTickCount() - target->hidden_time > 2000);
++    if (!target->region_dirty && !show)
++        return;
++
++    if (*count == *capacity)
++    {
++        unsigned int new_capacity = max(8, *capacity * 2);
++        struct window_update *new_updates;
++
++        if (!(new_updates = realloc(*updates, new_capacity * sizeof(**updates))))
++            return;
++        *updates = new_updates;
++        *capacity = new_capacity;
++    }
++    update = &(*updates)[(*count)++];
++    memset(update, 0, sizeof(*update));
++    update->hwnd = target->hwnd;
++
++    if (target->region_dirty && !target->region_rects)
++    {
++        /* Region no longer wanted: remove it from the window. */
++        target->region_dirty = FALSE;
++        target->region_applied = FALSE;
++        update->clear_region = TRUE;
++    }
++    else if (target->region_dirty)
++    {
++        target->region_dirty = FALSE;
++        target->region_applied = TRUE;
++        if ((data = malloc(sizeof(data->rdh) + target->region_count * sizeof(RECT))))
++        {
++            data->rdh.dwSize = sizeof(data->rdh);
++            data->rdh.iType = RDH_RECTANGLES;
++            data->rdh.nCount = target->region_count;
++            data->rdh.nRgnSize = target->region_count * sizeof(RECT);
++            SetRectEmpty(&data->rdh.rcBound);
++            memcpy(data->Buffer, target->region_rects, target->region_count * sizeof(RECT));
++            update->region = ExtCreateRegion(NULL, sizeof(data->rdh) + data->rdh.nRgnSize, data);
++            free(data);
++        }
++    }
++
++    if (show)
++    {
++        target->hidden = FALSE;
++        update->show = TRUE;
++        update->key = target->saved_key;
++        update->alpha = target->saved_alpha;
++        update->flags = target->saved_flags ? target->saved_flags : LWA_ALPHA;
++    }
++}
++
+ static DWORD WINAPI composite_thread_proc(void *iface)
+ {
+     struct composition_device *device = impl_from_IDCompositionDevice(iface);
+-    unsigned int count, frequency, refresh_period;
++    unsigned int count, frequency, refresh_period, i;
++    unsigned int update_count, update_capacity = 0;
++    struct window_update *updates = NULL;
+     struct composition_target *target;
+     struct composition_visual *visual;
+     HDC hdc;
+@@ -731,8 +916,11 @@ static DWORD WINAPI composite_thread_proc(void *iface)
+         dcomp_lock();
+ 
+         count = 0;
++        update_count = 0;
+         LIST_FOR_EACH_ENTRY(target, &device->targets, struct composition_target, entry)
+         {
++            target->content_drawn = FALSE;
++
+             if (!target->root)
+             {
+                 FIXME("Target %p has no root.\n", &target->IDCompositionTarget_iface);
+@@ -747,6 +935,7 @@ static DWORD WINAPI composite_thread_proc(void *iface)
+             visual = impl_from_IDCompositionVisual(target->root);
+             if (SUCCEEDED(do_composite(target, visual)))
+                 count++;
++            queue_window_update(target, &updates, &update_count, &update_capacity);
+         }
+ 
+         if (!count)
+@@ -759,12 +948,22 @@ static DWORD WINAPI composite_thread_proc(void *iface)
+ 
+         dcomp_unlock();
+ 
++        for (i = 0; i < update_count; ++i)
++        {
++            /* Apply the region before making the window visible. */
++            if (updates[i].region || updates[i].clear_region)
++                SetWindowRgn(updates[i].hwnd, updates[i].region, FALSE);
++            if (updates[i].show)
++                SetLayeredWindowAttributes(updates[i].hwnd, updates[i].key, updates[i].alpha, updates[i].flags);
++        }
++
+         if (device->exit_thread)
+             break;
+ 
+         Sleep(refresh_period);
+     }
+ 
++    free(updates);
+     return 0;
+ }
+ 
+diff --git a/dlls/dcomp/target.c b/dlls/dcomp/target.c
+index a8b6fab4872..eed2898995a 100644
+--- a/dlls/dcomp/target.c
++++ b/dlls/dcomp/target.c
+@@ -69,6 +69,8 @@ static ULONG STDMETHODCALLTYPE target_Release(IDCompositionTarget *iface)
+     {
+         prop = target->topmost ? wine_window_topmost_composed : wine_window_non_topmost_composed;
+         RemovePropW(target->hwnd, prop);
++        target_show(target);
++        free(target->region_rects);
+ 
+         dcomp_lock();
+         list_remove(&target->entry);
+@@ -187,9 +189,39 @@ HRESULT create_target(struct composition_device *device, HWND hwnd, BOOL topmost
+ 
+     prop = target->topmost ? wine_window_topmost_composed : wine_window_non_topmost_composed;
+     SetPropW(target->hwnd, prop, (HANDLE)1);
++
++    if (GetWindowLongW(hwnd, GWL_EXSTYLE) & WS_EX_LAYERED)
++    {
++        COLORREF key;
++        DWORD flags;
++        BYTE alpha;
++
++        target->layered = TRUE;
++        /* The window is already mapped (showing nothing but black) while the application
++         * renders its first frame; make it transparent until that frame is composited.
++         * SetLayeredWindowAttributes() doesn't send messages, so this is safe from any thread. */
++        if (GetLayeredWindowAttributes(hwnd, &key, &alpha, &flags) && !(flags & LWA_COLORKEY))
++        {
++            target->saved_key = key;
++            target->saved_alpha = (flags & LWA_ALPHA) ? alpha : 255;
++            target->saved_flags = flags;
++            target->hidden_time = GetTickCount();
++            target->hidden = TRUE;
++            SetLayeredWindowAttributes(hwnd, key, 0, LWA_ALPHA);
++        }
++    }
+     return S_OK;
+ }
+ 
++void target_show(struct composition_target *target)
++{
++    if (!target->hidden)
++        return;
++    target->hidden = FALSE;
++    SetLayeredWindowAttributes(target->hwnd, target->saved_key, target->saved_alpha,
++            target->saved_flags ? target->saved_flags : LWA_ALPHA);
++}
++
+ 
+ HRESULT create_target_from_shared_visual_handle(struct composition_device *device, HANDLE shared_visual_handle, void **new_target)
+ {
