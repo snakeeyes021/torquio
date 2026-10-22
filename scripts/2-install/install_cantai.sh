@@ -55,5 +55,16 @@ else
     
     distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine \"$EXTRACTED_EXE\"" || true
 fi
+# Cantai installs into the per-user VST3 folder, which Dorico's audio engine doesn't scan; link it
+# into the system-wide one (the Dorico launcher also does this for any per-user plug-in).
+COMMON_VST3="$TORQUIO_PREFIX_DIR/drive_c/Program Files/Common Files/VST3"
+for USER_VST3 in "$TORQUIO_PREFIX_DIR"/drive_c/users/*/AppData/Local/Programs/Common/VST3/*.vst3; do
+    [ -e "$USER_VST3" ] || continue
+    if [ ! -e "$COMMON_VST3/$(basename "$USER_VST3")" ]; then
+        mkdir -p "$COMMON_VST3"
+        ln -s "$USER_VST3" "$COMMON_VST3/$(basename "$USER_VST3")"
+    fi
+done
+
 # Cantai's editor is a web view; provision the WebView2 runtime it needs.
 "$SCRIPT_DIR/install_webview2.sh"
