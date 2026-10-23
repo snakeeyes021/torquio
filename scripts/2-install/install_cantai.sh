@@ -42,9 +42,30 @@ if [ -z "$EXTRACTED_EXE" ]; then
 fi
 
 # 4. Execution Phase
-# Cantai's setup (Inno Setup) runs with its normal wizard; an unattended install hasn't been tested.
-echo "Launching the Cantai installer..."
-distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine \"$EXTRACTED_EXE\"" || true
+# Cantai's setup is Inno Setup: install silently unless --interactive is given, and fall back to the
+# wizard if the silent install didn't leave the plug-in and its renderer in place.
+run_setup() {
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export WINEDLLOVERRIDES=\"winemenubuilder.exe=d\"; wine \"$EXTRACTED_EXE\" $*" || true
+}
+cantai_installed() {
+    ls "$TORQUIO_PREFIX_DIR"/drive_c/users/*/AppData/Local/Programs/Common/VST3/Cantai.vst3 >/dev/null 2>&1 &&
+        find "$TORQUIO_PREFIX_DIR"/drive_c/users/*/AppData/Local/"Cantai Local Render" -maxdepth 1 -iname cantai.exe 2>/dev/null | grep -q .
+}
+if [[ "$1" == "--interactive" ]]; then
+    echo "Launching the Cantai installer..."
+    run_setup
+else
+    echo "Installing Cantai silently (this takes a minute or two)..."
+    run_setup /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
+    if ! cantai_installed; then
+        echo "The silent install didn't complete; opening Cantai's installer so you can finish it..."
+        run_setup
+    fi
+fi
+if ! cantai_installed; then
+    echo "Error: Cantai doesn't appear to be installed."
+    exit 1
+fi
 
 # Cantai installs into the per-user VST3 folder, which Dorico's audio engine doesn't scan; link it
 # into the system-wide one (the Dorico launcher also does this for any per-user plug-in).
