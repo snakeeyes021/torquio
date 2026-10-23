@@ -147,6 +147,13 @@ If something goes wrong, Torquio can collect its own logs, Wine's output and the
   * **Interactive**: Option `10` (Export Logs) in the main menu.
   * **CLI Flag**: `torquio -l` or `torquio --export-logs`
 
+### 8. GPU for AI Plug-ins
+AI plug-ins such as Cantai can run part of their work on your graphics card, which makes rendering noticeably faster (about twice as fast on an NVIDIA laptop GPU in our tests). Torquio sets this up for you: it gives the plug-in a Direct3D 12 implementation that works under Wine (vkd3d-proton) and points it at your strongest GPU: a dedicated card of any brand if you have one, otherwise your integrated graphics. Intel and AMD GPUs work out of the box; for NVIDIA GPUs, Torquio's container needs access to NVIDIA's driver, which new installs get automatically and existing installs are offered during an update (it re-creates the container in a few minutes; Dorico, your settings and licenses aren't affected).
+
+**How to Use**:
+  * **Interactive**: Wine Tools & Maintenance > `13` (GPU for AI Plug-ins) to see your GPUs and choose Automatic, a specific GPU, or Off.
+  * **CLI Flag**: `torquio --setup-gpu` (sets up GPU access, including NVIDIA access for an existing install).
+
 ---
 
 ## Display Scaling & Performance
