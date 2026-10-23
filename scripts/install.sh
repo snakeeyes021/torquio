@@ -698,9 +698,4 @@ echo "               Torquio Setup Wizard Complete!                   "
 echo "================================================================"
 echo "All interactive wizard installation tasks completed successfully."
 echo "================================================================"
-if ls "$TORQUIO_PREFIX_DIR"/drive_c/users/*/AppData/Local/"Cantai Local Render"/Dorico/*.dorico_pt >/dev/null 2>&1; then
-    echo ""
-    echo "Cantai: its playback template (Auto & Cantai) is added to Dorico automatically the first"
-    echo "time Dorico starts. Choose it in Dorico under Play > Playback Template."
-fi
 echo ""
