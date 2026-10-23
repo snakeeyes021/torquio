@@ -543,7 +543,7 @@ if [ "$CREATE_CONTAINER" = true ]; then
         # can use the GPU (Intel and AMD drivers are part of the container's Mesa already).
         NVIDIA_FLAG=""
         [ -e /proc/driver/nvidia/version ] && NVIDIA_FLAG="--nvidia"
-        distrobox create -i ubuntu:24.04 -n "$TORQUIO_CONTAINER_NAME" --hostname "$(hostname)" --yes $NVIDIA_FLAG
+        distrobox create -i ubuntu:24.04 -n "$TORQUIO_CONTAINER_NAME" --hostname "$(hostname)" --no-entry --yes $NVIDIA_FLAG
     fi
     distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$SCRIPT_DIR\" && ./scripts/1-build/container_gpu_setup.sh" || true
 fi
