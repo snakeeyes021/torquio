@@ -1316,6 +1316,7 @@ post_update() {
 
     if distrobox list 2>/dev/null | grep -q "$TORQUIO_CONTAINER_NAME" && [ -f "$TORQUIO_PREFIX_DIR/.torquio_core_installed" ]; then
         refresh_launchers --no-pause
+        setup_gpu_access --quiet
         if echo "$changed" | grep -q '^scripts/1-build/'; then
             echo -e "${yellow}This update includes changes to Torquio's Wine engine. Rebuilding it takes 20-40 minutes; until then, Dorico keeps running on the current engine.${reset}"
             read -p "Rebuild the Wine engine now? [y/N]: " confirm || true
@@ -1531,6 +1532,121 @@ enable_ntsync() {
     fi
 }
 
+host_has_nvidia() { [ -e /proc/driver/nvidia/version ]; }
+container_has_nvidia() { distrobox enter "$TORQUIO_CONTAINER_NAME" -- test -e /usr/lib/x86_64-linux-gnu/libGLX_nvidia.so.0 2>/dev/null; }
+
+# Re-create the container with the host's NVIDIA libraries (distrobox --nvidia), keeping everything in it
+# (including the compiled Wine engine): snapshot it as an image, create the new container from that image,
+# check it, and only then replace the old one. The Wine prefix lives outside the container and isn't touched.
+rebuild_container_with_nvidia() {
+    local red="\033[38;5;167m"
+    local reset="\033[0m"
+    local mgr=podman
+    command -v podman >/dev/null 2>&1 || mgr=docker
+    local image="localhost/$TORQUIO_CONTAINER_NAME:gpu-$(date +%Y%m%d%H%M%S)"
+    local new="$TORQUIO_CONTAINER_NAME-gpu"
+    local store="$HOME/.local/share/containers"
+    [ -d "$store" ] || store="$HOME"
+
+    # The snapshot needs about as much space as the container (~7 GB) until the old container is removed.
+    if [ "$(df -Pk "$store" | awk 'NR == 2 {print $4}')" -lt $((10 * 1024 * 1024)) ]; then
+        echo -e "${red}Not enough free disk space (10 GB needed); nothing was changed.${reset}"
+        return 1
+    fi
+    echo "Stopping Wine and the container..."
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wineserver -k 2>/dev/null; wineserver -w 2>/dev/null" || true
+    distrobox stop "$TORQUIO_CONTAINER_NAME" --yes >/dev/null 2>&1 || true
+    echo "Saving the current container..."
+    if ! $mgr commit "$TORQUIO_CONTAINER_NAME" "$image" >/dev/null; then
+        echo -e "${red}Couldn't save the container; nothing was changed.${reset}"
+        return 1
+    fi
+    echo "Creating the new container with GPU access..."
+    distrobox rm --force "$new" >/dev/null 2>&1 || true
+    if ! distrobox create -i "$image" -n "$new" --hostname "$(hostname)" --nvidia --yes >/dev/null ||
+       ! distrobox enter "$new" -- test -x "$WINE_CUSTOM_BIN/wine"; then
+        echo -e "${red}The new container didn't work; your current one is unchanged.${reset}"
+        distrobox rm --force "$new" >/dev/null 2>&1 || true
+        $mgr rmi "$image" >/dev/null 2>&1 || true
+        return 1
+    fi
+    distrobox stop "$new" --yes >/dev/null 2>&1 || true
+    distrobox rm --force "$TORQUIO_CONTAINER_NAME" >/dev/null
+    $mgr rename "$new" "$TORQUIO_CONTAINER_NAME"
+    echo "Container replaced."
+}
+
+# Make the user's GPUs available to AI plug-ins (safe to re-run). --quiet skips the explanation when
+# nothing needs the user's attention.
+setup_gpu_access() {
+    local blue="\033[38;5;110m"
+    local reset="\033[0m"
+    if host_has_nvidia && ! container_has_nvidia; then
+        echo -e "${blue}=== GPU Access for AI Plug-ins ===${reset}"
+        echo "Your computer has an NVIDIA GPU that Torquio's container can't use yet. Torquio can re-create the"
+        echo "container with access to it (a few minutes). Dorico, your settings and your licenses aren't affected."
+        echo ""
+        read -p "Set up NVIDIA access now? [Y/n]: " confirm || true
+        if [[ ! "$confirm" =~ ^[Nn]$ ]]; then
+            rebuild_container_with_nvidia || return 1
+        fi
+    elif [ "$1" != "--quiet" ]; then
+        echo -e "${blue}=== GPU Access for AI Plug-ins ===${reset}"
+    fi
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$SCRIPT_DIR\" && ./scripts/1-build/container_gpu_setup.sh" || true
+    "$SCRIPT_DIR/scripts/2-install/install_vkd3d_proton.sh" || true
+}
+
+list_vulkan_gpus() { # "type|name" per GPU, without CPU emulations
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "vulkaninfo --summary 2>/dev/null" |
+        awk -F' = ' '/deviceType/ {t=$2} /deviceName/ {print t "|" $2}' | grep -v '^PHYSICAL_DEVICE_TYPE_CPU'
+}
+
+manage_ai_gpu() {
+    local wine="\033[38;5;125m"
+    local gray="\033[38;5;244m"
+    local reset="\033[0m"
+    local blue="\033[38;5;110m"
+    setup_gpu_access --quiet
+    while true; do
+        local current gpus
+        current=$(get_config_val "ai_gpu" "auto")
+        mapfile -t gpus < <(list_vulkan_gpus)
+        echo ""
+        echo -e "${blue}=== GPU for AI Plug-ins (e.g. Cantai) ===${reset}"
+        echo "AI plug-ins run their models on this GPU (changes apply the next time Dorico starts)."
+        echo ""
+        echo "GPUs found:"
+        for g in "${gpus[@]}"; do
+            local type="integrated"; [[ "${g%%|*}" == *DISCRETE* ]] && type="dedicated"
+            echo -e "  - ${g#*|} ${gray}($type)${reset}"
+        done
+        [ ${#gpus[@]} -eq 0 ] && echo "  (none)"
+        echo ""
+        echo -e "Current setting: ${wine}$current${reset}"
+        echo ""
+        echo -e "  ${wine}1)${reset} Automatic (the strongest GPU)"
+        echo -e "  ${wine}2)${reset} Choose a GPU"
+        echo -e "  ${wine}3)${reset} Off (AI plug-ins use the CPU)"
+        echo -e "  ${wine}4)${reset} [Back]"
+        echo ""
+        read -p "Select an option (1-4): " opt || true
+        case "$opt" in
+            1) set_config_val "ai_gpu" "auto" ;;
+            2)
+                local i=1
+                for g in "${gpus[@]}"; do echo -e "  ${wine}$i)${reset} ${g#*|}"; i=$((i + 1)); done
+                read -p "GPU (1-${#gpus[@]}): " pick || true
+                if [[ "$pick" =~ ^[0-9]+$ ]] && [ "$pick" -ge 1 ] && [ "$pick" -le ${#gpus[@]} ]; then
+                    set_config_val "ai_gpu" "${gpus[$((pick - 1))]#*|}"
+                fi
+                ;;
+            3) set_config_val "ai_gpu" "off" ;;
+            *) return ;;
+        esac
+    done
+}
+
 manage_wine() {
     local wine="\033[38;5;125m"
     local reset="\033[0m"
@@ -1551,9 +1667,10 @@ manage_wine() {
         echo -e "  ${wine}10)${reset} Open C: Drive in Host File Manager"
         echo -e "  ${wine}11)${reset} Enable Kernel Fast Sync (NTsync)"
         echo -e "  ${wine}12)${reset} Recompile / Rebuild Wine Engine"
-        echo -e "  ${wine}13)${reset} [Back to main menu]"
+        echo -e "  ${wine}13)${reset} GPU for AI Plug-ins (e.g. Cantai)"
+        echo -e "  ${wine}14)${reset} [Back to main menu]"
         echo ""
-        read -p "Select an option (1-13): " opt_wine
+        read -p "Select an option (1-14): " opt_wine
         local ft_int=$(get_config_val "freetype_interpreter" "40")
         local should_prompt=true
         case "$opt_wine" in
@@ -1617,6 +1734,10 @@ manage_wine() {
                 ;;
             12)
                 rebuild_wine
+                ;;
+            13)
+                manage_ai_gpu
+                should_prompt=false
                 ;;
             *)
                 return
@@ -1824,6 +1945,9 @@ if [ $# -gt 0 ]; then
         --rebuild-wine|--rebuild_wine)
             rebuild_wine
             ;;
+        --setup-gpu|--setup_gpu)
+            setup_gpu_access
+            ;;
         --enable-ntsync|--enable_ntsync)
             enable_ntsync
             ;;
@@ -1846,6 +1970,7 @@ if [ $# -gt 0 ]; then
             echo "  -b, --reboot                Simulate a Windows reboot inside the prefix."
             echo "  -e, --execute, --run [file] Execute a custom .exe or .msi in the prefix."
             echo "      --rebuild-wine          Recompile custom Wine engine inside container."
+            echo "      --setup-gpu             Give AI plug-ins (e.g. Cantai) access to the GPU."
             echo "      --enable-ntsync         Activate and persist host kernel fast sync (ntsync)."
             exit 1
             ;;

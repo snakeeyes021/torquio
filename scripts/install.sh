@@ -539,8 +539,13 @@ if [ "$CREATE_CONTAINER" = true ]; then
     if distrobox list 2>/dev/null | grep -q "$TORQUIO_CONTAINER_NAME"; then
         echo "Container $TORQUIO_CONTAINER_NAME already exists. Skipping creation."
     else
-        distrobox create -i ubuntu:24.04 -n "$TORQUIO_CONTAINER_NAME" --hostname "$(hostname)" --yes
+        # With an NVIDIA driver on the host, give the container the host's NVIDIA libraries so plug-ins
+        # can use the GPU (Intel and AMD drivers are part of the container's Mesa already).
+        NVIDIA_FLAG=""
+        [ -e /proc/driver/nvidia/version ] && NVIDIA_FLAG="--nvidia"
+        distrobox create -i ubuntu:24.04 -n "$TORQUIO_CONTAINER_NAME" --hostname "$(hostname)" --yes $NVIDIA_FLAG
     fi
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$SCRIPT_DIR\" && ./scripts/1-build/container_gpu_setup.sh" || true
 fi
 
 WORKSPACE_DIR="$SCRIPT_DIR"
