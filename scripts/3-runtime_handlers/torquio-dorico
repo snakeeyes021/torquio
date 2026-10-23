@@ -289,6 +289,22 @@ for USER_VST3 in "\$WINEPREFIX"/drive_c/users/*/AppData/Local/Programs/Common/VS
     fi
 done
 
+# Cantai ships its Dorico playback template ("Auto & Cantai.dorico_pt", a zip of the files Dorico's
+# Play > Playback Template > Import writes into its settings folder). Add it once, the first time Dorico
+# starts after Cantai is installed, unless a template of that name is already there.
+for CANTAI_PT in "\$WINEPREFIX"/drive_c/users/*/AppData/Local/"Cantai Local Render"/Dorico/*.dorico_pt; do
+    [ -f "\$CANTAI_PT" ] || continue
+    [ -f "\$WINEPREFIX/.torquio_cantai_template_added" ] && break
+    USER_DIR=\$(dirname "\$(dirname "\$(dirname "\$(dirname "\$(dirname "\$CANTAI_PT")")")")")
+    SETTINGS_DIR="\$USER_DIR/AppData/Roaming/Steinberg/Dorico \$DORICO_VER"
+    TEMPLATE_NAME=\$(basename "\$CANTAI_PT" .dorico_pt)
+    if [ ! -e "\$SETTINGS_DIR/PlaybackTemplateSpecs/\$TEMPLATE_NAME" ]; then
+        mkdir -p "\$SETTINGS_DIR"
+        unzip -q -n "\$CANTAI_PT" -d "\$SETTINGS_DIR" && echo "Added Cantai's playback template (\$TEMPLATE_NAME) to Dorico."
+    fi
+    touch "\$WINEPREFIX/.torquio_cantai_template_added"
+done
+
 # AI plug-ins that run their models on the GPU through DirectML (Cantai) get vkd3d-proton as their
 # Direct3D 12 (Wine's builtin d3d12 computes DirectML wrong), via a DLL copy next to the plug-in's
 # executable and a DLL override for that executable only. vkd3d-proton is pointed at the strongest GPU:
