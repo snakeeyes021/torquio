@@ -51,6 +51,7 @@ Download the following files from the Steinberg download pages for [Steinberg Do
 *   `Steinberg_Download_Assistant_*_Installer_win.exe` (Mandatory)
 *   `MediaBay_Installer_win64.zip` (Mandatory)
 *   `NotePerformer-Installer-*.exe` (3rd-party, Optional)
+*   `Cantai-Windows-Installer-*.exe.zip` (3rd-party, Optional; [Cantai](https://cantai.app) sings your lyrics. After Dorico is installed, import its playback template in Dorico: Torquio shows where it is at the end of the install)
 
 *Note: You do not need to download the Dorico installer itself. The Download Assistant will handle that once the environment is built.*
 
@@ -72,7 +73,7 @@ The build pipeline automatically handles all the heavy lifting:
 1. Configures an isolated Ubuntu container.
 2. Compiles a custom version of WINE (with specific stubs required by Dorico).
 3. Initializes a Windows prefix, applies ClearType font configurations, and installs core dependencies.
-4. Installs MediaBay, the Download Assistant, and NotePerformer (if provided).
+4. Installs MediaBay, the Download Assistant, and NotePerformer and Cantai (if provided), without you having to click through their installers.
 5. Registers all application desktop shortcuts and web-login handlers to your native Linux application menu.
 6. Installs the globally accessible `torquio` console utility to manage your environment easily.
 

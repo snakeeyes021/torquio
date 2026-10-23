@@ -154,7 +154,7 @@ if [ "$AUTO_ACCEPT" = false ] && { [ "$CONTAINER_EXISTS" = true ] || [ "$PREFIX_
     else
         echo "An existing installation was detected. How would you like to proceed?"
         echo -e "  ${wine}1)${reset} Configure Settings Only (No container or Wine rebuilding)"
-        echo -e "  ${wine}2)${reset} Re-run Windows Software Installers (MediaBay, SDA, NotePerformer)"
+        echo -e "  ${wine}2)${reset} Re-run Windows Software Installers (MediaBay, SDA, NotePerformer, Cantai)"
         echo -e "  ${wine}3)${reset} Recreate Distrobox Container Only (Preserves Wine prefix & licenses)"
         echo -e "  ${wine}4)${reset} Fresh Reinstallation (Deletes container & Wine prefix)"
         echo -e "  ${wine}5)${reset} Cancel and Exit"
@@ -474,6 +474,7 @@ if [ "$INSTALL_SOFTWARE" = true ]; then
     FOUND_MEDIABAY=$(find "${SEARCH_DIRS[@]}" -maxdepth 1 -type f -name "MediaBay_Installer_win64*.zip" 2>/dev/null | sort -V | tail -n 1)
     FOUND_SDA=$(find "${SEARCH_DIRS[@]}" -maxdepth 1 -type f -name "Steinberg_Download_Assistant_*_Installer_win*.exe" 2>/dev/null | sort -V | tail -n 1)
     FOUND_NP=$(find "${SEARCH_DIRS[@]}" -maxdepth 1 -type f -name "NotePerformer-Installer-*.exe" 2>/dev/null | sort -V | tail -n 1)
+    FOUND_CANTAI=$(find "${SEARCH_DIRS[@]}" -maxdepth 1 -type f -name "Cantai-Windows-*Installer-*.exe.zip" 2>/dev/null | sort -V | tail -n 1)
     
     MISSING_MANDATORY=false
     if [ -z "$FOUND_MEDIABAY" ]; then
@@ -520,6 +521,11 @@ if [ "$INSTALL_SOFTWARE" = true ]; then
         echo -e "  - NotePerformer Installer:    ${wine}$(basename "$FOUND_NP")${reset}"
     else
         echo -e "  - NotePerformer Installer:    ${gray}Not found (skipping)${reset}"
+    fi
+    if [ -n "$FOUND_CANTAI" ]; then
+        echo -e "  - Cantai Installer:           ${wine}$(basename "$FOUND_CANTAI")${reset}"
+    else
+        echo -e "  - Cantai Installer:           ${gray}Not found (skipping)${reset}"
     fi
 fi
 echo -e "${blue}=============================${reset}"
@@ -569,6 +575,11 @@ if [ "$INSTALL_SOFTWARE" = true ]; then
     if [ -n "$FOUND_NP" ]; then
         echo "Installing NotePerformer..."
         distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && ./scripts/2-install/install_noteperformer.sh"
+    fi
+    if [ -n "$FOUND_CANTAI" ]; then
+        # Runs on the host: it also sets up WebView2 (Cantai's editor) and vkd3d-proton (GPU rendering).
+        echo "Installing Cantai..."
+        "$WORKSPACE_DIR/scripts/2-install/install_cantai.sh" || echo -e "${yellow}Cantai couldn't be installed; you can retry with ./scripts/2-install/install_cantai.sh.${reset}"
     fi
 fi
 
@@ -687,4 +698,11 @@ echo "               Torquio Setup Wizard Complete!                   "
 echo "================================================================"
 echo "All interactive wizard installation tasks completed successfully."
 echo "================================================================"
+CANTAI_TEMPLATE=$(ls "$TORQUIO_PREFIX_DIR"/drive_c/users/*/AppData/Local/"Cantai Local Render"/Dorico/*.dorico_pt 2>/dev/null | head -n 1)
+if [ -n "$CANTAI_TEMPLATE" ]; then
+    echo ""
+    echo "Cantai: once Dorico is installed, import Cantai's playback template in Dorico"
+    echo "(Play > Playback Template... > Import...). It's at:"
+    echo "  C:\\users\\$(basename "$(dirname "$(dirname "$(dirname "$(dirname "$(dirname "$CANTAI_TEMPLATE")")")")")")\\AppData\\Local\\Cantai Local Render\\Dorico\\$(basename "$CANTAI_TEMPLATE")"
+fi
 echo ""
