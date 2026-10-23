@@ -59,3 +59,7 @@ done
 
 # Cantai's editor is a web view; provision the WebView2 runtime it needs.
 "$SCRIPT_DIR/install_webview2.sh"
+
+# Cantai's renderer runs part of its model on the GPU when it has vkd3d-proton (the Dorico launcher sets
+# it up and picks the GPU).
+"$SCRIPT_DIR/install_vkd3d_proton.sh" || echo "Couldn't fetch vkd3d-proton; Cantai will render on the CPU."
