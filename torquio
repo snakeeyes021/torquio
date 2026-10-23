@@ -947,6 +947,72 @@ show_status() {
     else
         echo -e "  - Graphics Automation:         ${red}Unsupported DE${reset}"
     fi
+    echo ""
+
+    # 5. GPU for AI plug-ins (one trip into the container for GPUs, NVIDIA libraries and Wine's dxcore)
+    echo -e "${blue}GPU for AI Plug-ins (e.g. Cantai):${reset}"
+    local ai_ready=true
+    if ! distrobox list 2>/dev/null | grep -q "$TORQUIO_CONTAINER_NAME"; then
+        echo -e "  - Status:                      ${red}Container not created${reset}"
+    else
+        local probe gpus ai_gpu picked vkd3d_ver
+        probe=$(distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "
+            vulkaninfo --summary 2>/dev/null | awk -F' = ' '/deviceType/ {t=\$2} /deviceName/ {print \"gpu=\" t \"|\" \$2}'
+            [ -e /usr/lib/x86_64-linux-gnu/libGLX_nvidia.so.0 ] && echo nvidia=yes
+            grep -qa 'builtin d3d12 is in use' $WINE_CUSTOM_PATH/lib/wine/x86_64-windows/dxcore.dll 2>/dev/null && echo dxcore=patched
+            command -v vulkaninfo >/dev/null && echo vulkaninfo=yes" 2>/dev/null)
+        mapfile -t gpus < <(echo "$probe" | sed -n 's/^gpu=//p' | grep -v '^PHYSICAL_DEVICE_TYPE_CPU')
+        if [ ${#gpus[@]} -gt 0 ]; then
+            local g type
+            for g in "${gpus[@]}"; do
+                type="integrated"; [[ "${g%%|*}" == *DISCRETE* ]] && type="dedicated"
+                echo -e "  - GPU:                         ${wine}${g#*|}${reset} ${gray}($type)${reset}"
+            done
+        elif echo "$probe" | grep -q '^vulkaninfo=yes'; then
+            echo -e "  - GPU:                         ${red}None found${reset}"
+            ai_ready=false
+        else
+            echo -e "  - GPU:                         ${yellow}Unknown${reset} (run 'torquio --setup-gpu')"
+            ai_ready=false
+        fi
+        if host_has_nvidia; then
+            if echo "$probe" | grep -q '^nvidia=yes'; then
+                echo -e "  - NVIDIA Access:               ${green}Enabled${reset}"
+            else
+                echo -e "  - NVIDIA Access:               ${yellow}Not set up${reset} (run 'torquio --setup-gpu')"
+            fi
+        fi
+        ai_gpu=$(get_config_val "ai_gpu" "auto")
+        if [ "$ai_gpu" = "auto" ]; then
+            picked=$(printf '%s\n' "${gpus[@]}" | awk -F'|' '$1 ~ /DISCRETE/ {d = d ? d : $2} $1 ~ /INTEGRATED/ {i = i ? i : $2} END {print d ? d : i}')
+            echo -e "  - Setting:                     ${wine}Automatic${reset}${picked:+ (uses ${picked})}"
+        elif [ "$ai_gpu" = "off" ]; then
+            echo -e "  - Setting:                     ${wine}Off${reset} (AI plug-ins use the CPU)"
+            ai_ready=false
+        else
+            echo -e "  - Setting:                     ${wine}$ai_gpu${reset}"
+        fi
+        vkd3d_ver=$(ls -d "$TORQUIO_DATA_DIR"/vkd3d-proton/*/ 2>/dev/null | sort -V | tail -n 1 | xargs -r basename)
+        if [ -n "$vkd3d_ver" ]; then
+            echo -e "  - vkd3d-proton (Direct3D 12):  ${green}$vkd3d_ver${reset}"
+        else
+            echo -e "  - vkd3d-proton (Direct3D 12):  ${yellow}Not downloaded${reset} (run 'torquio --setup-gpu')"
+            ai_ready=false
+        fi
+        if echo "$probe" | grep -q '^dxcore=patched'; then
+            echo -e "  - Wine Engine GPU Support:     ${green}Yes${reset}"
+        else
+            echo -e "  - Wine Engine GPU Support:     ${yellow}Needs a rebuild${reset} (Wine Tools > Recompile / Rebuild Wine Engine)"
+            ai_ready=false
+        fi
+        if ! ls "$TORQUIO_PREFIX_DIR"/drive_c/users/*/AppData/Local/Cantai/Cantai.exe >/dev/null 2>&1; then
+            echo -e "  - Cantai:                      ${gray}Not installed${reset}"
+        elif [ "$ai_ready" = true ]; then
+            echo -e "  - Cantai:                      ${green}Renders on the GPU${reset}"
+        else
+            echo -e "  - Cantai:                      ${yellow}Renders on the CPU${reset} (see above)"
+        fi
+    fi
     echo -e "${gray}================================================================${reset}"
     echo ""
 }
