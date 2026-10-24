@@ -149,6 +149,16 @@ extract_icon \
     "1" \
     "Dorico.desktop"
 
+# Dorico's audio engine. It owns every plug-in window (NotePerformer's splash, instrument windows,
+# Cantai's editor...), so they all share its window class and get its icon. Hidden from app menus.
+extract_icon \
+    "$TORQUIO_PREFIX_DIR/drive_c/Program Files/Steinberg/Dorico6/VSTAudioEngine/VSTAudioEngine6.exe" \
+    "*vstaudioengine*.exe" \
+    "torquio-dorico-audioengine" \
+    "false" \
+    "" \
+    "Dorico Audio Engine.desktop"
+
 # SDA
 # Variations: Steinberg Download Assistant.exe, SteinbergDownloadAssistant.exe, SDA.exe
 extract_icon \

@@ -278,6 +278,7 @@ rm -f "$HOME/.local/bin/torquio_graphics.py"
 
 # Removing .desktop files
 rm -f "$HOME/.local/share/applications/Dorico.desktop"
+rm -f "$HOME/.local/share/applications/Dorico Audio Engine.desktop"
 rm -f "$HOME/.local/share/applications/Steinberg Activation Manager.desktop"
 rm -f "$HOME/.local/share/applications/Steinberg Download Assistant.desktop"
 rm -f "$HOME/.local/share/applications/wine-extension-dorico.desktop"
@@ -288,6 +289,7 @@ rm -f "$HOME/.local/share/applications/wine-extension-slm.desktop"
 # Removing extracted icons
 rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/torquio-dorico.png"
 rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/torquio-dorico-project.png"
+rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/torquio-dorico-audioengine.png"
 rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/torquio-sda.png"
 rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/torquio-sam.png"
 

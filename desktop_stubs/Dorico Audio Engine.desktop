@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Dorico Audio Engine
+Comment=Plug-in windows hosted by Dorico's audio engine
+Exec=$HOME/.local/bin/torquio-dorico
+Icon=torquio-dorico-audioengine
+Type=Application
+Terminal=false
+NoDisplay=true
+StartupWMClass=vstaudioengine6.exe
