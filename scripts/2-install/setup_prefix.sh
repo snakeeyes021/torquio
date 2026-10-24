@@ -142,6 +142,11 @@ wine reg add "HKCU\\Control Panel\\Desktop" /v FontSmoothingType /t REG_DWORD /d
 # which Wine doesn't ship. Alias it to Tahoma (honored by both GDI and DirectWrite).
 wine reg add "HKCU\\Software\\Wine\\Fonts\\Replacements" /v "Segoe UI" /t REG_SZ /d "Tahoma" /f
 
+# Every Wine update re-registers mscoree.dll through rundll32 (wine.inf). With Microsoft's .NET installed that
+# shows two "This application could not be started" errors (64- and 32-bit) and achieves nothing; .NET's
+# installer registered it already. Don't load .NET into rundll32. ("*" also covers loads by full path.)
+wine reg add "HKCU\\Software\\Wine\\AppDefaults\\rundll32.exe\\DllOverrides" /v "*mscoree" /t REG_SZ /d "" /f
+
 # Customize key repeat speed to mitigate Auto-Repeat Lag Bug
 wine reg add "HKCU\\Control Panel\\Accessibility\\Keyboard Response" /v AutoRepeatDelay /t REG_SZ /d "250" /f
 wine reg add "HKCU\\Control Panel\\Accessibility\\Keyboard Response" /v AutoRepeatRate /t REG_SZ /d "30" /f

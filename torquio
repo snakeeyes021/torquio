@@ -1393,6 +1393,7 @@ post_update() {
     if distrobox list 2>/dev/null | grep -q "$TORQUIO_CONTAINER_NAME" && [ -f "$TORQUIO_PREFIX_DIR/.torquio_core_installed" ]; then
         refresh_launchers --no-pause
         setup_gpu_access --quiet
+        apply_prefix_settings
         if echo "$changed" | grep -q '^scripts/1-build/'; then
             echo -e "${yellow}This update includes changes to Torquio's Wine engine. Until it's updated, Dorico keeps running on the current engine.${reset}"
             update_wine_engine
@@ -1532,6 +1533,20 @@ run_custom_exe() {
     echo "Execution completed."
 }
 
+# Bring an existing prefix up to date with prefix settings added after it was created (setup_prefix.sh sets
+# them on new installs). Run this before the Wine engine changes: the first Wine command after a change updates
+# the prefix, and these settings should be in place for that.
+#  - Steinberg's plug-in host UI only draws text in "Segoe UI"; alias it to Tahoma.
+#  - Keep .NET out of rundll32, so the prefix update doesn't show two "This application could not be
+#    started" errors (see setup_prefix.sh).
+apply_prefix_settings() {
+    [ -f "$TORQUIO_PREFIX_DIR/system.reg" ] || return 0
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export WINEDEBUG=-all
+        wine reg add 'HKCU\\Software\\Wine\\Fonts\\Replacements' /v 'Segoe UI' /t REG_SZ /d Tahoma /f
+        wine reg add 'HKCU\\Software\\Wine\\AppDefaults\\rundll32.exe\\DllOverrides' /v '*mscoree' /t REG_SZ /d '' /f
+        wineserver -w" >/dev/null 2>&1 || true
+}
+
 rebuild_wine() {
     local wine="\033[38;5;125m"
     local reset="\033[0m"
@@ -1552,12 +1567,9 @@ rebuild_wine() {
     echo "Terminating any running Wine instances..."
     distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wineserver -k 2>/dev/null || true; wineserver -w 2>/dev/null || true"
 
+    apply_prefix_settings
     echo "Running build_wine.sh inside container..."
     distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$SCRIPT_DIR\" && ./scripts/1-build/build_wine.sh --rebuild"
-
-    # Bring existing prefixes up to date with prefix settings added after their install.
-    # Steinberg's plug-in host UI only draws text in "Segoe UI"; alias it to Tahoma.
-    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wine reg add \"HKCU\\Software\\Wine\\Fonts\\Replacements\" /v \"Segoe UI\" /t REG_SZ /d \"Tahoma\" /f" >/dev/null 2>&1 || true
 
     echo ""
     echo -e "${wine}Wine rebuild complete!${reset}"
@@ -1677,6 +1689,7 @@ update_wine_engine() {
     local reset="\033[0m"
     local image
     image=$(torquio_prebuilt_image)
+    apply_prefix_settings
     if [ -n "$image" ]; then
         if [ "$(torquio_container_image)" = "$image" ]; then
             echo -e "${green}Torquio's Wine engine is up to date.${reset}"
