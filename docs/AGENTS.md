@@ -18,6 +18,10 @@ To maintain repository stability and allow clean parallel development, follow th
 *   **`develop` (Feature Integration Testing):** A permanent integration branch used to test multiple merged features and fixes concurrently. This is where cross-feature compatibility, Wine build interactions, and system regressions are tested together.
 *   **Release Lifecycle:** Once all features and fixes merged into `develop` are verified to work seamlessly together across real-world testing with zero regressions, `develop` is merged into `main` to create a new stable release. The release entry's "Build Environment Artifacts" and "Verified Application Versions" sections come from `./torquio --manifest`, run on the system the release was tested on; resolve any warnings it prints first (e.g. a Wine engine built from older patches).
 
+## The Public Container Image
+
+The container image (`scripts/1-build/Containerfile`) is published publicly. Only free and open-source software may go into it (Ubuntu packages, Wine and the like). Never bake Steinberg's or any other proprietary software (installers, plug-ins, runtimes such as WebView2 or .NET, fonts with restrictive licenses) into the image; those are installed by the user into their Wine prefix in their home directory. Keep the patched Wine source in the image (Wine is LGPL).
+
 ## Repository Context
 
 When joining a session, please reference the following documents to understand the current state of the project:

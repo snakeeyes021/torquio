@@ -776,8 +776,18 @@ show_status() {
     # 1. Distrobox Container Status
     echo -e "${blue}Distrobox Container Status:${reset}"
     if distrobox list 2>/dev/null | grep -q "$TORQUIO_CONTAINER_NAME"; then
-        local cont_status=$(distrobox list 2>/dev/null | grep "$TORQUIO_CONTAINER_NAME" | awk -F'|' '{print $4}' | tr -d '[:space:]')
+        local cont_status=$(distrobox list 2>/dev/null | grep "$TORQUIO_CONTAINER_NAME" | awk -F'|' '{print $3}' | xargs)
         echo -e "  - Container: ${dark_gray}$TORQUIO_CONTAINER_NAME${reset} (Active: ${green}${cont_status:-running}${reset})"
+        local engine_image expected_image
+        engine_image=$(torquio_container_image)
+        expected_image=$(torquio_prebuilt_image)
+        if [[ "$engine_image" != "$TORQUIO_IMAGE_REPO:"* ]]; then
+            echo -e "  - Wine Engine: ${wine}Compiled locally${reset}"
+        elif [ -n "$expected_image" ] && [ "$engine_image" != "$expected_image" ]; then
+            echo -e "  - Wine Engine: ${yellow}Prebuilt ${engine_image##*:}, update available${reset} (Wine Tools > Update / Rebuild Wine Engine)"
+        else
+            echo -e "  - Wine Engine: ${green}Prebuilt ${engine_image##*:}${reset}"
+        fi
     else
         echo -e "  - Container: ${dark_gray}$TORQUIO_CONTAINER_NAME${reset} (${red}Not Created${reset})"
     fi
@@ -1002,7 +1012,7 @@ show_status() {
         if echo "$probe" | grep -q '^dxcore=patched'; then
             echo -e "  - Wine Engine GPU Support:     ${green}Yes${reset}"
         else
-            echo -e "  - Wine Engine GPU Support:     ${yellow}Needs a rebuild${reset} (Wine Tools > Recompile / Rebuild Wine Engine)"
+            echo -e "  - Wine Engine GPU Support:     ${yellow}Needs a rebuild${reset} (Wine Tools > Update / Rebuild Wine Engine)"
             ai_ready=false
         fi
         if ! ls "$TORQUIO_PREFIX_DIR"/drive_c/users/*/AppData/Local/Cantai/Cantai.exe >/dev/null 2>&1; then
@@ -1384,13 +1394,8 @@ post_update() {
         refresh_launchers --no-pause
         setup_gpu_access --quiet
         if echo "$changed" | grep -q '^scripts/1-build/'; then
-            echo -e "${yellow}This update includes changes to Torquio's Wine engine. Rebuilding it takes 20-40 minutes; until then, Dorico keeps running on the current engine.${reset}"
-            read -p "Rebuild the Wine engine now? [y/N]: " confirm || true
-            if [[ "$confirm" =~ ^[Yy]$ ]]; then
-                rebuild_wine
-            else
-                echo "You can rebuild it later from Wine Tools & Maintenance > Recompile / Rebuild Wine Engine."
-            fi
+            echo -e "${yellow}This update includes changes to Torquio's Wine engine. Until it's updated, Dorico keeps running on the current engine.${reset}"
+            update_wine_engine
         fi
     else
         echo "Torquio isn't installed yet, so there's nothing else to refresh."
@@ -1601,45 +1606,102 @@ enable_ntsync() {
 host_has_nvidia() { [ -e /proc/driver/nvidia/version ]; }
 container_has_nvidia() { distrobox enter "$TORQUIO_CONTAINER_NAME" -- test -e /usr/lib/x86_64-linux-gnu/libGLX_nvidia.so.0 2>/dev/null; }
 
-# Re-create the container with the host's NVIDIA libraries (distrobox --nvidia), keeping everything in it
-# (including the compiled Wine engine): snapshot it as an image, create the new container from that image,
-# check it, and only then replace the old one. The Wine prefix lives outside the container and isn't touched.
-rebuild_container_with_nvidia() {
+# Re-create the Torquio container from IMAGE (an updated prebuilt Wine engine) or, without one, from the image
+# it came from: the prebuilt image, or for a locally compiled engine a snapshot of the container itself. The new
+# container gets the host's NVIDIA libraries (distrobox --nvidia) when there are any, and is checked before it
+# replaces the old one. The Wine prefix lives outside the container and isn't touched.
+replace_container() {
+    local image="$1"
     local red="\033[38;5;167m"
     local reset="\033[0m"
-    local mgr=podman
-    command -v podman >/dev/null 2>&1 || mgr=docker
-    local image="localhost/$TORQUIO_CONTAINER_NAME:gpu-$(date +%Y%m%d%H%M%S)"
-    local new="$TORQUIO_CONTAINER_NAME-gpu"
-    local store="$HOME/.local/share/containers"
-    [ -d "$store" ] || store="$HOME"
+    local mgr current
+    mgr=$(torquio_container_manager)
+    current=$(torquio_container_image)
+    local new="$TORQUIO_CONTAINER_NAME-new"
+    local snapshot=""
 
-    # The snapshot needs about as much space as the container (~7 GB) until the old container is removed.
-    if [ "$(df -Pk "$store" | awk 'NR == 2 {print $4}')" -lt $((10 * 1024 * 1024)) ]; then
-        echo -e "${red}Not enough free disk space (10 GB needed); nothing was changed.${reset}"
-        return 1
-    fi
+    [ -z "$image" ] && [[ "$current" == "$TORQUIO_IMAGE_REPO:"* ]] && image="$current"
+    local machine_id
+    machine_id=$(distrobox enter "$TORQUIO_CONTAINER_NAME" -- cat /var/lib/dbus/machine-id 2>/dev/null | tr -dc '0-9a-f')
     echo "Stopping Wine and the container..."
     distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wineserver -k 2>/dev/null; wineserver -w 2>/dev/null" || true
     distrobox stop "$TORQUIO_CONTAINER_NAME" --yes >/dev/null 2>&1 || true
-    echo "Saving the current container..."
-    if ! $mgr commit "$TORQUIO_CONTAINER_NAME" "$image" >/dev/null; then
-        echo -e "${red}Couldn't save the container; nothing was changed.${reset}"
-        return 1
+    if [ -z "$image" ]; then
+        local store="$HOME/.local/share/containers"
+        [ -d "$store" ] || store="$HOME"
+        # The snapshot needs about as much space as the container (~7 GB) until the old container is removed.
+        if [ "$(df -Pk "$store" | awk 'NR == 2 {print $4}')" -lt $((10 * 1024 * 1024)) ]; then
+            echo -e "${red}Not enough free disk space (10 GB needed); nothing was changed.${reset}"
+            return 1
+        fi
+        snapshot="localhost/$TORQUIO_CONTAINER_NAME:gpu-$(date +%Y%m%d%H%M%S)"
+        echo "Saving the current container..."
+        if ! $mgr commit "$TORQUIO_CONTAINER_NAME" "$snapshot" >/dev/null; then
+            echo -e "${red}Couldn't save the container; nothing was changed.${reset}"
+            return 1
+        fi
+        image="$snapshot"
     fi
-    echo "Creating the new container with GPU access..."
+    echo "Creating the new container..."
+    local nvidia_flag=""
+    host_has_nvidia && nvidia_flag="--nvidia"
     distrobox rm --force "$new" >/dev/null 2>&1 || true
-    if ! distrobox create -i "$image" -n "$new" --hostname "$(hostname)" --nvidia --no-entry --yes >/dev/null ||
+    if ! distrobox create -i "$image" -n "$new" --hostname "$(hostname)" $nvidia_flag --no-entry --yes >/dev/null ||
        ! distrobox enter "$new" -- test -x "$WINE_CUSTOM_BIN/wine"; then
         echo -e "${red}The new container didn't work; your current one is unchanged.${reset}"
         distrobox rm --force "$new" >/dev/null 2>&1 || true
-        $mgr rmi "$image" >/dev/null 2>&1 || true
+        [ -n "$snapshot" ] && $mgr rmi "$snapshot" >/dev/null 2>&1
         return 1
+    fi
+    # Keep the computer's identity (Wine's system UUID, which e.g. Cantai's license is tied to)
+    if [ ${#machine_id} -eq 32 ]; then
+        distrobox enter "$new" -- bash -c "sudo mkdir -p /var/lib/dbus && sudo rm -f /var/lib/dbus/machine-id && echo $machine_id | sudo tee /var/lib/dbus/machine-id >/dev/null"
     fi
     distrobox stop "$new" --yes >/dev/null 2>&1 || true
     distrobox rm --force "$TORQUIO_CONTAINER_NAME" >/dev/null
     $mgr rename "$new" "$TORQUIO_CONTAINER_NAME"
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$SCRIPT_DIR\" && ./scripts/1-build/container_gpu_setup.sh" || true
+    # Earlier prebuilt engines are no longer needed
+    local old
+    for old in $($mgr images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep "^$TORQUIO_IMAGE_REPO:"); do
+        [ "$old" != "$image" ] && $mgr rmi "$old" >/dev/null 2>&1
+    done
     echo "Container replaced."
+}
+
+# Bring the Wine engine up to date with this copy of Torquio: download the matching prebuilt engine when
+# there is one, otherwise offer to compile it.
+update_wine_engine() {
+    local green="\033[38;5;108m"
+    local yellow="\033[38;5;179m"
+    local reset="\033[0m"
+    local image
+    image=$(torquio_prebuilt_image)
+    if [ -n "$image" ]; then
+        if [ "$(torquio_container_image)" = "$image" ]; then
+            echo -e "${green}Torquio's Wine engine is up to date.${reset}"
+            read -p "Compile it from source anyway (20-40 minutes)? [y/N]: " confirm || true
+            [[ "$confirm" =~ ^[Yy]$ ]] && rebuild_wine
+            return 0
+        fi
+        echo "Torquio's Wine engine can be downloaded ready-made (a few minutes; Wine and Dorico are closed while the container is replaced)."
+        read -p "Download it now? [Y/n]: " confirm || true
+        if [[ "$confirm" =~ ^[Nn]$ ]]; then
+            echo "You can update it later from Wine Tools & Maintenance > Update / Rebuild Wine Engine."
+            return 0
+        fi
+        if torquio_pull_image "$image"; then
+            replace_container "$image"
+            return $?
+        fi
+        echo -e "${yellow}The prebuilt engine for this version of Torquio isn't available yet (it's published within about an hour of each update). You can try again later, or compile it now.${reset}"
+    fi
+    read -p "Compile the Wine engine now (20-40 minutes)? [y/N]: " confirm || true
+    if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        rebuild_wine
+    else
+        echo "You can update it later from Wine Tools & Maintenance > Update / Rebuild Wine Engine."
+    fi
 }
 
 # Make the user's GPUs available to AI plug-ins (safe to re-run). --quiet skips the explanation when
@@ -1654,7 +1716,7 @@ setup_gpu_access() {
         echo ""
         read -p "Set up NVIDIA access now? [Y/n]: " confirm || true
         if [[ ! "$confirm" =~ ^[Nn]$ ]]; then
-            rebuild_container_with_nvidia || return 1
+            replace_container || return 1
         fi
     elif [ "$1" != "--quiet" ]; then
         echo -e "${blue}=== GPU Access for AI Plug-ins ===${reset}"
@@ -1732,7 +1794,7 @@ manage_wine() {
         echo -e "  ${wine}9)${reset} Run Custom Installer/Executable (.exe/.msi)"
         echo -e "  ${wine}10)${reset} Open C: Drive in Host File Manager"
         echo -e "  ${wine}11)${reset} Enable Kernel Fast Sync (NTsync)"
-        echo -e "  ${wine}12)${reset} Recompile / Rebuild Wine Engine"
+        echo -e "  ${wine}12)${reset} Update / Rebuild Wine Engine"
         echo -e "  ${wine}13)${reset} GPU for AI Plug-ins (e.g. Cantai)"
         echo -e "  ${wine}14)${reset} [Back to main menu]"
         echo ""
@@ -1799,7 +1861,7 @@ manage_wine() {
                 enable_ntsync
                 ;;
             12)
-                rebuild_wine
+                update_wine_engine
                 ;;
             13)
                 manage_ai_gpu

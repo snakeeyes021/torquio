@@ -25,6 +25,46 @@ export TORQUIO_INSTALLERS_DIR="$TORQUIO_REPO_DIR/installers"
 export WINE_CUSTOM_PATH="/opt/wine-custom"
 export WINE_CUSTOM_BIN="$WINE_CUSTOM_PATH/bin"
 
+# Torquio's prebuilt container image (scripts/1-build/Containerfile, published by GitHub Actions). Each
+# build is tagged with the git tree hash of scripts/1-build, so a copy of Torquio always finds the image
+# built from exactly its own Wine build files.
+export TORQUIO_IMAGE_REPO="${TORQUIO_IMAGE_REPO:-ghcr.io/snakeeyes021/torquio-env}"
+
+# The prebuilt image matching this copy of Torquio; prints nothing when Wine has to be compiled locally
+# (not a git checkout, local changes to the Wine build files, or "build_from_source" set in the config).
+torquio_prebuilt_image() {
+    [ "$(get_config_val "build_from_source" "false")" = "true" ] && return
+    [ -z "$(git -C "$TORQUIO_REPO_DIR" status --porcelain -- scripts/1-build 2>/dev/null)" ] || return 0
+    local tree
+    tree=$(git -C "$TORQUIO_REPO_DIR" rev-parse HEAD:scripts/1-build 2>/dev/null) || return 0
+    echo "$TORQUIO_IMAGE_REPO:build-${tree:0:12}"
+}
+
+# The container engine distrobox uses (it prefers podman)
+torquio_container_manager() {
+    if [ -n "$DBX_CONTAINER_MANAGER" ]; then echo "$DBX_CONTAINER_MANAGER"
+    elif command -v podman >/dev/null 2>&1; then echo podman
+    else echo docker; fi
+}
+
+# Download a prebuilt image unless it's already here (a build tag's contents never change)
+torquio_pull_image() {
+    local mgr
+    mgr=$(torquio_container_manager)
+    "$mgr" image inspect "$1" >/dev/null 2>&1 || "$mgr" pull "$1"
+}
+
+# The image the Torquio container was created from
+torquio_container_image() {
+    local mgr
+    mgr=$(torquio_container_manager)
+    if [ "$mgr" = podman ]; then
+        podman container inspect --format '{{.ImageName}}' "$TORQUIO_CONTAINER_NAME" 2>/dev/null || true
+    else
+        docker container inspect --format '{{.Config.Image}}' "$TORQUIO_CONTAINER_NAME" 2>/dev/null || true
+    fi
+}
+
 # Globally disable winemenubuilder to prevent host desktop pollution
 export WINEDLLOVERRIDES="winemenubuilder.exe=d"
 

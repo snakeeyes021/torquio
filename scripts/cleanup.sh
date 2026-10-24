@@ -255,11 +255,12 @@ fi
 
 echo "Removing Distrobox container..."
 distrobox rm "$TORQUIO_CONTAINER_NAME" --force || true
-# Snapshots made when the container was re-created with GPU access (see rebuild_container_with_nvidia)
+# Downloaded prebuilt engines, and snapshots made when the container was re-created with GPU access (see
+# replace_container)
 for mgr in podman docker; do
     command -v "$mgr" >/dev/null 2>&1 || continue
-    for image in $("$mgr" images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep "^localhost/$TORQUIO_CONTAINER_NAME:gpu-"); do
-        "$mgr" rmi "$image" >/dev/null 2>&1 && echo "Removed container snapshot $image"
+    for image in $("$mgr" images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -e "^localhost/$TORQUIO_CONTAINER_NAME:gpu-" -e "^$TORQUIO_IMAGE_REPO:"); do
+        "$mgr" rmi "$image" >/dev/null 2>&1 && echo "Removed container image $image"
     done
 done
 

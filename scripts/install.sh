@@ -217,6 +217,8 @@ elif [ "$ACTION" = "recreate_container" ]; then
     BUILD_WINE=true
     SETUP_PREFIX=false
     INSTALL_SOFTWARE=false
+    # Keep the computer's identity (Wine's system UUID, which e.g. Cantai's license is tied to) for the new container
+    KEEP_MACHINE_ID=$(distrobox enter "$TORQUIO_CONTAINER_NAME" -- cat /var/lib/dbus/machine-id 2>/dev/null | tr -dc '0-9a-f' || true)
     # Remove existing container to force recreation
     distrobox rm "$TORQUIO_CONTAINER_NAME" --force || true
 elif [ "$ACTION" = "resume" ]; then
@@ -549,7 +551,22 @@ if [ "$CREATE_CONTAINER" = true ]; then
         # can use the GPU (Intel and AMD drivers are part of the container's Mesa already).
         NVIDIA_FLAG=""
         [ -e /proc/driver/nvidia/version ] && NVIDIA_FLAG="--nvidia"
-        distrobox create -i ubuntu:24.04 -n "$TORQUIO_CONTAINER_NAME" --hostname "$(hostname)" --no-entry --yes $NVIDIA_FLAG
+        # Use the prebuilt image with Torquio's Wine engine when there is one for this version of Torquio;
+        # otherwise start from plain Ubuntu and compile Wine in Phase 2.
+        CONTAINER_IMAGE="docker.io/library/ubuntu:24.04"
+        PREBUILT_IMAGE=$(torquio_prebuilt_image)
+        if [ -n "$PREBUILT_IMAGE" ]; then
+            echo "Downloading Torquio's prebuilt Wine engine ($PREBUILT_IMAGE)..."
+            if torquio_pull_image "$PREBUILT_IMAGE"; then
+                CONTAINER_IMAGE="$PREBUILT_IMAGE"
+            else
+                echo -e "${yellow}No prebuilt Wine engine is available for this version of Torquio; it will be compiled instead (20-40 minutes).${reset}"
+            fi
+        fi
+        distrobox create -i "$CONTAINER_IMAGE" -n "$TORQUIO_CONTAINER_NAME" --hostname "$(hostname)" --no-entry --yes $NVIDIA_FLAG
+    fi
+    if [ ${#KEEP_MACHINE_ID} -eq 32 ]; then
+        distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "sudo mkdir -p /var/lib/dbus && sudo rm -f /var/lib/dbus/machine-id && echo $KEEP_MACHINE_ID | sudo tee /var/lib/dbus/machine-id >/dev/null" || true
     fi
     distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$SCRIPT_DIR\" && ./scripts/1-build/container_gpu_setup.sh" || true
 fi
@@ -557,7 +574,7 @@ fi
 WORKSPACE_DIR="$SCRIPT_DIR"
 
 if [ "$BUILD_WINE" = true ]; then
-    echo "Phase 2: Compiling Wine Engine..."
+    echo "Phase 2: Wine Engine..."
     distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$WORKSPACE_DIR\" && ./scripts/1-build/build_wine.sh"
 fi
 

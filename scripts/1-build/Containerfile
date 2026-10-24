@@ -1,0 +1,69 @@
+# Torquio's container image: Ubuntu 24.04 with Torquio's Wine engine in /opt/wine-custom, so installs don't
+# compile Wine themselves. Built from the repository root:
+#   podman build -f scripts/1-build/Containerfile -t torquio-env .
+# Only free and open-source software goes in here (Ubuntu packages and Wine); the image is public.
+# Steinberg's and any other proprietary software is installed by the user into their Wine prefix, which
+# lives in their home directory, never in the image.
+
+# --- Build: the same steps the installer runs when it compiles Wine itself ---
+FROM docker.io/library/ubuntu:24.04 AS build
+ARG TORQUIO_COMMIT=unknown
+COPY scripts/common.sh /src/scripts/common.sh
+COPY scripts/1-build/build_wine.sh /src/scripts/1-build/build_wine.sh
+RUN dpkg-query -W -f '${Package}:${Architecture}\n' | sort > /base-packages.txt && \
+    /src/scripts/1-build/build_wine.sh --deps-only && rm -rf /var/lib/apt/lists/*
+COPY scripts/1-build/patches/ /src/scripts/1-build/patches/
+COPY scripts/1-build/include/ /src/scripts/1-build/include/
+RUN TORQUIO_COMMIT="$TORQUIO_COMMIT" /src/scripts/1-build/build_wine.sh --skip-deps
+
+# Runtime packages: everything the build container has beyond the base image, minus headers, compilers
+# and other build tools. Installing these keeps every library Wine was built against (and may load at
+# runtime) available, both 64- and 32-bit.
+RUN dpkg-query -W -f '${Package}:${Architecture}\n' | sort | comm -13 /base-packages.txt - | \
+    grep -vE -- '-(dev|dev-bin|doc|headers)(:|$)' | \
+    grep -vE '^(gcc|g\+\+|cpp|mingw|binutils|clang|llvm|lld|libclang|libllvm[0-9]+-dev|libgcc-[0-9]+-dev|libstdc\+\+-[0-9]+-dev|libc6-dev|linux-libc-dev|libc-dev-bin|make|flex|bison|pkgconf|pkg-config|dpkg-dev|build-essential|autoconf|automake|autotools-dev|libtool|m4|git|patch|manpages|libasan|libubsan|libtsan|liblsan|libhwasan|libitm|libquadmath|libcc1|libobjc|gettext|intltool|po-debconf|debhelper|dh-|cmake|meson|ninja|python3-|perl|libperl|liberror-perl|gfortran|libgfortran|valgrind|gdb|strace)' | \
+    sed -E 's/:(all|amd64)$//' > /runtime-packages.txt
+# Every library Wine was configured to load at runtime ("SONAME_...") that the build container has, per
+# architecture, for the check below (configure sometimes names one that doesn't exist, e.g. 32-bit libodbc.so)
+RUN for arch in 64 32; do \
+        tag="(libc6,x86-64)"; [ $arch = 32 ] && tag="(libc6)"; \
+        for s in $(grep -h '^#define SONAME_' /root/.cache/torquio/wine-build/wine$arch/include/config.h | cut -d'"' -f2); do \
+            if ldconfig -p | grep -qF "	$s $tag"; then echo "$s"; fi; \
+        done > /sonames-$arch.txt; \
+    done
+# The patched Wine source this engine was compiled from (Wine is LGPL; its source goes with the binaries)
+RUN cd /root/.cache/torquio/wine-build && tar --exclude=.git -cf - wine-source | xz -T0 -6 > /wine-source.tar.xz
+
+# --- The image ---
+FROM docker.io/library/ubuntu:24.04
+ARG TORQUIO_COMMIT=unknown
+LABEL org.opencontainers.image.title="torquio-env" \
+      org.opencontainers.image.description="Ubuntu 24.04 with Torquio's Wine engine (zhiyi/wine plus Torquio's patches) for running Dorico on Linux" \
+      org.opencontainers.image.source="https://github.com/snakeeyes021/torquio" \
+      org.opencontainers.image.revision="$TORQUIO_COMMIT" \
+      org.opencontainers.image.licenses="LGPL-2.1-or-later"
+
+COPY --from=build /runtime-packages.txt /sonames-64.txt /sonames-32.txt /tmp/
+RUN dpkg --add-architecture i386 && apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        $(cat /tmp/runtime-packages.txt) vulkan-tools zstd wget curl ca-certificates && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -f /etc/machine-id /var/lib/dbus/machine-id  # never ship a machine ID: each computer gets its own
+
+COPY --from=build /opt/wine-custom /opt/wine-custom
+COPY --from=build /wine-source.tar.xz /opt/wine-custom/share/torquio/source/wine-source.tar.xz
+COPY scripts/1-build/patches/ /opt/wine-custom/share/torquio/source/patches/
+COPY scripts/1-build/SOURCE.md /opt/wine-custom/share/torquio/source/README.md
+
+# Fail the build if anything Wine links to or loads at runtime is missing (Wine's own ntdll.so and win32u.so
+# sit next to the library that needs them and are loaded by Wine itself)
+RUN set -e; missing=""; \
+    for f in /opt/wine-custom/bin/wine /opt/wine-custom/bin/wineserver /opt/wine-custom/lib/wine/*-unix/*.so; do \
+        for lib in $(ldd "$f" 2>/dev/null | awk '/not found/ {print $1}'); do \
+            [ -e "$(dirname "$f")/$lib" ] || missing="$missing $f:$lib"; \
+        done; \
+    done; \
+    for s in $(cat /tmp/sonames-64.txt); do ldconfig -p | grep -qF "	$s (libc6,x86-64)" || missing="$missing 64-bit:$s"; done; \
+    for s in $(cat /tmp/sonames-32.txt); do ldconfig -p | grep -qF "	$s (libc6)" || missing="$missing 32-bit:$s"; done; \
+    if [ -n "$missing" ]; then echo "Missing libraries:$missing"; exit 1; fi; \
+    rm /tmp/runtime-packages.txt /tmp/sonames-*.txt; /opt/wine-custom/bin/wine --version

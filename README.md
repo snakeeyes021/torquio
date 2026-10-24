@@ -70,12 +70,11 @@ Then just follow the interactive prompts to go through the install wizard.
 
 ### What happens next?
 The build pipeline automatically handles all the heavy lifting:
-1. Configures an isolated Ubuntu container.
-2. Compiles a custom version of WINE (with specific stubs required by Dorico).
-3. Initializes a Windows prefix, applies ClearType font configurations, and installs core dependencies.
-4. Installs MediaBay, the Download Assistant, and NotePerformer and Cantai (if provided), without you having to click through their installers.
-5. Registers all application desktop shortcuts and web-login handlers to your native Linux application menu.
-6. Installs the globally accessible `torquio` console utility to manage your environment easily.
+1. Sets up an isolated Ubuntu container with Torquio's custom version of WINE (with fixes required by Dorico), downloaded ready-made. If none is available for your version of Torquio, it's compiled on your machine instead (20-40 minutes).
+2. Initializes a Windows prefix, applies ClearType font configurations, and installs core dependencies.
+3. Installs MediaBay, the Download Assistant, and NotePerformer and Cantai (if provided), without you having to click through their installers.
+4. Registers all application desktop shortcuts and web-login handlers to your native Linux application menu.
+5. Installs the globally accessible `torquio` console utility to manage your environment easily.
 
 After installation, the Steinberg Download Assistant will launch automatically. Once the it does, simply sign in and download Dorico as you normally would! When finished, close the Download Assistant, run the Activation Manager to activate your license, and you are ready to start notating!
 
@@ -135,7 +134,7 @@ Occasionally, Wine servers hang, applications lock up in the background, or you'
     * **Fix Icons**: `torquio -f` or `torquio --fix-icons` (Refreshes desktop icons and launcher shortcuts on the host system).
 
 ### 6. Updating Torquio
-Torquio can update itself from GitHub. It shows what's new and asks before installing, then refreshes your launchers, icons and Wine prefix settings. If an update changes Torquio's Wine engine, it offers to rebuild it (20-40 minutes) or lets you do that later. It won't overwrite Torquio files you've changed yourself.
+Torquio can update itself from GitHub. It shows what's new and asks before installing, then refreshes your launchers, icons and Wine prefix settings. If an update changes Torquio's Wine engine, it offers to download the new one (a few minutes), or to compile it (20-40 minutes) if it hasn't been published yet; you can also do that later from Wine Tools & Maintenance > Update / Rebuild Wine Engine. It won't overwrite Torquio files you've changed yourself.
 
 **How to Use**:
   * **Interactive**: Option `9` (Update Torquio) in the main menu.
