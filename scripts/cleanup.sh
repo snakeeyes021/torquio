@@ -76,7 +76,7 @@ elif [[ "$LICENSE_STATE" == unknown* ]]; then
     fi
 else
     echo -e "${green}No activated Steinberg or Cantai licenses found in this installation.${reset}"
-    read -p "Have you deactivated any other third-party plug-in licenses? (y/N): " confirm
+    read -p "Have you deactivated every license in this installation (Steinberg products and any plug-ins)? (y/N): " confirm
     if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
         echo "Cleanup cancelled."
         exit 10
