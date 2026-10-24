@@ -1,0 +1,55 @@
+diff --git a/dlls/winex11.drv/bitblt.c b/dlls/winex11.drv/bitblt.c
+index b6e08eaa6b8..e33291aa3bb 100644
+--- a/dlls/winex11.drv/bitblt.c
++++ b/dlls/winex11.drv/bitblt.c
+@@ -1589,6 +1589,8 @@ struct x11drv_window_surface
+     GC                    gc;
+     struct x11drv_image  *image;
+     BOOL                  byteswap;
++    int                   hidden;    /* window kept invisible until drawn into: 2 = before the initial
++                                        upload of the new surface, 1 = until the next flush */
+ };
+ 
+ static struct x11drv_window_surface *get_x11_surface( struct window_surface *surface )
+@@ -1829,6 +1831,19 @@ static BOOL x11drv_surface_flush( struct window_surface *window_surface, const R
+                 ptr[x] |= alpha_bits;
+     }
+ 
++    if (surface->hidden == 2)
++    {
++        /* The initial upload of a new surface has no actual contents yet, keep the empty shape. */
++        surface->hidden = 1;
++        shape_changed = FALSE;
++    }
++    else if (surface->hidden)
++    {
++        /* Something was drawn: replace the empty shape with the window's actual shape. */
++        surface->hidden = 0;
++        shape_changed = TRUE;
++    }
++
+     if (shape_changed)
+     {
+ #ifdef HAVE_LIBXSHAPE
+@@ -1995,6 +2010,21 @@ BOOL X11DRV_CreateWindowSurface( HWND hwnd, BOOL layered, const RECT *surface_re
+     *surface = create_surface( data->hwnd, data->whole_window, &data->vis, surface_rect,
+                                layered ? data->use_alpha : FALSE );
+ 
++#ifdef HAVE_LIBXSHAPE
++    /* Windows made layered with SetLayeredWindowAttributes() are mapped as soon as they are shown,
++     * but their contents may come much later (e.g. from DirectComposition). Keep them invisible
++     * until the first flush instead of showing the black X window background. */
++    if (*surface && !layered && data->whole_window && data->pending_state.wm_state == WithdrawnState &&
++        (NtUserGetWindowLongW( hwnd, GWL_EXSTYLE ) & WS_EX_LAYERED))
++    {
++        static XRectangle empty_rect;
++
++        XShapeCombineRectangles( gdi_display, data->whole_window, ShapeBounding, 0, 0,
++                                 &empty_rect, 1, ShapeSet, YXBanded );
++        get_x11_surface( *surface )->hidden = 2;
++    }
++#endif
++
+ done:
+     release_win_data( data );
+     return TRUE;

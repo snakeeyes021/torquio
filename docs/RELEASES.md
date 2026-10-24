@@ -4,6 +4,46 @@ This document tracks known-good, tested "snapshots" of the entire system. It ser
 
 ---
 
+## **Release v0.4.0-alpha (Dropdowns, Cantai on the GPU & Maintenance Tools)**
+**Date:** 2026-10-23
+**Status:** Alpha / Milestone
+
+**Description:** Finished the DirectComposition work: dropdowns and tooltips now redraw, look and behave as on Windows. Cantai is functional end to end (installed silently with its playback template, editors, reliable rendering) and renders on the GPU, including NVIDIA GPUs. Added an uninstall license guard, a log exporter and self-updating. Verified with a from-scratch install on RedFoxOS, a Bazzite-based Fedora Atomic image (Intel Iris Xe + NVIDIA RTX 3080 Ti Laptop), and an upgrade of an existing install.
+
+**Key Improvements:**
+*   **Dropdowns & Popups (#6):** Wine patches 0004-0009: dropdowns and tooltips redraw on hover and keyboard input (Qt 6.10 needs a blocking `IDXGIOutput::WaitForVBlank`) and show the latest frame; no black flash or white corners; Windows 11 rounded corners; no flash on first open; nested menus work. Plug-in host text renders (Segoe UI aliased to Tahoma).
+*   **Cantai:** Detected and installed silently with the other installers (WebView2 runtime provisioned for its editor); its "Auto & Cantai" playback template is added to Dorico automatically; per-user VST3 plug-ins are loaded; every editor window shows its content; Dorico no longer hangs on exit. Wine patch 0010 stops Cantai's renderer from being restarted mid-render (its per-request `wmic` call is answered without starting a process), which caused missing parts and the placeholder tone.
+*   **GPU for AI Plug-ins:** Cantai renders on the GPU through vkd3d-proton (per-app, pinned and checksum-verified) with Wine patch 0011 (dxcore reports Direct3D 12 / ML adapters only for a native d3d12). The strongest GPU is picked automatically (setting in Wine Tools > GPU for AI Plug-ins). The container gets NVIDIA access (`distrobox --nvidia`) on NVIDIA hosts; existing installs are offered a quick container conversion. Fresh 4-part SATB render: CPU 44-47 s, Intel Iris Xe 36-37 s, NVIDIA RTX 3080 Ti Laptop 20-24 s.
+*   **Uninstall License Guard:** The uninstaller reads the Activation Manager's activation data and refuses to delete activated Steinberg licenses unless the user types an explicit override.
+*   **Log Exporter:** `torquio -l` / "Export Logs" zips Torquio, Wine, Dorico and Steinberg logs plus a system summary into `~/Downloads`, with emails, the username, the computer name, sign-in tokens and license IDs removed.
+*   **Update Torquio:** `torquio -u` / "Update Torquio" fetches the latest version, then refreshes launchers and prefix settings and offers a Wine engine rebuild or NVIDIA container conversion when needed.
+*   **Status Dashboard:** New "GPU for AI Plug-ins" section.
+
+**Build Environment Artifacts:**
+*   **Custom Wine Source (`zhiyi/wine`):** Commit `883970826c62286c3da998072a5f49813d333a31`
+*   **Torquio Wine Patches:** `0001`-`0003` (unchanged), `0004-dxgi-vblank-and-frame-latency-dcomp-presented-buffer`, `0005-dcomp-layered-popups-transparent-corners-no-black-flash`, `0006-ole32-revokedragdrop-other-process-windows`, `0007-dcomp-dwmapi-windows11-rounded-popup-corners`, `0008-winex11-hide-layered-windows-until-drawn`, `0009-dcomp-cross-process-targets-compose-on-change`, `0010-kernelbase-answer-wmic-uuid-query-without-a-process`, `0011-dxcore-report-d3d12-ml-adapters-for-native-d3d12`
+*   **vkd3d-proton:** `3.0.1`
+*   **WebView2 Runtime:** `156.0.4314.42` (fetched at install time)
+*   **Winetricks Version:** `20240105`
+*   **Wine-ICU MSI Version:** `72.1`
+
+**Verified Application Versions:**
+*   **Steinberg Download Assistant (SDA):** `1.40.1`
+*   **Steinberg Activation Manager (SAM):** `1.10.0.1489`
+*   **Steinberg Media Bay:** `1.3.80`
+*   **Dorico:** `6.2.30.6245`
+*   **NotePerformer (3rd Party):** `5.1.2`
+*   **Cantai (3rd Party):** `3.1.1`
+
+**Known Issues:**
+*   SDA attempts to update MediaBay automatically and fails (Error 231: `preinstall.ps1: not trusted`); MediaBay stays at the version from the provided installer.
+*   The Activation Manager asks you to sign in every time it opens (its License Engine discards the stored sign-in on start); licenses stay activated.
+*   Cantai's editor shows white for a few seconds when first opened (WebView2 start-up); score edits made while Cantai's renderer is starting aren't rendered until the next edit; its renderer stays running for ~2 minutes after Dorico quits.
+*   GPU rendering for Cantai is verified on Intel Iris Xe (Mesa) and NVIDIA (proprietary 615); other GPUs/drivers are untested. It can be turned off in Wine Tools > GPU for AI Plug-ins.
+*   ntsync requires a host kernel 6.14+ with `CONFIG_NTSYNC`. On older kernels Wine falls back to the wineserver path.
+
+---
+
 ## **Release v0.3.5-alpha (ntsync & DirectComposition Fixes)**
 **Date:** 2026-10-19
 **Status:** Alpha / Milestone

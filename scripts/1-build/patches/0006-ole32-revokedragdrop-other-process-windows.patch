@@ -1,0 +1,28 @@
+diff --git a/dlls/ole32/ole2.c b/dlls/ole32/ole2.c
+index 36838628c65..10d6f37aa1a 100644
+--- a/dlls/ole32/ole2.c
++++ b/dlls/ole32/ole2.c
+@@ -630,6 +630,7 @@ HRESULT WINAPI RevokeDragDrop(HWND hwnd)
+   HANDLE map;
+   IStream *stream;
+   IDropTarget *drop_target;
++  DWORD pid = 0;
+   HRESULT hr;
+ 
+   TRACE("(%p)\n", hwnd);
+@@ -640,6 +641,15 @@ HRESULT WINAPI RevokeDragDrop(HWND hwnd)
+     return DRAGDROP_E_INVALIDHWND;
+   }
+ 
++  /* The registration data of other processes' windows (raw pointer, map handle) isn't valid
++   * here, and RegisterDragDrop() refuses such windows anyway. */
++  GetWindowThreadProcessId(hwnd, &pid);
++  if (pid != GetCurrentProcessId())
++  {
++    WARN("hwnd %p belongs to another process\n", hwnd);
++    return DRAGDROP_E_INVALIDHWND;
++  }
++
+   /* no registration data */
+   if (!(map = get_droptarget_handle(hwnd)))
+     return DRAGDROP_E_NOTREGISTERED;

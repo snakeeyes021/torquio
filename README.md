@@ -51,6 +51,7 @@ Download the following files from the Steinberg download pages for [Steinberg Do
 *   `Steinberg_Download_Assistant_*_Installer_win.exe` (Mandatory)
 *   `MediaBay_Installer_win64.zip` (Mandatory)
 *   `NotePerformer-Installer-*.exe` (3rd-party, Optional)
+*   `Cantai-Windows-Installer-*.exe.zip` (3rd-party, Optional; [Cantai](https://cantai.app) sings your lyrics. Torquio also adds its "Auto & Cantai" playback template to Dorico)
 
 *Note: You do not need to download the Dorico installer itself. The Download Assistant will handle that once the environment is built.*
 
@@ -72,7 +73,7 @@ The build pipeline automatically handles all the heavy lifting:
 1. Configures an isolated Ubuntu container.
 2. Compiles a custom version of WINE (with specific stubs required by Dorico).
 3. Initializes a Windows prefix, applies ClearType font configurations, and installs core dependencies.
-4. Installs MediaBay, the Download Assistant, and NotePerformer (if provided).
+4. Installs MediaBay, the Download Assistant, and NotePerformer and Cantai (if provided), without you having to click through their installers.
 5. Registers all application desktop shortcuts and web-login handlers to your native Linux application menu.
 6. Installs the globally accessible `torquio` console utility to manage your environment easily.
 
@@ -131,7 +132,28 @@ Occasionally, Wine servers hang, applications lock up in the background, or you'
     * **Reboot Prefix**: `torquio -b` or `torquio --reboot` (Simulates a Windows system reboot in the prefix).
     * **Wine Configuration**: `torquio -w` or `torquio --winecfg` (Opens the standard `winecfg` graphical control panel for library overrides).
     * **Execute Installer**: `torquio -e [file.exe/msi]` or `torquio --execute [file.exe/msi]` (Executes custom Windows installers or tools inside the environment prefix).
-    * **Fix Icons**: `torquio -f` or `torquio --fix-icons` (Refreshes desktop icons and launcher shortcuts on the host system). This can also be useful when following a ```git pull```; at the moment, this is how you'd update Torquio.
+    * **Fix Icons**: `torquio -f` or `torquio --fix-icons` (Refreshes desktop icons and launcher shortcuts on the host system).
+
+### 6. Updating Torquio
+Torquio can update itself from GitHub. It shows what's new and asks before installing, then refreshes your launchers, icons and Wine prefix settings. If an update changes Torquio's Wine engine, it offers to rebuild it (20-40 minutes) or lets you do that later. It won't overwrite Torquio files you've changed yourself.
+
+**How to Use**:
+  * **Interactive**: Option `9` (Update Torquio) in the main menu.
+  * **CLI Flag**: `torquio -u` or `torquio --update`
+
+### 7. Exporting Logs for Bug Reports
+If something goes wrong, Torquio can collect its own logs, Wine's output and the Dorico and Steinberg logs into a single zip in your `~/Downloads` folder, along with a short summary of your system. Your email address, username, computer name and license details are removed first; the names of projects you've opened in Dorico are still in it.
+
+**How to Use**:
+  * **Interactive**: Option `10` (Export Logs) in the main menu.
+  * **CLI Flag**: `torquio -l` or `torquio --export-logs`
+
+### 8. GPU for AI Plug-ins
+AI plug-ins such as Cantai can run part of their work on your graphics card, which makes rendering noticeably faster (about twice as fast on an NVIDIA laptop GPU in our tests). Torquio sets this up for you: it gives the plug-in a Direct3D 12 implementation that works under Wine (vkd3d-proton) and points it at your strongest GPU: a dedicated card of any brand if you have one, otherwise your integrated graphics. Intel and AMD GPUs work out of the box; for NVIDIA GPUs, Torquio's container needs access to NVIDIA's driver, which new installs get automatically and existing installs are offered during an update (it re-creates the container in a few minutes; Dorico, your settings and licenses aren't affected).
+
+**How to Use**:
+  * **Interactive**: Wine Tools & Maintenance > `13` (GPU for AI Plug-ins) to see your GPUs and choose Automatic, a specific GPU, or Off.
+  * **CLI Flag**: `torquio --setup-gpu` (sets up GPU access, including NVIDIA access for an existing install).
 
 ---
 

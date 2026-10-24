@@ -1,0 +1,206 @@
+diff --git a/dlls/kernel32/kernel32.spec b/dlls/kernel32/kernel32.spec
+index 517a485ef41..01d3658860c 100644
+--- a/dlls/kernel32/kernel32.spec
++++ b/dlls/kernel32/kernel32.spec
+@@ -680,7 +680,7 @@
+ @ stdcall -import GetEnvironmentVariableW(wstr ptr long)
+ # @ stub GetEraNameCountedString
+ @ stdcall -import GetErrorMode()
+-@ stdcall GetExitCodeProcess(long ptr)
++@ stdcall -import GetExitCodeProcess(long ptr)
+ @ stdcall -import GetExitCodeThread(long ptr)
+ @ stdcall GetExpandedNameA(str ptr)
+ @ stdcall GetExpandedNameW(wstr ptr)
+diff --git a/dlls/kernel32/process.c b/dlls/kernel32/process.c
+index 98313f4634c..cdd766fe777 100644
+--- a/dlls/kernel32/process.c
++++ b/dlls/kernel32/process.c
+@@ -196,30 +196,6 @@ void WINAPI ExitProcess( DWORD status )
+ 
+ #endif
+ 
+-/***********************************************************************
+- * GetExitCodeProcess           [KERNEL32.@]
+- *
+- * Gets termination status of specified process.
+- *
+- * PARAMS
+- *   hProcess   [in]  Handle to the process.
+- *   lpExitCode [out] Address to receive termination status.
+- *
+- * RETURNS
+- *   Success: TRUE
+- *   Failure: FALSE
+- */
+-BOOL WINAPI GetExitCodeProcess( HANDLE hProcess, LPDWORD lpExitCode )
+-{
+-    PROCESS_BASIC_INFORMATION pbi;
+-
+-    if (!set_ntstatus( NtQueryInformationProcess( hProcess, ProcessBasicInformation, &pbi, sizeof(pbi), NULL )))
+-        return FALSE;
+-    if (lpExitCode) *lpExitCode = pbi.ExitStatus;
+-    return TRUE;
+-}
+-
+-
+ /**************************************************************************
+  *           FatalExit   (KERNEL32.@)
+  */
+diff --git a/dlls/kernelbase/process.c b/dlls/kernelbase/process.c
+index ee1f2e7d010..dff9ac849d7 100644
+--- a/dlls/kernelbase/process.c
++++ b/dlls/kernelbase/process.c
+@@ -501,6 +501,132 @@ done:
+     return ret;
+ }
+ 
++/* Torquio: answer "wmic csproduct get UUID" without starting a process. Cantai's renderer runs that
++ * command on every health check; under Wine every run costs a whole process start (0.25 s idle, seconds
++ * while rendering), long enough for its plug-in to decide the renderer hung and restart it mid-render.
++ * The output is byte-identical to Wine's wmic writing into a pipe, and the UUID is read the same way
++ * wbemprox reads it. The returned "process" and "thread" are a signaled event that GetExitCodeProcess
++ * reports as exit code 0. */
++static const WCHAR fake_wmic_event_name[] = L"__wine_torquio_wmic_done";
++#define RSMB_SIGNATURE (('R' << 24) | ('S' << 16) | ('M' << 8) | 'B')
++
++static BOOL is_wmic_uuid_query( const WCHAR *cmd_line )
++{
++    static const WCHAR *const args[] = { L"csproduct", L"get", L"uuid" };
++    const WCHAR *p = cmd_line;
++    WCHAR token[MAX_PATH];
++    unsigned int count = 0, len;
++
++    for (;;)
++    {
++        BOOL quoted = FALSE;
++        while (*p == ' ' || *p == '\t') p++;
++        if (!*p) break;
++        for (len = 0; *p && (quoted || (*p != ' ' && *p != '\t')); p++)
++        {
++            if (*p == '"') quoted = !quoted;
++            else if (len < ARRAY_SIZE(token) - 1) token[len++] = *p;
++        }
++        token[len] = 0;
++        if (!count)
++        {
++            WCHAR *name = wcsrchr( token, '\\' );
++            if (!name) name = wcsrchr( token, '/' );
++            name = name ? name + 1 : token;
++            if (wcsicmp( name, L"wmic" ) && wcsicmp( name, L"wmic.exe" )) return FALSE;
++        }
++        else if (count > ARRAY_SIZE(args) || wcsicmp( token, args[count - 1] )) return FALSE;
++        count++;
++    }
++    return count == ARRAY_SIZE(args) + 1;
++}
++
++/* Win32_ComputerSystemProduct.UUID as wbemprox reports it: the SMBIOS system UUID in raw byte order. */
++static void get_smbios_system_uuid( char *uuid )
++{
++    static const BYTE none[16] = {0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff};
++    UINT size = GetSystemFirmwareTable( RSMB_SIGNATURE, 0, NULL, 0 ), offset;
++    BYTE *buf;
++
++    strcpy( uuid, "deaddead-dead-dead-dead-deaddeaddead" );
++    if (size < 8 || !(buf = HeapAlloc( GetProcessHeap(), 0, size ))) return;
++    if (GetSystemFirmwareTable( RSMB_SIGNATURE, 0, buf, size ) == size)
++    {
++        DWORD table_len = *(DWORD *)(buf + 4);
++        const BYTE *start = buf + 8;
++
++        if (table_len <= size - 8)
++        {
++            for (offset = 0; offset + 4 <= table_len && start[offset + 1];)
++            {
++                const BYTE *hdr = start + offset;
++                const BYTE *ptr;
++
++                if (hdr[0] == 1 && hdr[1] >= 8 + 16 && offset + hdr[1] <= table_len)
++                {
++                    const BYTE *u = hdr + 8;
++                    if (memcmp( u, none, sizeof(none) ))
++                        sprintf( uuid, "%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X",
++                                 u[0], u[1], u[2], u[3], u[4], u[5], u[6], u[7], u[8], u[9], u[10], u[11],
++                                 u[12], u[13], u[14], u[15] );
++                    break;
++                }
++                /* skip the formatted area and the string set, which ends with two NULs */
++                for (ptr = hdr + hdr[1]; ptr + 1 < start + table_len && (ptr[0] || ptr[1]); ptr++) ;
++                offset = ptr + 2 - start;
++            }
++        }
++    }
++    HeapFree( GetProcessHeap(), 0, buf );
++}
++
++static BOOL fake_wmic_uuid_query( const WCHAR *cmd_line, DWORD flags, const STARTUPINFOW *startup,
++                                  PROCESS_INFORMATION *info )
++{
++    char uuid[40], out[128];
++    DWORD written, len;
++    HANDLE process, thread;
++
++    if (!cmd_line || !is_wmic_uuid_query( cmd_line )) return FALSE;
++    if (flags & (CREATE_SUSPENDED | DEBUG_PROCESS | DEBUG_ONLY_THIS_PROCESS)) return FALSE;
++    if (!startup || !(startup->dwFlags & STARTF_USESTDHANDLES)) return FALSE;
++    if (!startup->hStdOutput || startup->hStdOutput == INVALID_HANDLE_VALUE) return FALSE;
++    if (GetFileType( startup->hStdOutput ) != FILE_TYPE_PIPE) return FALSE;
++
++    get_smbios_system_uuid( uuid );
++    len = sprintf( out, "%-*s\r\n%-*s\r\n", (int)strlen( uuid ) + 2, "UUID", (int)strlen( uuid ) + 2, uuid );
++    if (!(process = CreateEventW( NULL, TRUE, TRUE, fake_wmic_event_name ))) return FALSE;
++    if (!(thread = CreateEventW( NULL, TRUE, TRUE, fake_wmic_event_name )))
++    {
++        CloseHandle( process );
++        return FALSE;
++    }
++    if (!WriteFile( startup->hStdOutput, out, len, &written, NULL ))
++    {
++        CloseHandle( process );
++        CloseHandle( thread );
++        return FALSE;
++    }
++    TRACE( "answered %s without starting wmic\n", debugstr_w(cmd_line) );
++    info->hProcess = process;
++    info->hThread = thread;
++    info->dwProcessId = 0xfffffff0;
++    info->dwThreadId = 0xfffffff4;
++    return TRUE;
++}
++
++static BOOL is_fake_wmic_handle( HANDLE handle )
++{
++    char buffer[sizeof(OBJECT_NAME_INFORMATION) + MAX_PATH * sizeof(WCHAR)];
++    OBJECT_NAME_INFORMATION *name = (OBJECT_NAME_INFORMATION *)buffer;
++    UINT len = ARRAY_SIZE(fake_wmic_event_name) - 1;
++
++    if (NtQueryObject( handle, ObjectNameInformation, name, sizeof(buffer), NULL )) return FALSE;
++    return name->Name.Length >= len * sizeof(WCHAR) &&
++           !wcsncmp( name->Name.Buffer + name->Name.Length / sizeof(WCHAR) - len, fake_wmic_event_name, len );
++}
++
++
+ /**********************************************************************
+  *           CreateProcessInternalW   (kernelbase.@)
+  */
+@@ -527,6 +653,8 @@ BOOL WINAPI DECLSPEC_HOTPATCH CreateProcessInternalW( HANDLE token, const WCHAR
+ 
+     if (new_token) FIXME( "No support for returning created process token\n" );
+ 
++    if (fake_wmic_uuid_query( cmd_line, flags, startup_info, info )) return TRUE;
++
+     if (app_name)
+     {
+         if (!cmd_line || !cmd_line[0]) /* no command-line, create one */
+@@ -801,6 +929,11 @@ BOOL WINAPI DECLSPEC_HOTPATCH GetExitCodeProcess( HANDLE process, LPDWORD exit_c
+     PROCESS_BASIC_INFORMATION pbi;
+ 
+     status = NtQueryInformationProcess( process, ProcessBasicInformation, &pbi, sizeof(pbi), NULL );
++    if (status == STATUS_OBJECT_TYPE_MISMATCH && is_fake_wmic_handle( process ))
++    {
++        if (exit_code) *exit_code = 0;
++        return TRUE;
++    }
+     if (!status && exit_code) *exit_code = pbi.ExitStatus;
+     return set_ntstatus( status );
+ }

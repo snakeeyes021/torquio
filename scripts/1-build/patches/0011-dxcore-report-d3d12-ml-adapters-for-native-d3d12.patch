@@ -1,0 +1,143 @@
+diff --git a/dlls/dxcore/dxcore.c b/dlls/dxcore/dxcore.c
+index a63a8f33d72..d78bc6da9d4 100644
+--- a/dlls/dxcore/dxcore.c
++++ b/dlls/dxcore/dxcore.c
+@@ -21,6 +21,7 @@
+ #define COBJMACROS
+ #include "initguid.h"
+ #include "dxcore.h"
++#include "d3d12.h"
+ #include "wine/wined3d.h"
+ 
+ #include "wine/debug.h"
+@@ -34,8 +35,14 @@ struct dxcore_adapter
+ 
+     struct wined3d_adapter_identifier identifier;
+     char driver_description[128];
++    int d3d12_support; /* -1 not checked yet, 0 no, 1 yes */
+ };
+ 
++/* Not in Wine's dxcore_interface.h yet. */
++DEFINE_GUID(dxcore_attribute_d3d11_graphics, 0x8c47866b, 0x7583, 0x450d, 0xf0, 0xf0, 0x6b, 0xad, 0xa8, 0x95, 0xaf, 0x4b);
++DEFINE_GUID(dxcore_attribute_d3d12_generic_ml, 0xb71b0d41, 0x1088, 0x422f, 0xa2, 0x7c, 0x02, 0x50, 0xb7, 0xd3, 0xa9, 0x88);
++DEFINE_GUID(dxcore_hardware_type_gpu, 0xd46140c4, 0xadd7, 0x451b, 0x9e, 0x56, 0x06, 0xfe, 0x8c, 0x3b, 0x58, 0xed);
++
+ static inline struct dxcore_adapter *impl_from_IDXCoreAdapter(IDXCoreAdapter *iface)
+ {
+     return CONTAINING_RECORD(iface, struct dxcore_adapter, IDXCoreAdapter_iface);
+@@ -85,20 +92,71 @@ static ULONG STDMETHODCALLTYPE dxcore_adapter_Release(IDXCoreAdapter *iface)
+ 
+ static BOOL STDMETHODCALLTYPE dxcore_adapter_IsValid(IDXCoreAdapter *iface)
+ {
+-    FIXME("iface %p stub!\n", iface);
+-    return FALSE;
++    TRACE("iface %p.\n", iface);
++    return TRUE;
++}
++
++/* Torquio: whether this process can run Direct3D 12 (and therefore DirectML) on this adapter.
++ * Only reported for a native d3d12.dll such as vkd3d-proton: DirectML on Wine's builtin d3d12 runs but
++ * computes wrong results (Cantai's vocoder produced fixed tones), so with the builtin one adapters keep
++ * reporting no Direct3D 12 support and machine-learning apps stay on the CPU, as before this patch.
++ * Checked once per adapter, without creating a device. */
++static BOOL dxcore_adapter_supports_d3d12(struct dxcore_adapter *adapter)
++{
++    static const char builtin_signature[] = "Wine builtin DLL";
++
++    if (adapter->d3d12_support < 0)
++    {
++        HRESULT (WINAPI *create_device)(IUnknown *, D3D_FEATURE_LEVEL, REFIID, void **) = NULL;
++        HMODULE d3d12 = LoadLibraryW(L"d3d12.dll");
++
++        adapter->d3d12_support = 0;
++        if (!d3d12)
++            WARN("d3d12.dll not available.\n");
++        else if (!memcmp((const char *)d3d12 + 0x40, builtin_signature, sizeof(builtin_signature) - 1))
++            TRACE("Wine's builtin d3d12 is in use; not reporting Direct3D 12 support.\n");
++        else if ((create_device = (void *)GetProcAddress(d3d12, "D3D12CreateDevice")))
++            adapter->d3d12_support = SUCCEEDED(create_device((IUnknown *)&adapter->IDXCoreAdapter_iface,
++                    D3D_FEATURE_LEVEL_11_0, &IID_ID3D12Device, NULL));
++        TRACE("adapter %p, Direct3D 12 %ssupported.\n", adapter, adapter->d3d12_support ? "" : "not ");
++    }
++    return adapter->d3d12_support;
+ }
+ 
+ static BOOL STDMETHODCALLTYPE dxcore_adapter_IsAttributeSupported(IDXCoreAdapter *iface, REFGUID attribute)
+ {
+-    FIXME("iface %p, attribute %s stub!\n", iface, debugstr_guid(attribute));
++    struct dxcore_adapter *adapter = impl_from_IDXCoreAdapter(iface);
++
++    TRACE("iface %p, attribute %s.\n", iface, debugstr_guid(attribute));
++
++    if (IsEqualGUID(attribute, &dxcore_attribute_d3d11_graphics)
++            || IsEqualGUID(attribute, &dxcore_hardware_type_gpu))
++        return TRUE;
++    if (IsEqualGUID(attribute, &DXCORE_ADAPTER_ATTRIBUTE_D3D12_GRAPHICS)
++            || IsEqualGUID(attribute, &DXCORE_ADAPTER_ATTRIBUTE_D3D12_CORE_COMPUTE)
++            || IsEqualGUID(attribute, &dxcore_attribute_d3d12_generic_ml))
++        return dxcore_adapter_supports_d3d12(adapter);
++
++    FIXME("Unhandled attribute %s.\n", debugstr_guid(attribute));
+     return FALSE;
+ }
+ 
+ static BOOL STDMETHODCALLTYPE dxcore_adapter_IsPropertySupported(IDXCoreAdapter *iface, DXCoreAdapterProperty property)
+ {
+-    FIXME("iface %p, property %u stub!\n", iface, property);
+-    return FALSE;
++    TRACE("iface %p, property %u.\n", iface, property);
++
++    switch (property)
++    {
++        case InstanceLuid:
++        case DriverVersion:
++        case DriverDescription:
++        case HardwareID:
++        case IsHardware:
++            return TRUE;
++        default:
++            FIXME("Unhandled property %u.\n", property);
++            return FALSE;
++    }
+ }
+ 
+ static HRESULT dxcore_adapter_get_property_size(struct dxcore_adapter *adapter,
+@@ -454,6 +512,7 @@ static HRESULT dxcore_adapter_create(const struct wined3d_adapter *wined3d_adapt
+ 
+     adapter->IDXCoreAdapter_iface.lpVtbl = &dxcore_adapter_vtbl;
+     adapter->refcount = 1;
++    adapter->d3d12_support = -1;
+ 
+     adapter->identifier.description_size = sizeof(adapter->driver_description);
+     adapter->identifier.description = adapter->driver_description;
+@@ -502,7 +561,7 @@ static HRESULT STDMETHODCALLTYPE dxcore_adapter_factory_CreateAdapterList(IDXCor
+     struct dxcore_adapter_list *list;
+     HRESULT hr;
+ 
+-    FIXME("iface %p, num_attributes %u, filter_attributes %p, riid %s, out %p semi-stub!\n", iface, num_attributes, filter_attributes,
++    TRACE("iface %p, num_attributes %u, filter_attributes %p, riid %s, out %p.\n", iface, num_attributes, filter_attributes,
+             debugstr_guid(riid), out);
+ 
+     if (!out)
+@@ -524,6 +583,21 @@ static HRESULT STDMETHODCALLTYPE dxcore_adapter_factory_CreateAdapterList(IDXCor
+         return hr;
+     }
+ 
++    /* Keep only the adapters that support every requested attribute. */
++    for (uint32_t i = 0, kept = 0, count = list->adapter_count; i < count; i++)
++    {
++        struct dxcore_adapter *adapter = list->adapters[i];
++        BOOL supported = TRUE;
++
++        for (uint32_t j = 0; j < num_attributes && supported; j++)
++            supported = IDXCoreAdapter_IsAttributeSupported(&adapter->IDXCoreAdapter_iface, &filter_attributes[j]);
++        if (supported)
++            list->adapters[kept++] = adapter;
++        else
++            IDXCoreAdapter_Release(&adapter->IDXCoreAdapter_iface);
++        list->adapter_count = kept;
++    }
++
+     hr = IDXCoreAdapterList_QueryInterface(&list->IDXCoreAdapterList_iface, riid, out);
+     IDXCoreAdapterList_Release(&list->IDXCoreAdapterList_iface);
+     TRACE("created IDXCoreAdapterList %p.\n", *out);

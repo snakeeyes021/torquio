@@ -61,6 +61,9 @@ json.dump(d, open(f, "w"), indent=4)
 MANAGE_GRAPHICS=$(get_config_val "manage_graphics" "false")
 MANUAL_DPI=$(get_config_val "manual_dpi" "96")
 FREETYPE_INTERP=$(get_config_val "freetype_interpreter" "40")
+# GPU for AI plug-ins (Cantai): "auto" (strongest GPU), "off" (CPU only) or (part of) a GPU's name
+AI_GPU=$(get_config_val "ai_gpu" "auto")
+TORQUIO_DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/torquio"
 
 DPI_TO_SET="$MANUAL_DPI"
 
@@ -274,6 +277,63 @@ if [ -d "\$STAGED_DIR" ] && [ \$(ls -A "\$STAGED_DIR" 2>/dev/null | wc -l) -gt 0
     cp -r "\$STAGED_DIR"/* "\$DORICO_APPDATA_DIR/" >/dev/null 2>&1 || true
     rm -rf "\$STAGED_DIR"
 fi
+
+# Plug-ins installed "for this user only" (e.g. Cantai) land in the per-user VST3 folder, which
+# Dorico's audio engine doesn't scan; link them into the system-wide VST3 folder.
+COMMON_VST3="\$WINEPREFIX/drive_c/Program Files/Common Files/VST3"
+for USER_VST3 in "\$WINEPREFIX"/drive_c/users/*/AppData/Local/Programs/Common/VST3/*.vst3; do
+    [ -e "\$USER_VST3" ] || continue
+    if [ ! -e "\$COMMON_VST3/\$(basename "\$USER_VST3")" ]; then
+        mkdir -p "\$COMMON_VST3"
+        ln -s "\$USER_VST3" "\$COMMON_VST3/\$(basename "\$USER_VST3")"
+    fi
+done
+
+# Cantai ships its Dorico playback template ("Auto & Cantai.dorico_pt", a zip of the files Dorico's
+# Play > Playback Template > Import writes into its settings folder). Add it once, the first time Dorico
+# starts after Cantai is installed, unless a template of that name is already there.
+for CANTAI_PT in "\$WINEPREFIX"/drive_c/users/*/AppData/Local/"Cantai Local Render"/Dorico/*.dorico_pt; do
+    [ -f "\$CANTAI_PT" ] || continue
+    [ -f "\$WINEPREFIX/.torquio_cantai_template_added" ] && break
+    USER_DIR=\$(dirname "\$(dirname "\$(dirname "\$(dirname "\$(dirname "\$CANTAI_PT")")")")")
+    SETTINGS_DIR="\$USER_DIR/AppData/Roaming/Steinberg/Dorico \$DORICO_VER"
+    TEMPLATE_NAME=\$(basename "\$CANTAI_PT" .dorico_pt)
+    if [ ! -e "\$SETTINGS_DIR/PlaybackTemplateSpecs/\$TEMPLATE_NAME" ]; then
+        mkdir -p "\$SETTINGS_DIR"
+        unzip -q -n "\$CANTAI_PT" -d "\$SETTINGS_DIR" && echo "Added Cantai's playback template (\$TEMPLATE_NAME) to Dorico."
+    fi
+    touch "\$WINEPREFIX/.torquio_cantai_template_added"
+done
+
+# AI plug-ins that run their models on the GPU through DirectML (Cantai) get vkd3d-proton as their
+# Direct3D 12 (Wine's builtin d3d12 computes DirectML wrong), via a DLL copy next to the plug-in's
+# executable and a DLL override for that executable only. vkd3d-proton is pointed at the strongest GPU:
+# a discrete one of any brand, else an integrated one (never a CPU emulation like llvmpipe).
+AI_GPU="$AI_GPU"
+VKD3D_DIR=\$(ls -d "$TORQUIO_DATA_DIR"/vkd3d-proton/*/ 2>/dev/null | sort -V | tail -n 1)
+for AI_DIR in "\$WINEPREFIX"/drive_c/users/*/AppData/Local/Cantai; do
+    [ -f "\$AI_DIR/Cantai.exe" ] || continue
+    KEY="HKCU\\\\Software\\\\Wine\\\\AppDefaults\\\\Cantai.exe\\\\DllOverrides"
+    if [ "\$AI_GPU" != "off" ] && [ -n "\$VKD3D_DIR" ]; then
+        for dll in d3d12.dll d3d12core.dll; do
+            cmp -s "\$VKD3D_DIR\$dll" "\$AI_DIR/\$dll" || cp "\$VKD3D_DIR\$dll" "\$AI_DIR/\$dll"
+        done
+        if ! grep -q 'AppDefaults\\\\\\\\Cantai.exe\\\\\\\\DllOverrides' "\$WINEPREFIX/user.reg" 2>/dev/null; then
+            WINEDEBUG=-all wine reg add "\$KEY" /v d3d12 /t REG_SZ /d native /f >/dev/null 2>&1
+            WINEDEBUG=-all wine reg add "\$KEY" /v d3d12core /t REG_SZ /d native /f >/dev/null 2>&1
+        fi
+    elif [ -f "\$AI_DIR/d3d12.dll" ]; then
+        rm -f "\$AI_DIR/d3d12.dll" "\$AI_DIR/d3d12core.dll"
+        WINEDEBUG=-all wine reg delete "HKCU\\\\Software\\\\Wine\\\\AppDefaults\\\\Cantai.exe" /f >/dev/null 2>&1
+    fi
+done
+if [ "\$AI_GPU" = "auto" ]; then
+    AI_GPU_NAME=\$(vulkaninfo --summary 2>/dev/null | awk -F' = ' '/deviceType/ {t=\$2} /deviceName/ {print t "|" \$2}' |
+        awk -F'|' '\$1 ~ /DISCRETE/ {d = d ? d : \$2} \$1 ~ /INTEGRATED/ {i = i ? i : \$2} END {print d ? d : i}')
+elif [ "\$AI_GPU" != "off" ]; then
+    AI_GPU_NAME="\$AI_GPU"
+fi
+[ -n "\$AI_GPU_NAME" ] && export VKD3D_FILTER_DEVICE_NAME="\$AI_GPU_NAME"
 
 cd "\$DORICO_DIR"
 if [ -n "\$WIN_PATH" ]; then

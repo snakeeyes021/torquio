@@ -138,6 +138,10 @@ wine reg add "HKCU\\Control Panel\\Desktop" /v FontSmoothingGamma /t REG_DWORD /
 wine reg add "HKCU\\Control Panel\\Desktop" /v FontSmoothingOrientation /t REG_DWORD /d 1 /f
 wine reg add "HKCU\\Control Panel\\Desktop" /v FontSmoothingType /t REG_DWORD /d 2 /f
 
+# Steinberg's plug-in host UI (instrument window title bar, tooltips) only draws text in "Segoe UI",
+# which Wine doesn't ship. Alias it to Tahoma (honored by both GDI and DirectWrite).
+wine reg add "HKCU\\Software\\Wine\\Fonts\\Replacements" /v "Segoe UI" /t REG_SZ /d "Tahoma" /f
+
 # Customize key repeat speed to mitigate Auto-Repeat Lag Bug
 wine reg add "HKCU\\Control Panel\\Accessibility\\Keyboard Response" /v AutoRepeatDelay /t REG_SZ /d "250" /f
 wine reg add "HKCU\\Control Panel\\Accessibility\\Keyboard Response" /v AutoRepeatRate /t REG_SZ /d "30" /f

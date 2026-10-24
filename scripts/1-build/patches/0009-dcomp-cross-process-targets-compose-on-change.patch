@@ -1,0 +1,206 @@
+diff --git a/dlls/dcomp/dcomp_private.h b/dlls/dcomp/dcomp_private.h
+index ac5d7029fdf..da20d3a04e5 100644
+--- a/dlls/dcomp/dcomp_private.h
++++ b/dlls/dcomp/dcomp_private.h
+@@ -33,6 +33,7 @@ struct composition_device
+     HANDLE thread;
+     BOOL exit_thread;
+     BOOL thread_exited;
++    LONG commit_count;      /* bumped on every Commit(), for change tracking */
+     int version;
+     LONG ref;
+ };
+@@ -60,6 +61,7 @@ struct composition_surface
+     UINT height;
+     DXGI_FORMAT pixel_format;
+     DXGI_ALPHA_MODE alpha_mode;
++    LONG draw_count;        /* bumped on every EndDraw(), for change tracking */
+     ID2D1DeviceContext *d2d_context;
+     ID2D1Bitmap1 *d2d_target_bitmap;
+     LONG ref;
+@@ -89,6 +91,14 @@ struct composition_target
+     UINT region_count;
+     BOOL region_dirty;
+     BOOL region_applied;    /* a region is set on the window, clear it if no longer wanted */
++
++    /* Only recompose when something changed: re-blitting unchanged content races with other
++     * processes drawing into the same window (e.g. Chromium's GPU process into plug-in editors). */
++    BOOL composed;
++    ULONGLONG content_version;
++    RECT window_rect;
++    BOOL visible;
++    int settle;             /* extra passes after a change, rendering completes asynchronously */
+ };
+ 
+ void target_show(struct composition_target *target);
+diff --git a/dlls/dcomp/device.c b/dlls/dcomp/device.c
+index 647d8745b1a..7806367fb31 100644
+--- a/dlls/dcomp/device.c
++++ b/dlls/dcomp/device.c
+@@ -407,8 +407,8 @@ done:
+ 
+ /* Record, for each row of the frame, the span of pixels that aren't fully transparent.
+  * X11 windows have no alpha channel, so those pixels are cut out with a window region. */
+-/* Only cut layered windows without a non-client area (e.g. popups); windows may also stop
+- * being layered after the target was created. */
++/* Only cut top-level layered windows without a non-client area (e.g. popups); windows may also
++ * stop being layered after the target was created. */
+ static BOOL target_wants_region(struct composition_target *target)
+ {
+     RECT window_rect, client_rect;
+@@ -416,6 +416,8 @@ static BOOL target_wants_region(struct composition_target *target)
+ 
+     if (!target->layered || !(GetWindowLongW(target->hwnd, GWL_EXSTYLE) & WS_EX_LAYERED))
+         return FALSE;
++    if (GetWindowLongW(target->hwnd, GWL_STYLE) & WS_CHILD)
++        return FALSE;
+     if (!GetWindowRect(target->hwnd, &window_rect) || !GetClientRect(target->hwnd, &client_rect)
+             || !ClientToScreen(target->hwnd, &origin))
+         return FALSE;
+@@ -672,7 +674,10 @@ static void do_composite_dxgi_surface(struct composition_target *target,
+     style = DCX_USESTYLE | DCX_CACHE;
+     if (!target->topmost)
+         style |= DCX_CLIPCHILDREN;
+-    dst_dc = GetDCEx(target->hwnd, 0, style);
++    /* The window may be moved or resized by other processes (Chromium's GPU process composes into a
++     * child of a window owned by the browser process). That doesn't invalidate this process's cached
++     * DCs, so pass an unbounded clip region to make GetDCEx() recompute the visible region. */
++    dst_dc = GetDCEx(target->hwnd, CreateRectRgn(-0x4000, -0x4000, 0x4000, 0x4000), style | DCX_INTERSECTRGN);
+     if (target_wants_region(target))
+     {
+         if (target->content_drawn)
+@@ -850,6 +855,82 @@ static HRESULT do_composite(struct composition_target *target, struct compositio
+ }
+ 
+ 
++/* Sum of change counters of everything that do_composite() would draw for this visual. */
++static ULONGLONG visual_content_version(struct composition_visual *visual, int depth)
++{
++    struct composition_visual *child;
++    ULONGLONG version = 0;
++
++    if (depth > 32)
++        return 0;
++
++    if (visual->shared_visual_handle)
++    {
++        struct composition_visual *root = shared_visual_target_get_root(visual->shared_visual_handle);
++        if (root)
++            version += visual_content_version(root, depth + 1);
++    }
++
++    if (visual->content)
++    {
++        if (IsEqualGUID(&visual->content_iid, &IID_IDXGISwapChain1))
++        {
++            IDXGISwapChain1 *swapchain;
++            UINT count;
++
++            if (SUCCEEDED(IUnknown_QueryInterface(visual->content, &IID_IDXGISwapChain1, (void **)&swapchain)))
++            {
++                if (SUCCEEDED(IDXGISwapChain1_GetLastPresentCount(swapchain, &count)))
++                    version += count;
++                IDXGISwapChain1_Release(swapchain);
++            }
++        }
++        else if (IsEqualGUID(&visual->content_iid, &IID_IDCompositionSurface))
++        {
++            IDCompositionSurface *surface;
++
++            if (SUCCEEDED(IUnknown_QueryInterface(visual->content, &IID_IDCompositionSurface, (void **)&surface)))
++            {
++                struct composition_surface *surface_impl = impl_from_IDCompositionSurface(surface);
++                if (surface_impl)
++                    version += surface_impl->draw_count;
++                IDCompositionSurface_Release(surface);
++            }
++        }
++    }
++
++    LIST_FOR_EACH_ENTRY(child, &visual->child_visuals, struct composition_visual, entry)
++        version += visual_content_version(child, depth + 1);
++
++    return version;
++}
++
++/* Whether the target needs to be composed this pass. */
++static BOOL target_needs_composite(struct composition_device *device, struct composition_target *target,
++        struct composition_visual *visual)
++{
++    ULONGLONG version = visual_content_version(visual, 0) + device->commit_count;
++    BOOL visible = IsWindowVisible(target->hwnd);
++    RECT rect;
++
++    GetWindowRect(target->hwnd, &rect);
++    if (!target->composed || version != target->content_version || visible != target->visible
++            || !EqualRect(&rect, &target->window_rect))
++    {
++        target->content_version = version;
++        target->window_rect = rect;
++        target->visible = visible;
++        target->settle = 2;
++        return TRUE;
++    }
++    if (target->settle > 0)
++    {
++        target->settle--;
++        return TRUE;
++    }
++    return FALSE;
++}
++
+ /* Window updates that may send messages to the window's thread; they are applied after
+  * releasing the dcomp lock so that the composition thread can't deadlock with it. */
+ struct window_update
+@@ -965,8 +1046,17 @@ static DWORD WINAPI composite_thread_proc(void *iface)
+                 continue;
+ 
+             visual = impl_from_IDCompositionVisual(target->root);
++            if (!target_needs_composite(device, target, visual))
++            {
++                count++;
++                continue;
++            }
+             if (SUCCEEDED(do_composite(target, visual)))
++            {
++                if (target->content_drawn)
++                    target->composed = TRUE;
+                 count++;
++            }
+             queue_window_update(target, &updates, &update_count, &update_capacity);
+         }
+ 
+@@ -1006,6 +1096,8 @@ static HRESULT STDMETHODCALLTYPE device_Commit(IDCompositionDevice *iface)
+ 
+     FIXME("iface %p semi-stub!\n", iface);
+ 
++    InterlockedIncrement(&device->commit_count);
++
+     dcomp_lock();
+ 
+     if (!device->thread || device->thread_exited)
+diff --git a/dlls/dcomp/surface.c b/dlls/dcomp/surface.c
+index 52223a19c22..f42b7f25b7a 100644
+--- a/dlls/dcomp/surface.c
++++ b/dlls/dcomp/surface.c
+@@ -283,6 +283,7 @@ static HRESULT STDMETHODCALLTYPE surface_EndDraw(IDCompositionSurfaceUnknown *if
+         return DCOMPOSITION_ERROR_SURFACE_NOT_BEING_RENDERED;
+     }
+     device->drawing_surface = NULL;
++    InterlockedIncrement(&surface->draw_count);
+     dcomp_unlock();
+ 
+     /* End the D2D drawing session if active */
+diff --git a/dlls/dcomp/target.c b/dlls/dcomp/target.c
+index eed2898995a..397229057b3 100644
+--- a/dlls/dcomp/target.c
++++ b/dlls/dcomp/target.c
+@@ -190,7 +190,7 @@ HRESULT create_target(struct composition_device *device, HWND hwnd, BOOL topmost
+     prop = target->topmost ? wine_window_topmost_composed : wine_window_non_topmost_composed;
+     SetPropW(target->hwnd, prop, (HANDLE)1);
+ 
+-    if (GetWindowLongW(hwnd, GWL_EXSTYLE) & WS_EX_LAYERED)
++    if ((GetWindowLongW(hwnd, GWL_EXSTYLE) & WS_EX_LAYERED) && !(GetWindowLongW(hwnd, GWL_STYLE) & WS_CHILD))
+     {
+         COLORREF key;
+         DWORD flags;
