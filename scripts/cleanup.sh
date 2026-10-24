@@ -323,13 +323,32 @@ rm -f "$HOME/.local/share/applications/wine-extension-dorico.desktop"
 rm -f "$HOME/.local/share/applications/wine-protocol-net-steinberg-"*.desktop
 rm -f "$HOME/.local/share/applications/wine-extension-vstsound.desktop"
 rm -f "$HOME/.local/share/applications/wine-extension-slm.desktop"
-# Launchers Wine's menu builder created for Torquio's prefixes (file types and web links pointing into its
-# data or cache directory), with the file types they registered
-for launcher in "$HOME/.local/share/applications/"wine-*.desktop; do
-    [ -f "$launcher" ] && grep -q -e "$TORQUIO_DATA_DIR" -e "$TORQUIO_CACHE_DIR" "$launcher" || continue
+# Leftovers of Wine's menu builder (Torquio disables it, but older versions and some setup steps didn't):
+# 1. launchers pointing into Torquio's data or cache directory (file types, web links, Start menu shortcuts
+#    under wine/Programs), with the file types they registered
+apps="$HOME/.local/share/applications"
+torquio_dirs=(-e "$TORQUIO_DATA_DIR" -e "$TORQUIO_CACHE_DIR" -e "$(readlink -f "$TORQUIO_DATA_DIR" 2>/dev/null || echo "$TORQUIO_DATA_DIR")" -e "$(readlink -f "$TORQUIO_CACHE_DIR" 2>/dev/null || echo "$TORQUIO_CACHE_DIR")")
+while IFS= read -r -d '' launcher; do
+    grep -q -F "${torquio_dirs[@]}" "$launcher" || continue
     name=$(basename "$launcher" .desktop)
     rm -f "$launcher"
     [[ "$name" == wine-extension-* ]] && rm -f "$HOME/.local/share/mime/packages/x-wine-extension-${name#wine-extension-}.xml"
+done < <(find "$apps" -maxdepth 1 -name 'wine-*.desktop' -print0 2>/dev/null; find "$apps/wine" -name '*.desktop' -print0 2>/dev/null)
+find "$apps/wine" -depth -type d -empty -delete 2>/dev/null || true
+# 2. Wine menu entries whose launcher no longer exists (their desktop file ID is the launcher's path under
+#    applications/ with "/" replaced by "-")
+launcher_ids=$(cd "$apps" 2>/dev/null && find wine -name '*.desktop' 2>/dev/null | tr '/' '-')
+for menu in "$HOME/.config/menus/applications-merged/"wine-*.menu; do
+    [ -f "$menu" ] || continue
+    id=$(grep -o '<Filename>[^<]*</Filename>' "$menu" | head -n 1 | sed -e 's/<[^>]*>//g')
+    if [ -z "$id" ] || ! grep -qxF "$id" <<< "$launcher_ids"; then
+        rm -f "$menu"
+    fi
+done
+# 3. Wine menu folders no remaining menu entry uses
+for directory in "$HOME/.local/share/desktop-directories/"wine-*.directory; do
+    [ -f "$directory" ] || continue
+    grep -qF "<Directory>$(basename "$directory")</Directory>" "$HOME/.config/menus/applications-merged/"wine-*.menu 2>/dev/null || rm -f "$directory"
 done
 
 # Removing extracted icons
