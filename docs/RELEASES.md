@@ -4,6 +4,52 @@ This document tracks known-good, tested "snapshots" of the entire system. It ser
 
 ---
 
+## **Release v0.5.0-alpha (Prebuilt Wine Engine, Version Manifest & Plug-in Icons)**
+**Date:** 2026-10-24
+**Status:** Alpha / Milestone
+
+**Description:** Torquio's Wine engine is now built by GitHub Actions and published as a public container image, so installing and updating it is a download of about 1.5 GB instead of compiling Wine for 20-40 minutes. Engine updates swap the container and keep everything else: the Wine prefix, settings, licenses, NVIDIA access and the computer's identity (Cantai stays activated). Also: release notes' version sections are generated, plug-in windows get an icon, Wine updates no longer show `rundll32` errors, and the uninstaller checks for Cantai licenses and projects stored in the Wine prefix and leaves nothing behind. Verified on RedFoxOS, a Bazzite-based Fedora Atomic image (Intel Iris Xe + NVIDIA RTX 3080 Ti Laptop): a real update of an existing, locally compiled install to the published image and back (Cantai staying activated throughout), then an uninstall and a from-scratch install with the published image. From starting the installer to pressing play in Dorico took 36 minutes; Torquio's part, until it handed over to Steinberg's Download Assistant, took 17 of them.
+
+**Key Improvements:**
+*   **Prebuilt Wine Engine:** `scripts/1-build/Containerfile` builds the engine with the same `build_wine.sh` and ships it on Ubuntu 24.04 with only the runtime libraries (the build fails if anything Wine links to or loads at runtime is missing, 64- and 32-bit). GitHub Actions publishes it as `ghcr.io/snakeeyes021/torquio-env`, tagged by the hash of the Wine build files, so every copy of Torquio gets the engine built from exactly its own files; without a matching image (or with local changes to them) the installer compiles Wine as before. The image contains only free and open-source software, plus the complete patched Wine source it was built from.
+*   **Engine Updates:** When an update changes the Wine engine, Torquio offers to download the new one and swaps the container (also from Wine Tools > Update / Rebuild Wine Engine), compiling only if it hasn't been published yet. This is offered whenever the engine is out of date, including on installs updated by hand with `git pull` or from before Update Torquio existed (their locally compiled engines have no build record). The dashboard shows where the engine came from and whether an update is available.
+*   **Stable Computer Identity:** Wine derives the Windows system UUID (which Cantai's license is tied to) from a machine ID that each container used to generate for itself, so a re-created container looked like a new computer. New containers now get one derived from the host's (hashed), and container swaps keep the existing one. Older installs are offered a one-time switch to the derived ID after updating (or with `torquio --fix-identity`), once plug-ins tied to it such as Cantai are deactivated; the dashboard shows which kind of ID a container has.
+*   **Crash Handler Ships with the Engine:** Torquio's crash handler (which logs crashes instead of showing Wine's crash windows) is now built with the Wine engine, so it's in every container, including ones from the prebuilt image; it used to be compiled into the container during prefix setup and was lost when the container was re-created.
+*   **No `rundll32` Errors on Wine Updates:** Each Wine update re-registered .NET's `mscoree.dll`, which showed two "This application could not be started" errors with .NET 4.8 installed. A `rundll32`-only override skips that redundant step.
+*   **Update Notice & Settings:** When you open Torquio it checks GitHub for a new version (at most once a day, silently when offline) and shows a notice at the top of the menu. A new Settings entry in the main menu turns the check off.
+*   **Version Manifest:** `torquio --manifest` prints the "Build Environment Artifacts" and "Verified Application Versions" sections of these notes from the installed system, including the Wine engine's build record, and warns if the engine wasn't built from the current Wine build files. The log export includes it.
+*   **Uninstall Checks:** The license guard now also lists an activated Cantai (with where to deactivate it) next to Steinberg's licenses, and the uninstaller lists Dorico projects stored inside the Wine prefix instead of showing a generic warning. It also removes the leftovers of Wine's menu builder (file-type launchers, Start menu entries, Desktop shortcuts, default-application entries) and keeps it out of the WebView2 setup, which had been creating them.
+*   **Plug-in Window Icons:** Plug-in windows (NotePerformer's splash and instrument windows, Cantai's editor, ...) all belong to Dorico's audio engine and now show its icon instead of a generic one.
+
+**Build Environment Artifacts:**
+*   **Custom Wine Source (`zhiyi/wine`):** Commit `883970826c62286c3da998072a5f49813d333a31` (`wine-11.5-191-g883970826c6`)
+*   **Torquio Wine Patches:** `0001-dcomp-dxgi-composition-swapchain`, `0002-dcomp-virtual-surface`, `0003-dcomp-d2d1-device-context-support`, `0004-dxgi-vblank-and-frame-latency-dcomp-presented-buffer`, `0005-dcomp-layered-popups-transparent-corners-no-black-flash`, `0006-ole32-revokedragdrop-other-process-windows`, `0007-dcomp-dwmapi-windows11-rounded-popup-corners`, `0008-winex11-hide-layered-windows-until-drawn`, `0009-dcomp-cross-process-targets-compose-on-change`, `0010-kernelbase-answer-wmic-uuid-query-without-a-process`, `0011-dxcore-report-d3d12-ml-adapters-for-native-d3d12`
+*   **Container Image:** `ghcr.io/snakeeyes021/torquio-env:build-f568ffd9a7fc`
+*   **Container:** `Ubuntu 24.04.5 LTS`, Mesa `25.2.8-0ubuntu0.24.04.4`
+*   **vkd3d-proton:** `3.0.1`
+*   **WebView2 Runtime:** `156.0.4314.42` (fetched at install time)
+*   **Winetricks Version:** `20240105`
+*   **Wine-ICU MSI Version:** `72.1`
+
+**Verified Application Versions:**
+*   **Steinberg Download Assistant:** `1.40.1`
+*   **Steinberg Activation Manager:** `1.10.0.1489`
+*   **Steinberg MediaBay:** `1.3.80.59`
+*   **Steinberg Dorico 6:** `6.2.30.6245`
+*   **Cantai (3rd Party):** `3.1.1`
+*   **NotePerformer (3rd Party):** `5.1.2`
+
+**Known Issues:**
+*   SDA attempts to update MediaBay automatically and fails (Error 231: `preinstall.ps1: not trusted`); MediaBay stays at the version from the provided installer.
+*   The Activation Manager asks you to sign in every time it opens (its License Engine discards the stored sign-in on start); licenses stay activated.
+*   Cantai's editor shows white for a few seconds when first opened (WebView2 start-up); score edits made while Cantai's renderer is starting aren't rendered until the next edit; its renderer stays running for ~2 minutes after Dorico quits.
+*   GPU rendering for Cantai is verified on Intel Iris Xe (Mesa) and NVIDIA (proprietary 615); other GPUs/drivers are untested. It can be turned off in Wine Tools > GPU for AI Plug-ins.
+*   A new container's first start takes about a minute longer (distrobox installs its base packages).
+*   32-bit programs that crash use Wine's default crash handling rather than Torquio's (only the 64-bit debugger setting points at it); Dorico and its audio engine are 64-bit.
+*   ntsync requires a host kernel 6.14+ with `CONFIG_NTSYNC`. On older kernels Wine falls back to the wineserver path.
+
+---
+
 ## **Release v0.4.0-alpha (Dropdowns, Cantai on the GPU & Maintenance Tools)**
 **Date:** 2026-10-23
 **Status:** Alpha / Milestone
