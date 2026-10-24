@@ -111,8 +111,11 @@ fi
 # The following registry optimizations, focus loss remedies, and custom debugger wrappers
 # are always verified/applied on setup to ensure up-to-date settings.
 
-echo "Compiling and installing Windows GUI debugger helper (torquio-winedbg.exe)..."
-x86_64-w64-mingw32-gcc -mwindows -O2 "$SCRIPT_DIR/torquio-winedbg.c" -o "/opt/wine-custom/bin/torquio-winedbg.exe"
+# The crash handler is built with the engine (build_wine.sh); engines built before that lack it.
+if [ ! -f /opt/wine-custom/bin/torquio-winedbg.exe ] && command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1; then
+    echo "Compiling and installing Windows GUI debugger helper (torquio-winedbg.exe)..."
+    x86_64-w64-mingw32-gcc -mwindows -O2 "$SCRIPT_DIR/../1-build/torquio-winedbg.c" -o "/opt/wine-custom/bin/torquio-winedbg.exe"
+fi
 
 echo "Configuring Keyboard Focus Loss Mitigation & Accessibility Registry Overrides..."
 # FocusOnClick forces window focus acquisition upon mouse click, preventing focus loss in modals

@@ -11,6 +11,7 @@ import glob
 import hashlib
 import os
 import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -177,6 +178,17 @@ true
     return info
 
 
+def container_image():
+    """The image the Torquio container was created from (empty if unknown)."""
+    manager = os.environ.get("DBX_CONTAINER_MANAGER") or ("podman" if shutil.which("podman") else "docker")
+    field = "{{.ImageName}}" if manager == "podman" else "{{.Config.Image}}"
+    try:
+        return subprocess.run([manager, "container", "inspect", "--format", field, CONTAINER],
+                              capture_output=True, text=True, timeout=60).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
 def repo_build():
     """The zhiyi/wine commit and patches (short sha256, name) this copy of Torquio builds."""
     commit = re.search(r'^TARGET_COMMIT="([0-9a-f]+)"', open(os.path.join(REPO, "scripts/1-build/build_wine.sh")).read(), re.M)
@@ -220,6 +232,14 @@ def manifest():
     lines = ["**Build Environment Artifacts:**",
              f"*   **Custom Wine Source (`zhiyi/wine`):** Commit `{commit}`{wine}",
              "*   **Torquio Wine Patches:** " + (", ".join(f"`{name}`" for _, name in patches) or "none")]
+    image = container_image()
+    if image:
+        prebuilt = image.startswith(os.environ.get("TORQUIO_IMAGE_REPO") or "ghcr.io/snakeeyes021/torquio-env") and ":" in image
+        lines.append(f"*   **Container Image:** `{image}`" if prebuilt else "*   **Container Image:** compiled locally")
+        tree = subprocess.run(["git", "-C", REPO, "rev-parse", "HEAD:scripts/1-build"], capture_output=True, text=True).stdout.strip()
+        if prebuilt and tree and not image.endswith(f":build-{tree[:12]}"):
+            warnings.append(f"The container runs {image}, not the engine built from this copy's Wine build files (build-{tree[:12]}). "
+                            "Update it (Wine Tools > Update / Rebuild Wine Engine) before a release.")
     if c.get("os"):
         lines.append(f"*   **Container:** `{c['os']}`" + (f", Mesa `{c['mesa']}`" if c.get("mesa") else ""))
     vkd3d = versions_in(os.path.join(DATA_DIR, "vkd3d-proton"))

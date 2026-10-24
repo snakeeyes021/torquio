@@ -14,6 +14,7 @@ RUN dpkg-query -W -f '${Package}:${Architecture}\n' | sort > /base-packages.txt 
     /src/scripts/1-build/build_wine.sh --deps-only && rm -rf /var/lib/apt/lists/*
 COPY scripts/1-build/patches/ /src/scripts/1-build/patches/
 COPY scripts/1-build/include/ /src/scripts/1-build/include/
+COPY scripts/1-build/torquio-winedbg.c /src/scripts/1-build/torquio-winedbg.c
 RUN TORQUIO_COMMIT="$TORQUIO_COMMIT" /src/scripts/1-build/build_wine.sh --skip-deps
 
 # Runtime packages: everything the build container has beyond the base image, minus headers, compilers

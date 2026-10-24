@@ -145,6 +145,11 @@ $SUDO mkdir -p /opt/wine-custom
 cd ../wine64 && make install prefix=/opt/wine-custom
 cd ../wine32 && make install prefix=/opt/wine-custom
 
+# Torquio's crash handler (registered as the prefix's AeDebug debugger by setup_prefix.sh) is part of the
+# engine, so it's in every container that has the engine, including ones from the prebuilt image.
+echo "Compiling the crash handler (torquio-winedbg.exe)..."
+x86_64-w64-mingw32-gcc -mwindows -O2 "$SCRIPT_DIR/torquio-winedbg.c" -o /opt/wine-custom/bin/torquio-winedbg.exe
+
 # Record what this engine was built from, for `torquio --manifest`
 mkdir -p /opt/wine-custom/share/torquio
 {
