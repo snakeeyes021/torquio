@@ -782,7 +782,11 @@ show_status() {
         engine_image=$(torquio_container_image)
         expected_image=$(torquio_prebuilt_image)
         if [[ "$engine_image" != "$TORQUIO_IMAGE_REPO:"* ]]; then
-            echo -e "  - Wine Engine: ${wine}Compiled locally${reset}"
+            if engine_outdated; then
+                echo -e "  - Wine Engine: ${yellow}Compiled locally, update available${reset} (Wine Tools > Update / Rebuild Wine Engine)"
+            else
+                echo -e "  - Wine Engine: ${wine}Compiled locally${reset}"
+            fi
         elif [ -n "$expected_image" ] && [ "$engine_image" != "$expected_image" ]; then
             echo -e "  - Wine Engine: ${yellow}Prebuilt ${engine_image##*:}, update available${reset} (Wine Tools > Update / Rebuild Wine Engine)"
         else
@@ -1402,8 +1406,10 @@ post_update() {
         setup_gpu_access --quiet
         apply_prefix_settings
         fix_machine_identity --quiet
-        if echo "$changed" | grep -q '^scripts/1-build/'; then
-            echo -e "${yellow}This update includes changes to Torquio's Wine engine. Until it's updated, Dorico keeps running on the current engine.${reset}"
+        # Also when the engine was already out of date (e.g. Torquio was updated with git pull, or an earlier
+        # offer was declined), not only when this update changed it
+        if echo "$changed" | grep -q '^scripts/1-build/' || engine_outdated; then
+            echo -e "${yellow}There's a newer version of Torquio's Wine engine. Until it's updated, Dorico keeps running on the current engine.${reset}"
             update_wine_engine
         fi
     else
@@ -1691,6 +1697,26 @@ replace_container() {
 
 # Bring the Wine engine up to date with this copy of Torquio: download the matching prebuilt engine when
 # there is one, otherwise offer to compile it.
+# Whether the Wine engine in the container isn't the one this copy of Torquio builds: a prebuilt image other than
+# the matching one, or a locally compiled engine whose build record (zhiyi/wine commit and patches) doesn't match
+# this copy's, or that has none (engines compiled before Torquio recorded them).
+engine_outdated() {
+    local image expected record wanted
+    image=$(torquio_container_image)
+    if [[ "$image" == "$TORQUIO_IMAGE_REPO:"* ]]; then
+        expected=$(torquio_prebuilt_image)
+        [ -n "$expected" ] && [ "$image" != "$expected" ]
+        return
+    fi
+    record=$(distrobox enter "$TORQUIO_CONTAINER_NAME" -- cat /opt/wine-custom/share/torquio/build-info </dev/null 2>/dev/null | grep -E '^(zhiyi_commit|patch)=' || true)
+    [ -z "$record" ] && return 0
+    wanted=$(echo "zhiyi_commit=$(sed -n 's/^TARGET_COMMIT="\(.*\)"$/\1/p' "$SCRIPT_DIR/scripts/1-build/build_wine.sh")"
+             for patch in "$SCRIPT_DIR"/scripts/1-build/patches/*.patch; do
+                 echo "patch=$(sha256sum "$patch" | cut -c1-12) $(basename "$patch" .patch)"
+             done)
+    [ "$record" != "$wanted" ]
+}
+
 update_wine_engine() {
     local green="\033[38;5;108m"
     local yellow="\033[38;5;179m"
