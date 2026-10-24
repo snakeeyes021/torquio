@@ -5,7 +5,8 @@
   deactivating it in Cantai empties the token.
 
 Usage: plugin_license_state.py PREFIX
-Prints the name of each plug-in with an activated license, one per line (nothing if there are none).
+Prints one line per plug-in with an activated license (nothing if there are none):
+    NAME<TAB>where to deactivate it
 """
 import glob
 import os
@@ -28,12 +29,12 @@ def main(prefix):
     drive_c = os.path.join(prefix, "drive_c")
     active = []
     if cantai_active(drive_c):
-        active.append("Cantai")
+        active.append(("Cantai", "in Cantai itself"))
     return active
 
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         sys.exit(__doc__)
-    for name in main(sys.argv[1]):
-        print(name)
+    for name, where in main(sys.argv[1]):
+        print(f"{name}\t{where}")

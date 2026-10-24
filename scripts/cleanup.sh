@@ -41,10 +41,16 @@ echo ""
 LICENSE_STATE=$(python3 "$SCRIPT_DIR/steinberg_license_state.py" "$TORQUIO_PREFIX_DIR" 2>/dev/null || echo "unknown the license check failed to run")
 PLUGIN_LICENSES=$(python3 "$SCRIPT_DIR/plugin_license_state.py" "$TORQUIO_PREFIX_DIR" 2>/dev/null || true)
 ACTIVE_LICENSES=""
-[[ "$LICENSE_STATE" == active* ]] && ACTIVE_LICENSES="${LICENSE_STATE#active$'\n'}"
-if [ -n "$PLUGIN_LICENSES" ]; then
-    ACTIVE_LICENSES="${ACTIVE_LICENSES:+$ACTIVE_LICENSES$'\n'}$PLUGIN_LICENSES"
+DEACTIVATE_HINTS=()
+if [[ "$LICENSE_STATE" == active* ]]; then
+    ACTIVE_LICENSES="${LICENSE_STATE#active$'\n'}"
+    DEACTIVATE_HINTS+=("Steinberg products in the Steinberg Activation Manager")
 fi
+while IFS=$'\t' read -r name where; do
+    [ -n "$name" ] || continue
+    ACTIVE_LICENSES="${ACTIVE_LICENSES:+$ACTIVE_LICENSES$'\n'}$name"
+    DEACTIVATE_HINTS+=("$name $where")
+done <<< "$PLUGIN_LICENSES"
 if [ -n "$ACTIVE_LICENSES" ]; then
     echo -e "⚠️  ${red}These licenses are still activated in this installation:${reset}"
     echo ""
@@ -54,7 +60,8 @@ if [ -n "$ACTIVE_LICENSES" ]; then
         echo -e "${yellow}Torquio also couldn't determine whether your Steinberg licenses are deactivated (${LICENSE_STATE#unknown }).${reset}"
         echo ""
     fi
-    echo "Deactivate them (Steinberg products in the Steinberg Activation Manager, plug-ins in the plug-in itself), then run the uninstall again. If you delete them while they're activated, you can no longer deactivate them from this computer."
+    hints=$(printf '%s, ' "${DEACTIVATE_HINTS[@]}")
+    echo "Deactivate them (${hints%, }), then run the uninstall again. If you delete them while they're activated, you can no longer deactivate them from this computer."
     echo ""
     override="yes, I'm aware my license is active and deleting it will prevent me from ever deactivating it. proceed anyways"
     read -p "To uninstall anyway, type '$override': " confirm
