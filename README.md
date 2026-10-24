@@ -134,7 +134,7 @@ Occasionally, Wine servers hang, applications lock up in the background, or you'
     * **Fix Icons**: `torquio -f` or `torquio --fix-icons` (Refreshes desktop icons and launcher shortcuts on the host system).
 
 ### 6. Updating Torquio
-Torquio can update itself from GitHub. It shows what's new and asks before installing, then refreshes your launchers, icons and Wine prefix settings. If an update changes Torquio's Wine engine, it offers to download the new one (a few minutes), or to compile it (20-40 minutes) if it hasn't been published yet; you can also do that later from Wine Tools & Maintenance > Update / Rebuild Wine Engine. It won't overwrite Torquio files you've changed yourself.
+Torquio can update itself from GitHub. When you open it, it checks for a new version (at most once a day; you can turn this off in Settings) and shows a notice at the top of the menu. Updating shows what's new and asks before installing, then refreshes your launchers, icons and Wine prefix settings. If an update changes Torquio's Wine engine, it offers to download the new one (a few minutes), or to compile it (20-40 minutes) if it hasn't been published yet; you can also do that later from Wine Tools & Maintenance > Update / Rebuild Wine Engine. It won't overwrite Torquio files you've changed yourself.
 
 **How to Use**:
   * **Interactive**: Option `9` (Update Torquio) in the main menu.

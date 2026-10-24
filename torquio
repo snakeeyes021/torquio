@@ -1983,7 +1983,59 @@ manage_wine() {
     done
 }
 
+# Look for a newer Torquio on GitHub, at most once a day and quietly: never longer than a few seconds, no
+# password or key prompts, nothing at all when offline or turned off in Settings.
+check_for_updates() {
+    [ "$(get_config_val "check_for_updates" "true")" = "true" ] || return 0
+    git -C "$SCRIPT_DIR" rev-parse --abbrev-ref "@{u}" >/dev/null 2>&1 || return 0
+    local stamp="$TORQUIO_CACHE_DIR/last-update-check" now last
+    now=$(date +%s)
+    last=$(cat "$stamp" 2>/dev/null || echo 0)
+    [ $((now - last)) -lt 86400 ] && return 0
+    if GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=5" \
+        timeout 8 git -C "$SCRIPT_DIR" fetch --quiet </dev/null >/dev/null 2>&1; then
+        mkdir -p "$TORQUIO_CACHE_DIR"
+        echo "$now" > "$stamp"
+    fi
+}
+
+# Updates found by the last check (no network access)
+pending_updates() {
+    [ "$(get_config_val "check_for_updates" "true")" = "true" ] || { echo 0; return; }
+    git -C "$SCRIPT_DIR" rev-list --count "HEAD..@{u}" 2>/dev/null || echo 0
+}
+
+manage_settings() {
+    local wine="\033[38;5;125m"
+    local blue="\033[38;5;110m"
+    local reset="\033[0m"
+    while true; do
+        local auto="Off"
+        [ "$(get_config_val "check_for_updates" "true")" = "true" ] && auto="On"
+        echo ""
+        echo -e "${blue}=== Settings ===${reset}"
+        echo ""
+        echo -e "  ${wine}1)${reset} Automatically check for updates: ${wine}${auto}${reset}"
+        echo -e "  ${wine}2)${reset} [Back]"
+        echo ""
+        read -p "Select an option (1-2): " opt || true
+        case "$opt" in
+            1)
+                if [ "$auto" = "On" ]; then
+                    set_config_val "check_for_updates" "false"
+                    echo "Torquio won't check for updates on its own any more (Update Torquio still works)."
+                else
+                    set_config_val "check_for_updates" "true"
+                    echo "Torquio will check GitHub for updates once a day when you open it."
+                fi
+                ;;
+            *) return 0 ;;
+        esac
+    done
+}
+
 show_menu() {
+    check_for_updates
     while true; do
         print_header
         echo ""
@@ -1995,8 +2047,20 @@ show_menu() {
         fi
         
         local wine="\033[38;5;125m"
+        local yellow="\033[38;5;179m"
         local reset="\033[0m"
-        
+
+        local updates
+        updates=$(pending_updates)
+        if [ "${updates:-0}" -gt 0 ]; then
+            local update_option=4
+            [ "$env_active" = "true" ] && update_option=9
+            local changes="$updates changes"
+            [ "$updates" -eq 1 ] && changes="1 change"
+            echo -e "  ${yellow}Torquio update available ($changes): choose ${update_option}) Update Torquio, or run 'torquio -u'.${reset}"
+            echo ""
+        fi
+
         if [ "$env_active" = "true" ]; then
             echo -e "  ${wine}1)${reset} Reinstall/Repair Torquio Environment"
             echo -e "  ${wine}2)${reset} Uninstall/Wipe Torquio"
@@ -2008,9 +2072,10 @@ show_menu() {
             echo -e "  ${wine}8)${reset} Wine Tools & Maintenance"
             echo -e "  ${wine}9)${reset} Update Torquio"
             echo -e "  ${wine}10)${reset} Export Logs (for bug reports)"
-            echo -e "  ${wine}11)${reset} Exit"
+            echo -e "  ${wine}11)${reset} Settings"
+            echo -e "  ${wine}12)${reset} Exit"
             echo ""
-            read -p "Select an option (1-11): " choice
+            read -p "Select an option (1-12): " choice
             echo ""
             case "$choice" in
                 1)
@@ -2052,8 +2117,9 @@ show_menu() {
                 8)  manage_wine; clear; continue ;;
                 9)  update_torquio --menu || true ;;
                 10) export_logs ;;
-                11) exit 0 ;;
-                *)  echo "Invalid option. Please choose 1-11." ;;
+                11) manage_settings; clear; continue ;;
+                12) exit 0 ;;
+                *)  echo "Invalid option. Please choose 1-12." ;;
             esac
         else
             echo -e "  ${wine}1)${reset} Install Torquio Environment"
@@ -2061,9 +2127,10 @@ show_menu() {
             echo -e "  ${wine}3)${reset} Status Dashboard"
             echo -e "  ${wine}4)${reset} Update Torquio"
             echo -e "  ${wine}5)${reset} Export Logs (for bug reports)"
-            echo -e "  ${wine}6)${reset} Exit"
+            echo -e "  ${wine}6)${reset} Settings"
+            echo -e "  ${wine}7)${reset} Exit"
             echo ""
-            read -p "Select an option (1-6): " choice
+            read -p "Select an option (1-7): " choice
             echo ""
             case "$choice" in
                 1)
@@ -2100,8 +2167,9 @@ show_menu() {
                 3)  show_status ;;
                 4)  update_torquio --menu || true ;;
                 5)  export_logs ;;
-                6)  exit 0 ;;
-                *)  echo "Invalid option. Please choose 1-6." ;;
+                6)  manage_settings; clear; continue ;;
+                7)  exit 0 ;;
+                *)  echo "Invalid option. Please choose 1-7." ;;
             esac
         fi
         
