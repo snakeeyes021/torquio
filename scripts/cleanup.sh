@@ -361,6 +361,12 @@ rm -f "$HOME/.local/share/mime/packages/application-x-dorico.xml"
 rm -f "$HOME/.local/share/mime/packages/x-wine-extension-dorico.xml"
 rm -f "$HOME/.local/share/mime/packages/x-wine-extension-vstsound.xml"
 rm -f "$HOME/.local/share/mime/packages/x-wine-extension-slm.xml"
+# Generated from Wine's .dorico file type; update-mime-database leaves it behind once its package is gone
+rm -rf "$HOME/.local/share/mime/dorico"
+# Default-application entries pointing at Torquio's launchers
+for list in "$HOME/.config/mimeapps.list" "$HOME/.local/share/applications/mimeapps.list"; do
+    [ -f "$list" ] && sed -i -E '/^[^=]+=(Dorico|Steinberg Download Assistant|Steinberg Activation Manager|Dorico Audio Engine)\.desktop;?$/d' "$list"
+done
 
 echo "Removing orphaned Windows desktop shortcuts..."
 host_desktop="${XDG_DESKTOP_DIR:-$HOME/Desktop}"
