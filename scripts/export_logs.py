@@ -152,6 +152,8 @@ def system_info():
     lines += ["== Torquio settings", config, ""]
     state = run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "steinberg_license_state.py"), PREFIX])
     lines += ["== Steinberg licenses activated in this installation", state.replace("\n", ": ", 1).replace("\n", ", "), ""]
+    plugins = run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "plugin_license_state.py"), PREFIX])
+    lines += ["== Plug-in licenses activated in this installation", ", ".join(line.split("\t")[0] for line in plugins.splitlines()) or "(none detected)", ""]
     manifest, warnings = version_manifest.manifest()
     lines += ["== Version manifest (Wine engine and installed Windows software)"] + manifest + [f"Warning: {w}" for w in warnings] + [""]
     dumps = sorted(glob.glob(os.path.join(PREFIX, "drive_c/users/*/Documents/Steinberg/CrashDumps/*.dmp")), key=os.path.getmtime, reverse=True)

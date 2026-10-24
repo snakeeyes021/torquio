@@ -35,50 +35,87 @@ echo -e " - Cache directory:     ${gray}$TORQUIO_CACHE_DIR${reset} (includes Win
 echo " - Host integration scripts and .desktop files"
 echo " - Extracted desktop icons"
 echo ""
-# License check: refuse to delete a prefix that still holds activated Steinberg licenses unless the user
-# explicitly accepts it (e.g. they can't deactivate and will do it from their Steinberg account online).
+# License check: refuse to delete a prefix that still holds activated licenses (Steinberg's, and plug-ins
+# Torquio can detect, e.g. Cantai) unless the user explicitly accepts it (e.g. they can't deactivate and will
+# do it from their account online).
 LICENSE_STATE=$(python3 "$SCRIPT_DIR/steinberg_license_state.py" "$TORQUIO_PREFIX_DIR" 2>/dev/null || echo "unknown the license check failed to run")
-case "$LICENSE_STATE" in
-    active*)
-        echo -e "⚠️  ${red}These Steinberg licenses are still activated in this installation:${reset}"
+PLUGIN_LICENSES=$(python3 "$SCRIPT_DIR/plugin_license_state.py" "$TORQUIO_PREFIX_DIR" 2>/dev/null || true)
+ACTIVE_LICENSES=""
+DEACTIVATE_HINTS=()
+if [[ "$LICENSE_STATE" == active* ]]; then
+    ACTIVE_LICENSES="${LICENSE_STATE#active$'\n'}"
+    DEACTIVATE_HINTS+=("Steinberg products in the Steinberg Activation Manager")
+fi
+while IFS=$'\t' read -r name where; do
+    [ -n "$name" ] || continue
+    ACTIVE_LICENSES="${ACTIVE_LICENSES:+$ACTIVE_LICENSES$'\n'}$name"
+    DEACTIVATE_HINTS+=("$name $where")
+done <<< "$PLUGIN_LICENSES"
+if [ -n "$ACTIVE_LICENSES" ]; then
+    echo -e "⚠️  ${red}These licenses are still activated in this installation:${reset}"
+    echo ""
+    echo -e "${yellow}${ACTIVE_LICENSES}${reset}"
+    echo ""
+    if [[ "$LICENSE_STATE" == unknown* ]]; then
+        echo -e "${yellow}Torquio also couldn't determine whether your Steinberg licenses are deactivated (${LICENSE_STATE#unknown }).${reset}"
         echo ""
-        echo -e "${yellow}${LICENSE_STATE#active$'\n'}${reset}"
-        echo ""
-        echo "Deactivate them in the Steinberg Activation Manager, then run the uninstall again. If you delete them while they're activated, you can no longer deactivate them from this computer."
-        echo ""
-        override="yes, I'm aware my license is active and deleting it will prevent me from ever deactivating it. proceed anyways"
-        read -p "To uninstall anyway, type '$override': " confirm
-        if [[ "$confirm" != "$override" ]]; then
-            echo "Cleanup cancelled."
-            exit 10
-        fi
-        ;;
-    inactive)
-        echo -e "${green}No activated Steinberg licenses found in this installation.${reset}"
-        read -p "Have you deactivated any third-party plug-in licenses (e.g. Cantai)? (y/N): " confirm
-        if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-            echo "Cleanup cancelled."
-            exit 10
-        fi
-        ;;
-    *)
-        echo -e "⚠️  ${yellow}Torquio couldn't determine whether your Steinberg licenses are deactivated (${LICENSE_STATE#unknown }).${reset}"
-        echo "Open the Steinberg Activation Manager and make sure every product is deactivated before continuing."
-        echo ""
-        override="no, I promise, I've deactivated my license"
-        read -p "To continue, type '$override': " confirm
-        if [[ "$confirm" != "$override" ]]; then
-            echo "Cleanup cancelled."
-            exit 10
-        fi
-        ;;
-esac
+    fi
+    hints=$(printf '%s, ' "${DEACTIVATE_HINTS[@]}")
+    echo "Deactivate them (${hints%, }), then run the uninstall again. If you delete them while they're activated, you can no longer deactivate them from this computer."
+    echo ""
+    override="yes, I'm aware my license is active and deleting it will prevent me from ever deactivating it. proceed anyways"
+    read -p "To uninstall anyway, type '$override': " confirm
+    if [[ "$confirm" != "$override" ]]; then
+        echo "Cleanup cancelled."
+        exit 10
+    fi
+elif [[ "$LICENSE_STATE" == unknown* ]]; then
+    echo -e "⚠️  ${yellow}Torquio couldn't determine whether your Steinberg licenses are deactivated (${LICENSE_STATE#unknown }).${reset}"
+    echo "Open the Steinberg Activation Manager and make sure every product is deactivated before continuing."
+    echo ""
+    override="no, I promise, I've deactivated my license"
+    read -p "To continue, type '$override': " confirm
+    if [[ "$confirm" != "$override" ]]; then
+        echo "Cleanup cancelled."
+        exit 10
+    fi
+else
+    echo -e "${green}No activated Steinberg or Cantai licenses found in this installation.${reset}"
+    read -p "Have you deactivated any other third-party plug-in licenses? (y/N): " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo "Cleanup cancelled."
+        exit 10
+    fi
+fi
 echo ""
-read -p "Have you backed up any Dorico projects you were keeping in the data directory? (y/N): " confirm
-
-if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-    echo "Cleanup cancelled."
-    exit 10
+# Projects saved inside the Wine prefix. Not followed: the prefix's Documents, Desktop, Downloads, Music etc.
+# link to the host's own folders (where Dorico saves by default), and deleting the prefix only removes the
+# links. Skipped: Dorico's own example projects, tutorials (Program Files) and autosave data (AppData).
+mapfile -t PREFIX_PROJECTS < <(find "$TORQUIO_PREFIX_DIR/drive_c" \( -path "*/Program Files*" -o -path "*/ProgramData" \
+    -o -path "*/windows" -o -path "*/AppData" -o -path "*/users/Public/Documents/Dorico Example Projects" \) -prune \
+    -o -type f -iname '*.dorico' -print 2>/dev/null)
+if [ ${#PREFIX_PROJECTS[@]} -gt 0 ]; then
+    echo -e "⚠️  ${red}Torquio found Dorico projects stored inside the Wine prefix, which will be deleted:${reset}"
+    echo ""
+    for project in "${PREFIX_PROJECTS[@]:0:10}"; do
+        echo -e "${yellow}${project#"$TORQUIO_PREFIX_DIR/"}${reset}"
+    done
+    [ ${#PREFIX_PROJECTS[@]} -gt 10 ] && echo -e "${yellow}... and $(( ${#PREFIX_PROJECTS[@]} - 10 )) more${reset}"
+    echo ""
+    echo "Copy any you want to keep somewhere outside $TORQUIO_PREFIX_DIR first (e.g. your Documents folder)."
+    echo ""
+    override="yes, I've saved my projects elsewhere or I'm ok with losing them"
+    read -p "To continue, type '$override': " confirm
+    if [[ "$confirm" != "$override" ]]; then
+        echo "Cleanup cancelled."
+        exit 10
+    fi
+else
+    read -p "Have you backed up any Dorico projects you were keeping in the data directory? (y/N): " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo "Cleanup cancelled."
+        exit 10
+    fi
 fi
 read -p "If you have read the above warning and would like to proceed, type 'yes, permanently delete everything' to continue: " confirm
 
