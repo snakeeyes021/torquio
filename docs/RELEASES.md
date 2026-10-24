@@ -8,7 +8,7 @@ This document tracks known-good, tested "snapshots" of the entire system. It ser
 **Date:** 2026-10-23
 **Status:** Alpha / Milestone
 
-**Description:** Finished the DirectComposition work: dropdowns and tooltips now redraw, look and behave as on Windows. Cantai is functional end to end (installed silently with its playback template, editors, reliable rendering) and renders on the GPU, including NVIDIA GPUs. Added an uninstall license guard, a log exporter and self-updating. Verified with a from-scratch install on Bazzite (Intel Iris Xe + NVIDIA RTX 3080 Ti Laptop) and an upgrade of an existing install.
+**Description:** Finished the DirectComposition work: dropdowns and tooltips now redraw, look and behave as on Windows. Cantai is functional end to end (installed silently with its playback template, editors, reliable rendering) and renders on the GPU, including NVIDIA GPUs. Added an uninstall license guard, a log exporter and self-updating. Verified with a from-scratch install on RedFoxOS, a Bazzite-based Fedora Atomic image (Intel Iris Xe + NVIDIA RTX 3080 Ti Laptop), and an upgrade of an existing install.
 
 **Key Improvements:**
 *   **Dropdowns & Popups (#6):** Wine patches 0004-0009: dropdowns and tooltips redraw on hover and keyboard input (Qt 6.10 needs a blocking `IDXGIOutput::WaitForVBlank`) and show the latest frame; no black flash or white corners; Windows 11 rounded corners; no flash on first open; nested menus work. Plug-in host text renders (Segoe UI aliased to Tahoma).
