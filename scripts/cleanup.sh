@@ -35,56 +35,45 @@ echo -e " - Cache directory:     ${gray}$TORQUIO_CACHE_DIR${reset} (includes Win
 echo " - Host integration scripts and .desktop files"
 echo " - Extracted desktop icons"
 echo ""
-# License check: refuse to delete a prefix that still holds activated Steinberg licenses unless the user
-# explicitly accepts it (e.g. they can't deactivate and will do it from their Steinberg account online).
+# License check: refuse to delete a prefix that still holds activated licenses (Steinberg's, and plug-ins
+# Torquio can detect, e.g. Cantai) unless the user explicitly accepts it (e.g. they can't deactivate and will
+# do it from their account online).
 LICENSE_STATE=$(python3 "$SCRIPT_DIR/steinberg_license_state.py" "$TORQUIO_PREFIX_DIR" 2>/dev/null || echo "unknown the license check failed to run")
-case "$LICENSE_STATE" in
-    active*)
-        echo -e "⚠️  ${red}These Steinberg licenses are still activated in this installation:${reset}"
-        echo ""
-        echo -e "${yellow}${LICENSE_STATE#active$'\n'}${reset}"
-        echo ""
-        echo "Deactivate them in the Steinberg Activation Manager, then run the uninstall again. If you delete them while they're activated, you can no longer deactivate them from this computer."
-        echo ""
-        override="yes, I'm aware my license is active and deleting it will prevent me from ever deactivating it. proceed anyways"
-        read -p "To uninstall anyway, type '$override': " confirm
-        if [[ "$confirm" != "$override" ]]; then
-            echo "Cleanup cancelled."
-            exit 10
-        fi
-        ;;
-    inactive)
-        echo -e "${green}No activated Steinberg licenses found in this installation.${reset}"
-        ;;
-    *)
-        echo -e "⚠️  ${yellow}Torquio couldn't determine whether your Steinberg licenses are deactivated (${LICENSE_STATE#unknown }).${reset}"
-        echo "Open the Steinberg Activation Manager and make sure every product is deactivated before continuing."
-        echo ""
-        override="no, I promise, I've deactivated my license"
-        read -p "To continue, type '$override': " confirm
-        if [[ "$confirm" != "$override" ]]; then
-            echo "Cleanup cancelled."
-            exit 10
-        fi
-        ;;
-esac
-# Third-party plug-in licenses Torquio can detect (scripts/plugin_license_state.py), then the rest
 PLUGIN_LICENSES=$(python3 "$SCRIPT_DIR/plugin_license_state.py" "$TORQUIO_PREFIX_DIR" 2>/dev/null || true)
+ACTIVE_LICENSES=""
+[[ "$LICENSE_STATE" == active* ]] && ACTIVE_LICENSES="${LICENSE_STATE#active$'\n'}"
 if [ -n "$PLUGIN_LICENSES" ]; then
+    ACTIVE_LICENSES="${ACTIVE_LICENSES:+$ACTIVE_LICENSES$'\n'}$PLUGIN_LICENSES"
+fi
+if [ -n "$ACTIVE_LICENSES" ]; then
+    echo -e "⚠️  ${red}These licenses are still activated in this installation:${reset}"
     echo ""
-    echo -e "⚠️  ${red}These plug-in licenses are still activated in this installation:${reset}"
+    echo -e "${yellow}${ACTIVE_LICENSES}${reset}"
     echo ""
-    echo -e "${yellow}${PLUGIN_LICENSES}${reset}"
+    if [[ "$LICENSE_STATE" == unknown* ]]; then
+        echo -e "${yellow}Torquio also couldn't determine whether your Steinberg licenses are deactivated (${LICENSE_STATE#unknown }).${reset}"
+        echo ""
+    fi
+    echo "Deactivate them (Steinberg products in the Steinberg Activation Manager, plug-ins in the plug-in itself), then run the uninstall again. If you delete them while they're activated, you can no longer deactivate them from this computer."
     echo ""
-    echo "Deactivate them in the plug-in itself, then run the uninstall again. If you delete them while they're activated, you can no longer deactivate them from this computer."
-    echo ""
-    override="yes, I'm aware my plug-in license is active and deleting it will prevent me from deactivating it here. proceed anyways"
+    override="yes, I'm aware my license is active and deleting it will prevent me from ever deactivating it. proceed anyways"
     read -p "To uninstall anyway, type '$override': " confirm
     if [[ "$confirm" != "$override" ]]; then
         echo "Cleanup cancelled."
         exit 10
     fi
+elif [[ "$LICENSE_STATE" == unknown* ]]; then
+    echo -e "⚠️  ${yellow}Torquio couldn't determine whether your Steinberg licenses are deactivated (${LICENSE_STATE#unknown }).${reset}"
+    echo "Open the Steinberg Activation Manager and make sure every product is deactivated before continuing."
+    echo ""
+    override="no, I promise, I've deactivated my license"
+    read -p "To continue, type '$override': " confirm
+    if [[ "$confirm" != "$override" ]]; then
+        echo "Cleanup cancelled."
+        exit 10
+    fi
 else
+    echo -e "${green}No activated Steinberg or Cantai licenses found in this installation.${reset}"
     read -p "Have you deactivated any other third-party plug-in licenses? (y/N): " confirm
     if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
         echo "Cleanup cancelled."
