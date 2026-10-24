@@ -323,11 +323,14 @@ rm -f "$HOME/.local/share/applications/wine-extension-dorico.desktop"
 rm -f "$HOME/.local/share/applications/wine-protocol-net-steinberg-"*.desktop
 rm -f "$HOME/.local/share/applications/wine-extension-vstsound.desktop"
 rm -f "$HOME/.local/share/applications/wine-extension-slm.desktop"
+# Patterns matching Torquio's data and cache directories (also by their real path, e.g. /var/home), for
+# finding launchers Wine created for Torquio's prefixes
+torquio_dirs=(-e "$TORQUIO_DATA_DIR" -e "$TORQUIO_CACHE_DIR" -e "$(readlink -f "$TORQUIO_DATA_DIR" 2>/dev/null || echo "$TORQUIO_DATA_DIR")" -e "$(readlink -f "$TORQUIO_CACHE_DIR" 2>/dev/null || echo "$TORQUIO_CACHE_DIR")")
+
 # Leftovers of Wine's menu builder (Torquio disables it, but older versions and some setup steps didn't):
 # 1. launchers pointing into Torquio's data or cache directory (file types, web links, Start menu shortcuts
 #    under wine/Programs), with the file types they registered
 apps="$HOME/.local/share/applications"
-torquio_dirs=(-e "$TORQUIO_DATA_DIR" -e "$TORQUIO_CACHE_DIR" -e "$(readlink -f "$TORQUIO_DATA_DIR" 2>/dev/null || echo "$TORQUIO_DATA_DIR")" -e "$(readlink -f "$TORQUIO_CACHE_DIR" 2>/dev/null || echo "$TORQUIO_CACHE_DIR")")
 while IFS= read -r -d '' launcher; do
     grep -q -F "${torquio_dirs[@]}" "$launcher" || continue
     name=$(basename "$launcher" .desktop)
@@ -380,6 +383,10 @@ for dir in "$host_desktop" "$TORQUIO_PREFIX_DIR/drive_c/users/Public/Desktop" "$
             -name "Steinberg Library Manager.lnk" \
         \) -delete 2>/dev/null || true
     fi
+done
+# Desktop launchers Wine's menu builder created for programs in Torquio's prefix
+for launcher in "$host_desktop"/*.desktop; do
+    [ -f "$launcher" ] && grep -q -F "${torquio_dirs[@]}" "$launcher" && rm -f "$launcher"
 done
 
 echo "Updating desktop database and icon cache..."
