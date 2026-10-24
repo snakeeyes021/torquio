@@ -40,6 +40,13 @@ torquio_prebuilt_image() {
     echo "$TORQUIO_IMAGE_REPO:build-${tree:0:12}"
 }
 
+# The machine ID Torquio gives its container (scripts/1-build/container_gpu_setup.sh): derived from the host's,
+# hashed. Wine turns it into the Windows system UUID, which some plug-ins (e.g. Cantai) tie their license to.
+torquio_derived_machine_id() {
+    [ -s /etc/machine-id ] || return 0
+    printf 'torquio:%s' "$(cat /etc/machine-id)" | sha256sum | cut -c1-32
+}
+
 # The container engine distrobox uses (it prefers podman)
 torquio_container_manager() {
     if [ -n "$DBX_CONTAINER_MANAGER" ]; then echo "$DBX_CONTAINER_MANAGER"

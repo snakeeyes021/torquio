@@ -788,6 +788,13 @@ show_status() {
         else
             echo -e "  - Wine Engine: ${green}Prebuilt ${engine_image##*:}${reset}"
         fi
+        local machine_id
+        machine_id=$(container_machine_id)
+        if [ "$machine_id" = "$(torquio_derived_machine_id)" ]; then
+            echo -e "  - Computer Identity: ${green}Stable${reset} (derived from this computer)"
+        elif [ ${#machine_id} -eq 32 ]; then
+            echo -e "  - Computer Identity: ${yellow}Specific to this container${reset} (run 'torquio --fix-identity')"
+        fi
     else
         echo -e "  - Container: ${dark_gray}$TORQUIO_CONTAINER_NAME${reset} (${red}Not Created${reset})"
     fi
@@ -1394,6 +1401,7 @@ post_update() {
         refresh_launchers --no-pause
         setup_gpu_access --quiet
         apply_prefix_settings
+        fix_machine_identity --quiet
         if echo "$changed" | grep -q '^scripts/1-build/'; then
             echo -e "${yellow}This update includes changes to Torquio's Wine engine. Until it's updated, Dorico keeps running on the current engine.${reset}"
             update_wine_engine
@@ -1544,7 +1552,7 @@ apply_prefix_settings() {
     distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export WINEDEBUG=-all
         wine reg add 'HKCU\\Software\\Wine\\Fonts\\Replacements' /v 'Segoe UI' /t REG_SZ /d Tahoma /f
         wine reg add 'HKCU\\Software\\Wine\\AppDefaults\\rundll32.exe\\DllOverrides' /v '*mscoree' /t REG_SZ /d '' /f
-        wineserver -w" >/dev/null 2>&1 || true
+        wineserver -w" </dev/null >/dev/null 2>&1 || true
 }
 
 rebuild_wine() {
@@ -1634,7 +1642,7 @@ replace_container() {
 
     [ -z "$image" ] && [[ "$current" == "$TORQUIO_IMAGE_REPO:"* ]] && image="$current"
     local machine_id
-    machine_id=$(distrobox enter "$TORQUIO_CONTAINER_NAME" -- cat /var/lib/dbus/machine-id 2>/dev/null | tr -dc '0-9a-f')
+    machine_id=$(container_machine_id)
     echo "Stopping Wine and the container..."
     distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wineserver -k 2>/dev/null; wineserver -w 2>/dev/null" || true
     distrobox stop "$TORQUIO_CONTAINER_NAME" --yes >/dev/null 2>&1 || true
@@ -1714,6 +1722,63 @@ update_wine_engine() {
         rebuild_wine
     else
         echo "You can update it later from Wine Tools & Maintenance > Update / Rebuild Wine Engine."
+    fi
+}
+
+container_machine_id() {
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- cat /var/lib/dbus/machine-id </dev/null 2>/dev/null | tr -dc '0-9a-f' || true
+}
+
+# Containers created before Torquio derived the machine ID from the host's have one they made up themselves.
+# Torquio keeps it whenever it re-creates the container, but if the container is ever lost (deleted outside
+# Torquio, or broken) the new one gets the derived ID, and plug-ins tied to the old one (e.g. Cantai) see a new
+# computer. Switching to the derived ID once, with those plug-ins deactivated, avoids that.
+fix_machine_identity() {
+    local blue="\033[38;5;110m"
+    local green="\033[38;5;108m"
+    local yellow="\033[38;5;179m"
+    local reset="\033[0m"
+    local current derived plugins
+    derived=$(torquio_derived_machine_id)
+    current=$(container_machine_id)
+    if [ ${#derived} -ne 32 ] || [ ${#current} -ne 32 ]; then
+        echo "Couldn't read this computer's identity; nothing was changed."
+        return 1
+    fi
+    if [ "$current" = "$derived" ]; then
+        [ "$1" = "--quiet" ] || echo -e "${green}This computer's identity is already stable; nothing to do.${reset}"
+        return 0
+    fi
+    echo -e "${blue}=== Computer Identity ===${reset}"
+    echo "Windows programs identify this computer by an ID that Torquio's container made up when it was created."
+    echo "Torquio now derives it from your computer instead, so it stays the same even if the container ever has"
+    echo "to be created from scratch. Some plug-ins (e.g. Cantai) tie their license to this ID: changing it makes"
+    echo "them see a new computer, so deactivate them first and activate them again afterwards. Steinberg"
+    echo "licenses aren't affected. It's unlikely to ever matter, but it's worth doing once."
+    echo ""
+    plugins=$(python3 "$SCRIPT_DIR/scripts/plugin_license_state.py" "$TORQUIO_PREFIX_DIR" 2>/dev/null || true)
+    if [ -n "$plugins" ]; then
+        echo -e "${yellow}Still activated:${reset}"
+        echo ""
+        while IFS=$'\t' read -r name where; do
+            echo -e "${yellow}$name${reset} (deactivate it $where)"
+        done <<< "$plugins"
+        echo ""
+        echo "Deactivate them, then run 'torquio --fix-identity'."
+        return 0
+    fi
+    read -p "Have you deactivated every plug-in license tied to this computer, and should Torquio change the ID now? [y/N]: " confirm || true
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo "Nothing was changed. You can do this later with 'torquio --fix-identity'."
+        return 0
+    fi
+    echo "Closing Wine (and Dorico, if it's open)..."
+    distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$TORQUIO_PREFIX_DIR\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; wineserver -k 2>/dev/null; wineserver -w 2>/dev/null; sudo rm -f /var/lib/dbus/machine-id; echo $derived | sudo tee /var/lib/dbus/machine-id >/dev/null"
+    if [ "$(container_machine_id)" = "$derived" ]; then
+        echo -e "${green}Done. Activate your plug-ins again the next time you open Dorico.${reset}"
+    else
+        echo "Couldn't change the ID; nothing was changed."
+        return 1
     fi
 }
 
@@ -2089,6 +2154,9 @@ if [ $# -gt 0 ]; then
         --rebuild-wine|--rebuild_wine)
             rebuild_wine
             ;;
+        --fix-identity|--fix_identity)
+            fix_machine_identity
+            ;;
         --setup-gpu|--setup_gpu)
             setup_gpu_access
             ;;
@@ -2116,6 +2184,7 @@ if [ $# -gt 0 ]; then
             echo "  -e, --execute, --run [file] Execute a custom .exe or .msi in the prefix."
             echo "      --rebuild-wine          Recompile custom Wine engine inside container."
             echo "      --setup-gpu             Give AI plug-ins (e.g. Cantai) access to the GPU."
+            echo "      --fix-identity          Give the container a machine ID derived from this computer."
             echo "      --enable-ntsync         Activate and persist host kernel fast sync (ntsync)."
             exit 1
             ;;
