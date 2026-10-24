@@ -1,0 +1,5 @@
+# The image build only needs these; everything else (notably installers/, which holds proprietary
+# installers) stays out of the build context.
+*
+!scripts/common.sh
+!scripts/1-build/

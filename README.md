@@ -70,12 +70,11 @@ Then just follow the interactive prompts to go through the install wizard.
 
 ### What happens next?
 The build pipeline automatically handles all the heavy lifting:
-1. Configures an isolated Ubuntu container.
-2. Compiles a custom version of WINE (with specific stubs required by Dorico).
-3. Initializes a Windows prefix, applies ClearType font configurations, and installs core dependencies.
-4. Installs MediaBay, the Download Assistant, and NotePerformer and Cantai (if provided), without you having to click through their installers.
-5. Registers all application desktop shortcuts and web-login handlers to your native Linux application menu.
-6. Installs the globally accessible `torquio` console utility to manage your environment easily.
+1. Sets up an isolated Ubuntu container with Torquio's custom version of WINE (with fixes required by Dorico), downloaded ready-made. If none is available for your version of Torquio, it's compiled on your machine instead (20-40 minutes).
+2. Initializes a Windows prefix, applies ClearType font configurations, and installs core dependencies.
+3. Installs MediaBay, the Download Assistant, and NotePerformer and Cantai (if provided), without you having to click through their installers.
+4. Registers all application desktop shortcuts and web-login handlers to your native Linux application menu.
+5. Installs the globally accessible `torquio` console utility to manage your environment easily.
 
 After installation, the Steinberg Download Assistant will launch automatically. Once the it does, simply sign in and download Dorico as you normally would! When finished, close the Download Assistant, run the Activation Manager to activate your license, and you are ready to start notating!
 
@@ -135,7 +134,7 @@ Occasionally, Wine servers hang, applications lock up in the background, or you'
     * **Fix Icons**: `torquio -f` or `torquio --fix-icons` (Refreshes desktop icons and launcher shortcuts on the host system).
 
 ### 6. Updating Torquio
-Torquio can update itself from GitHub. It shows what's new and asks before installing, then refreshes your launchers, icons and Wine prefix settings. If an update changes Torquio's Wine engine, it offers to rebuild it (20-40 minutes) or lets you do that later. It won't overwrite Torquio files you've changed yourself.
+Torquio can update itself from GitHub. When you open it, it checks for a new version (at most once a day; you can turn this off in Settings) and shows a notice at the top of the menu. Updating shows what's new and asks before installing, then refreshes your launchers, icons and Wine prefix settings. If an update changes Torquio's Wine engine, it offers to download the new one (a few minutes), or to compile it (20-40 minutes) if it hasn't been published yet; you can also do that later from Wine Tools & Maintenance > Update / Rebuild Wine Engine. It won't overwrite Torquio files you've changed yourself.
 
 **How to Use**:
   * **Interactive**: Option `9` (Update Torquio) in the main menu.
@@ -228,7 +227,7 @@ When using it, keep the following architectural realities in mind:
 * **Version Breaking Changes**: As the project is optimized, future updates/features could in some rare circumstances require a full removal and reinstall. It's not tremendously likely, but we can't definitively promise that it could never happen (it's occurred exactly once, because of the name change; we're hoping that's the only one going forward).
 * **Missing Features**: Some quality of life features have yet to be implemented, and there's no guarantee we'll ever cross everything off our wishlist. Initial build/install can take longer than we'd like, certain things are less automatic than they should be, and any number of other inconveniences could pop up here and there. We hope we've cast a pretty wide net and made Torquio work for most people who need it, but if something is just absolutely broken or some quirk of the way we've done things makes its use impossible with your setup, do of course open an issue above.
 * **The prefix is just files in a folder**: But that's where Dorico and your Steinberg licenses live. While Torquio includes safety checks and prompts to prevent accidents, understand that running `torquio --uninstall` completely wipes the prefix.
-    * **Licenses:** Because Steinberg licenses are stored *inside* the prefix, wiping the environment without deactivating your license first will permanently prevent access to it (thus requiring you to deactivate the license on Steinberg's website; we don't know if there's some sort of limit or monitoring for fraud prevention on this type of deactivation, nor would we like to find out, so we try to avoid this at all costs and recommend you do the same). Always deactivate via the Steinberg Activation Manager before a clean reinstall.
+    * **Licenses:** Because Steinberg licenses are stored *inside* the prefix, wiping the environment without deactivating your license first will permanently prevent access to it (thus requiring you to deactivate the license on Steinberg's website; we don't know if there's some sort of limit or monitoring for fraud prevention on this type of deactivation, nor would we like to find out, so we try to avoid this at all costs and recommend you do the same). Always deactivate via the Steinberg Activation Manager before a clean reinstall. The same goes for plug-ins with their own activation, such as Cantai (deactivate it in the plug-in itself). The uninstaller checks for activated Steinberg and Cantai licenses and won't delete them without an explicit override.
     * **Project Files:** Save your `.dorico` project files to your local user directory, not inside the prefix. Torquio provides a convenient tool to map links to your native host folders directly onto specific prefix locations, providing convenient access to them via the WINE file picker dialogs. To that end, not an advertisement, but we really love Insync (coupled with your cloud service of choice), which, yes, is proprietary/paid software, but it gets the job done and does so reliably. 
 
 ## Legal & Disclaimer

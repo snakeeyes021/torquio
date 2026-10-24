@@ -23,11 +23,6 @@ yellow="\033[38;5;179m"
 reset="\033[0m"
 
 echo ""
-echo -e "${red}### W A R N I N G ###${reset}"
-echo ""
-echo -e "⚠️  ${red}If you store your Dorico projects inside the data directory (as opposed to somewhere in your user folder) and have not already backed them up, you will PERMANENTLY lose access!${reset}"
-echo ""
-echo ""
 echo "This operation will permanently delete the following:"
 echo -e " - Distrobox container: ${wine}$TORQUIO_CONTAINER_NAME${reset}"
 echo -e " - Data directory:      ${gray}$TORQUIO_DATA_DIR${reset} (includes Wine prefix)"
@@ -35,50 +30,87 @@ echo -e " - Cache directory:     ${gray}$TORQUIO_CACHE_DIR${reset} (includes Win
 echo " - Host integration scripts and .desktop files"
 echo " - Extracted desktop icons"
 echo ""
-# License check: refuse to delete a prefix that still holds activated Steinberg licenses unless the user
-# explicitly accepts it (e.g. they can't deactivate and will do it from their Steinberg account online).
+# License check: refuse to delete a prefix that still holds activated licenses (Steinberg's, and plug-ins
+# Torquio can detect, e.g. Cantai) unless the user explicitly accepts it (e.g. they can't deactivate and will
+# do it from their account online).
 LICENSE_STATE=$(python3 "$SCRIPT_DIR/steinberg_license_state.py" "$TORQUIO_PREFIX_DIR" 2>/dev/null || echo "unknown the license check failed to run")
-case "$LICENSE_STATE" in
-    active*)
-        echo -e "⚠️  ${red}These Steinberg licenses are still activated in this installation:${reset}"
+PLUGIN_LICENSES=$(python3 "$SCRIPT_DIR/plugin_license_state.py" "$TORQUIO_PREFIX_DIR" 2>/dev/null || true)
+ACTIVE_LICENSES=""
+DEACTIVATE_HINTS=()
+if [[ "$LICENSE_STATE" == active* ]]; then
+    ACTIVE_LICENSES="${LICENSE_STATE#active$'\n'}"
+    DEACTIVATE_HINTS+=("Steinberg products in the Steinberg Activation Manager")
+fi
+while IFS=$'\t' read -r name where; do
+    [ -n "$name" ] || continue
+    ACTIVE_LICENSES="${ACTIVE_LICENSES:+$ACTIVE_LICENSES$'\n'}$name"
+    DEACTIVATE_HINTS+=("$name $where")
+done <<< "$PLUGIN_LICENSES"
+if [ -n "$ACTIVE_LICENSES" ]; then
+    echo -e "⚠️  ${red}These licenses are still activated in this installation:${reset}"
+    echo ""
+    echo -e "${yellow}${ACTIVE_LICENSES}${reset}"
+    echo ""
+    if [[ "$LICENSE_STATE" == unknown* ]]; then
+        echo -e "${yellow}Torquio also couldn't determine whether your Steinberg licenses are deactivated (${LICENSE_STATE#unknown }).${reset}"
         echo ""
-        echo -e "${yellow}${LICENSE_STATE#active$'\n'}${reset}"
-        echo ""
-        echo "Deactivate them in the Steinberg Activation Manager, then run the uninstall again. If you delete them while they're activated, you can no longer deactivate them from this computer."
-        echo ""
-        override="yes, I'm aware my license is active and deleting it will prevent me from ever deactivating it. proceed anyways"
-        read -p "To uninstall anyway, type '$override': " confirm
-        if [[ "$confirm" != "$override" ]]; then
-            echo "Cleanup cancelled."
-            exit 10
-        fi
-        ;;
-    inactive)
-        echo -e "${green}No activated Steinberg licenses found in this installation.${reset}"
-        read -p "Have you deactivated any third-party plug-in licenses (e.g. Cantai)? (y/N): " confirm
-        if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-            echo "Cleanup cancelled."
-            exit 10
-        fi
-        ;;
-    *)
-        echo -e "⚠️  ${yellow}Torquio couldn't determine whether your Steinberg licenses are deactivated (${LICENSE_STATE#unknown }).${reset}"
-        echo "Open the Steinberg Activation Manager and make sure every product is deactivated before continuing."
-        echo ""
-        override="no, I promise, I've deactivated my license"
-        read -p "To continue, type '$override': " confirm
-        if [[ "$confirm" != "$override" ]]; then
-            echo "Cleanup cancelled."
-            exit 10
-        fi
-        ;;
-esac
+    fi
+    hints=$(printf '%s, ' "${DEACTIVATE_HINTS[@]}")
+    echo "Deactivate them (${hints%, }), then run the uninstall again. If you delete them while they're activated, you can no longer deactivate them from this computer."
+    echo ""
+    override="yes, I'm aware my license is active and deleting it will prevent me from ever deactivating it. proceed anyways"
+    read -p "To uninstall anyway, type '$override': " confirm
+    if [[ "$confirm" != "$override" ]]; then
+        echo "Cleanup cancelled."
+        exit 10
+    fi
+elif [[ "$LICENSE_STATE" == unknown* ]]; then
+    echo -e "⚠️  ${yellow}Torquio couldn't determine whether your Steinberg licenses are deactivated (${LICENSE_STATE#unknown }).${reset}"
+    echo "Open the Steinberg Activation Manager and make sure every product is deactivated before continuing."
+    echo ""
+    override="no, I promise, I've deactivated my license"
+    read -p "To continue, type '$override': " confirm
+    if [[ "$confirm" != "$override" ]]; then
+        echo "Cleanup cancelled."
+        exit 10
+    fi
+else
+    echo -e "${green}No activated Steinberg or Cantai licenses found in this installation.${reset}"
+    read -p "Have you deactivated every license in this installation (Steinberg products and any plug-ins)? (y/N): " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo "Cleanup cancelled."
+        exit 10
+    fi
+fi
 echo ""
-read -p "Have you backed up any Dorico projects you were keeping in the data directory? (y/N): " confirm
-
-if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-    echo "Cleanup cancelled."
-    exit 10
+# Projects saved inside the Wine prefix. Not followed: the prefix's Documents, Desktop, Downloads, Music etc.
+# link to the host's own folders (where Dorico saves by default), and deleting the prefix only removes the
+# links. Skipped: Dorico's own example projects, tutorials (Program Files) and autosave data (AppData).
+mapfile -t PREFIX_PROJECTS < <(find "$TORQUIO_PREFIX_DIR/drive_c" \( -path "*/Program Files*" -o -path "*/ProgramData" \
+    -o -path "*/windows" -o -path "*/AppData" -o -path "*/users/Public/Documents/Dorico Example Projects" \) -prune \
+    -o -type f -iname '*.dorico' -print 2>/dev/null)
+if [ ${#PREFIX_PROJECTS[@]} -gt 0 ]; then
+    echo -e "⚠️  ${red}Torquio found Dorico projects stored inside the Wine prefix, which will be deleted:${reset}"
+    echo ""
+    for project in "${PREFIX_PROJECTS[@]:0:10}"; do
+        echo -e "${yellow}${project#"$TORQUIO_PREFIX_DIR/"}${reset}"
+    done
+    [ ${#PREFIX_PROJECTS[@]} -gt 10 ] && echo -e "${yellow}... and $(( ${#PREFIX_PROJECTS[@]} - 10 )) more${reset}"
+    echo ""
+    echo "Copy any you want to keep somewhere outside $TORQUIO_PREFIX_DIR first (e.g. your Documents folder)."
+    echo ""
+    override="yes, I've saved my projects elsewhere or I'm ok with losing them"
+    read -p "To continue, type '$override': " confirm
+    if [[ "$confirm" != "$override" ]]; then
+        echo "Cleanup cancelled."
+        exit 10
+    fi
+else
+    read -p "Have you backed up any Dorico projects you were keeping in the data directory? (y/N): " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo "Cleanup cancelled."
+        exit 10
+    fi
 fi
 read -p "If you have read the above warning and would like to proceed, type 'yes, permanently delete everything' to continue: " confirm
 
@@ -255,11 +287,12 @@ fi
 
 echo "Removing Distrobox container..."
 distrobox rm "$TORQUIO_CONTAINER_NAME" --force || true
-# Snapshots made when the container was re-created with GPU access (see rebuild_container_with_nvidia)
+# Downloaded prebuilt engines, and snapshots made when the container was re-created with GPU access (see
+# replace_container)
 for mgr in podman docker; do
     command -v "$mgr" >/dev/null 2>&1 || continue
-    for image in $("$mgr" images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep "^localhost/$TORQUIO_CONTAINER_NAME:gpu-"); do
-        "$mgr" rmi "$image" >/dev/null 2>&1 && echo "Removed container snapshot $image"
+    for image in $("$mgr" images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -e "^localhost/$TORQUIO_CONTAINER_NAME:gpu-" -e "^$TORQUIO_IMAGE_REPO:"); do
+        "$mgr" rmi "$image" >/dev/null 2>&1 && echo "Removed container image $image"
     done
 done
 
@@ -278,21 +311,62 @@ rm -f "$HOME/.local/bin/torquio_graphics.py"
 
 # Removing .desktop files
 rm -f "$HOME/.local/share/applications/Dorico.desktop"
+rm -f "$HOME/.local/share/applications/Dorico Audio Engine.desktop"
 rm -f "$HOME/.local/share/applications/Steinberg Activation Manager.desktop"
 rm -f "$HOME/.local/share/applications/Steinberg Download Assistant.desktop"
 rm -f "$HOME/.local/share/applications/wine-extension-dorico.desktop"
 rm -f "$HOME/.local/share/applications/wine-protocol-net-steinberg-"*.desktop
 rm -f "$HOME/.local/share/applications/wine-extension-vstsound.desktop"
 rm -f "$HOME/.local/share/applications/wine-extension-slm.desktop"
+# Patterns matching Torquio's data and cache directories (also by their real path, e.g. /var/home), for
+# finding launchers Wine created for Torquio's prefixes
+torquio_dirs=(-e "$TORQUIO_DATA_DIR" -e "$TORQUIO_CACHE_DIR" -e "$(readlink -f "$TORQUIO_DATA_DIR" 2>/dev/null || echo "$TORQUIO_DATA_DIR")" -e "$(readlink -f "$TORQUIO_CACHE_DIR" 2>/dev/null || echo "$TORQUIO_CACHE_DIR")")
+
+# Leftovers of Wine's menu builder (Torquio disables it, but older versions and some setup steps didn't):
+# 1. launchers pointing into Torquio's data or cache directory (file types, web links, Start menu shortcuts
+#    under wine/Programs), with the file types they registered
+apps="$HOME/.local/share/applications"
+while IFS= read -r -d '' launcher; do
+    grep -q -F "${torquio_dirs[@]}" "$launcher" || continue
+    name=$(basename "$launcher" .desktop)
+    rm -f "$launcher"
+    [[ "$name" == wine-extension-* ]] && rm -f "$HOME/.local/share/mime/packages/x-wine-extension-${name#wine-extension-}.xml"
+done < <(find "$apps" -maxdepth 1 -name 'wine-*.desktop' -print0 2>/dev/null; find "$apps/wine" -name '*.desktop' -print0 2>/dev/null)
+find "$apps/wine" -depth -type d -empty -delete 2>/dev/null || true
+# 2. Wine menu entries whose launcher no longer exists (their desktop file ID is the launcher's path under
+#    applications/ with "/" replaced by "-")
+launcher_ids=$(cd "$apps" 2>/dev/null && find wine -name '*.desktop' 2>/dev/null | tr '/' '-')
+for menu in "$HOME/.config/menus/applications-merged/"wine-*.menu; do
+    [ -f "$menu" ] || continue
+    id=$(grep -o '<Filename>[^<]*</Filename>' "$menu" | head -n 1 | sed -e 's/<[^>]*>//g')
+    if [ -z "$id" ] || ! grep -qxF "$id" <<< "$launcher_ids"; then
+        rm -f "$menu"
+    fi
+done
+# 3. Wine menu folders no remaining menu entry uses
+for directory in "$HOME/.local/share/desktop-directories/"wine-*.directory; do
+    [ -f "$directory" ] || continue
+    grep -qF "<Directory>$(basename "$directory")</Directory>" "$HOME/.config/menus/applications-merged/"wine-*.menu 2>/dev/null || rm -f "$directory"
+done
 
 # Removing extracted icons
 rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/torquio-dorico.png"
 rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/torquio-dorico-project.png"
+rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/torquio-dorico-audioengine.png"
 rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/torquio-sda.png"
 rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/torquio-sam.png"
 
 # Removing MIME types
 rm -f "$HOME/.local/share/mime/packages/application-x-dorico.xml"
+rm -f "$HOME/.local/share/mime/packages/x-wine-extension-dorico.xml"
+rm -f "$HOME/.local/share/mime/packages/x-wine-extension-vstsound.xml"
+rm -f "$HOME/.local/share/mime/packages/x-wine-extension-slm.xml"
+# Generated from Wine's .dorico file type; update-mime-database leaves it behind once its package is gone
+rm -rf "$HOME/.local/share/mime/dorico"
+# Default-application entries pointing at Torquio's launchers
+for list in "$HOME/.config/mimeapps.list" "$HOME/.local/share/applications/mimeapps.list"; do
+    [ -f "$list" ] && sed -i -E '/^[^=]+=(Dorico|Steinberg Download Assistant|Steinberg Activation Manager|Dorico Audio Engine)\.desktop;?$/d' "$list"
+done
 
 echo "Removing orphaned Windows desktop shortcuts..."
 host_desktop="${XDG_DESKTOP_DIR:-$HOME/Desktop}"
@@ -310,6 +384,10 @@ for dir in "$host_desktop" "$TORQUIO_PREFIX_DIR/drive_c/users/Public/Desktop" "$
             -name "Steinberg Library Manager.lnk" \
         \) -delete 2>/dev/null || true
     fi
+done
+# Desktop launchers Wine's menu builder created for programs in Torquio's prefix
+for launcher in "$host_desktop"/*.desktop; do
+    [ -f "$launcher" ] && grep -q -F "${torquio_dirs[@]}" "$launcher" && rm -f "$launcher"
 done
 
 echo "Updating desktop database and icon cache..."

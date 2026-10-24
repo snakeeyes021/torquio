@@ -4,30 +4,43 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../common.sh"
 
+# --rebuild: build even if an engine is installed. --deps-only / --skip-deps: only install the build
+# dependencies / build without installing them (the container image build installs them in its own step).
 REBUILD=false
-if [ "$1" = "--rebuild" ] || [ "$1" = "-f" ] || [ "$1" = "--force" ]; then
-    REBUILD=true
-fi
+DEPS=install
+for arg in "$@"; do
+    case "$arg" in
+        --rebuild|-f|--force) REBUILD=true ;;
+        --deps-only) DEPS=only ;;
+        --skip-deps) DEPS=skip ;;
+    esac
+done
 
-if [ -f "/opt/wine-custom/.torquio_wine_build_complete" ] && [ "$REBUILD" = false ]; then
-    echo "Custom Wine engine is already compiled and installed at /opt/wine-custom. Skipping build."
+if [ -f "/opt/wine-custom/.torquio_wine_build_complete" ] && [ "$REBUILD" = false ] && [ "$DEPS" != only ]; then
+    echo "Torquio's Wine engine is already installed in the container (/opt/wine-custom). Skipping build."
     exit 0
 fi
 
+# Root (the container image build) doesn't need sudo
+SUDO=sudo
+[ "$(id -u)" = 0 ] && SUDO=""
+
+if [ "$DEPS" != skip ]; then
+
 echo "Adding i386 architecture..."
-sudo dpkg --add-architecture i386
+$SUDO dpkg --add-architecture i386
 
 echo "Enabling source repos..."
-sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources || true
-sudo sed -i 's/^# deb-src/deb-src/' /etc/apt/sources.list || true
+$SUDO sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources || true
+$SUDO sed -i 's/^# deb-src/deb-src/' /etc/apt/sources.list || true
 
-sudo apt update
+$SUDO apt update
 
 echo "Attempting apt build-dep wine..."
-sudo DEBIAN_FRONTEND=noninteractive apt-get build-dep -y wine || true
+$SUDO env DEBIAN_FRONTEND=noninteractive apt-get build-dep -y wine || true
 
 echo "Installing build dependencies..."
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+$SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y \
     build-essential \
     git \
     flex \
@@ -56,6 +69,9 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
     icoutils \
     libcups2 libcups2:i386 \
     x11-xserver-utils
+
+fi
+[ "$DEPS" = only ] && exit 0
 
 echo "Cloning or updating zhiyi wine branch..."
 mkdir -p "$TORQUIO_BUILD_DIR"
@@ -93,13 +109,13 @@ fi
 # Ensure linux/ntsync.h is present in the build environment so configure detects it
 if [ ! -f /usr/include/linux/ntsync.h ]; then
     echo "Injecting ntsync.h header for Wine compilation..."
-    sudo mkdir -p /usr/include/linux
+    $SUDO mkdir -p /usr/include/linux
     if [ -f "$SCRIPT_DIR/include/linux/ntsync.h" ]; then
-        sudo cp "$SCRIPT_DIR/include/linux/ntsync.h" /usr/include/linux/ntsync.h
+        $SUDO cp "$SCRIPT_DIR/include/linux/ntsync.h" /usr/include/linux/ntsync.h
     elif [ -d /run/host/usr/src ]; then
         HOST_NTSYNC=$(find /run/host/usr/src -name ntsync.h 2>/dev/null | head -n 1)
         if [ -n "$HOST_NTSYNC" ]; then
-            sudo cp "$HOST_NTSYNC" /usr/include/linux/ntsync.h
+            $SUDO cp "$HOST_NTSYNC" /usr/include/linux/ntsync.h
         fi
     fi
 fi
@@ -123,10 +139,29 @@ PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig ../wine-source/configure --wit
 make -j$(nproc)
 
 echo "Installing locally to /opt/wine-custom..."
-sudo mkdir -p /opt/wine-custom
-sudo chown $USER:$USER /opt/wine-custom
+$SUDO mkdir -p /opt/wine-custom
+# -R: an engine from the prebuilt image is owned by root
+[ -n "$SUDO" ] && sudo chown -R "$USER:$USER" /opt/wine-custom
 cd ../wine64 && make install prefix=/opt/wine-custom
 cd ../wine32 && make install prefix=/opt/wine-custom
+
+# Torquio's crash handler (registered as the prefix's AeDebug debugger by setup_prefix.sh) is part of the
+# engine, so it's in every container that has the engine, including ones from the prebuilt image.
+echo "Compiling the crash handler (torquio-winedbg.exe)..."
+x86_64-w64-mingw32-gcc -mwindows -O2 "$SCRIPT_DIR/torquio-winedbg.c" -o /opt/wine-custom/bin/torquio-winedbg.exe
+
+# Record what this engine was built from, for `torquio --manifest`
+mkdir -p /opt/wine-custom/share/torquio
+{
+    echo "zhiyi_commit=$TARGET_COMMIT"
+    echo "torquio_commit=${TORQUIO_COMMIT:-$(git -C "$SCRIPT_DIR" describe --always --dirty --tags 2>/dev/null)}"
+    echo "built=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    for patch_file in "$PATCHES_DIR"/*.patch; do
+        if [ -f "$patch_file" ]; then
+            echo "patch=$(sha256sum "$patch_file" | cut -c1-12) $(basename "$patch_file" .patch)"
+        fi
+    done
+} > /opt/wine-custom/share/torquio/build-info
 
 touch /opt/wine-custom/.torquio_wine_build_complete
 echo "Done building Wine!"

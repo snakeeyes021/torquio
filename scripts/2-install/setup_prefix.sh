@@ -111,8 +111,11 @@ fi
 # The following registry optimizations, focus loss remedies, and custom debugger wrappers
 # are always verified/applied on setup to ensure up-to-date settings.
 
-echo "Compiling and installing Windows GUI debugger helper (torquio-winedbg.exe)..."
-x86_64-w64-mingw32-gcc -mwindows -O2 "$SCRIPT_DIR/torquio-winedbg.c" -o "/opt/wine-custom/bin/torquio-winedbg.exe"
+# The crash handler is built with the engine (build_wine.sh); engines built before that lack it.
+if [ ! -f /opt/wine-custom/bin/torquio-winedbg.exe ] && command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1; then
+    echo "Compiling and installing Windows GUI debugger helper (torquio-winedbg.exe)..."
+    x86_64-w64-mingw32-gcc -mwindows -O2 "$SCRIPT_DIR/../1-build/torquio-winedbg.c" -o "/opt/wine-custom/bin/torquio-winedbg.exe"
+fi
 
 echo "Configuring Keyboard Focus Loss Mitigation & Accessibility Registry Overrides..."
 # FocusOnClick forces window focus acquisition upon mouse click, preventing focus loss in modals
@@ -141,6 +144,11 @@ wine reg add "HKCU\\Control Panel\\Desktop" /v FontSmoothingType /t REG_DWORD /d
 # Steinberg's plug-in host UI (instrument window title bar, tooltips) only draws text in "Segoe UI",
 # which Wine doesn't ship. Alias it to Tahoma (honored by both GDI and DirectWrite).
 wine reg add "HKCU\\Software\\Wine\\Fonts\\Replacements" /v "Segoe UI" /t REG_SZ /d "Tahoma" /f
+
+# Every Wine update re-registers mscoree.dll through rundll32 (wine.inf). With Microsoft's .NET installed that
+# shows two "This application could not be started" errors (64- and 32-bit) and achieves nothing; .NET's
+# installer registered it already. Don't load .NET into rundll32. ("*" also covers loads by full path.)
+wine reg add "HKCU\\Software\\Wine\\AppDefaults\\rundll32.exe\\DllOverrides" /v "*mscoree" /t REG_SZ /d "" /f
 
 # Customize key repeat speed to mitigate Auto-Repeat Lag Bug
 wine reg add "HKCU\\Control Panel\\Accessibility\\Keyboard Response" /v AutoRepeatDelay /t REG_SZ /d "250" /f
