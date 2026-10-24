@@ -21,13 +21,12 @@ PREFIX = os.environ.get("TORQUIO_PREFIX_DIR") or os.path.join(DATA_DIR, "prefix"
 CONTAINER = os.environ.get("TORQUIO_CONTAINER_NAME") or "torquio-env"
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Release-note labels for some programs; others keep their Windows "Programs and Features" name
-LABELS = {
-    "Steinberg Download Assistant": "Steinberg Download Assistant (SDA)",
-    "Steinberg Activation Manager": "Steinberg Activation Manager (SAM)",
-    "Cantai Local Render": "Cantai",
-}
-FIRST = ["Steinberg Download Assistant", "Steinberg Activation Manager", "Steinberg MediaBay", "Steinberg Dorico"]
+# Programs are listed under their Windows "Programs and Features" names, except Cantai, whose installer
+# registers as its renderer but installs the plug-in too
+LABELS = {"Cantai Local Render": "Cantai"}
+# The Steinberg programs listed, in this order; components bundled with them (HALion Sonic, Groove Agent,
+# Library Manager, ...) are left out. All third-party programs are listed.
+STEINBERG = ["Steinberg Download Assistant", "Steinberg Activation Manager", "Steinberg MediaBay", "Steinberg Dorico"]
 HIDDEN = re.compile(r"^(Microsoft |Wine ICU|Wine Mono|Wine Gecko)")
 
 
@@ -240,15 +239,16 @@ def manifest():
     if icu:
         lines.append(f"*   **Wine-ICU MSI Version:** `{icu.get('DisplayVersion', '?')}`")
 
+    def third_party(name):
+        return "steinberg" not in programs[name].get("Publisher", name).lower()
+
     def order(name):
-        third_party = "steinberg" not in programs[name].get("Publisher", name).lower()
-        first = next((i for i, f in enumerate(FIRST) if name.startswith(f)), len(FIRST))
-        return (third_party, first, name.lower())
+        return (third_party(name), next((i for i, f in enumerate(STEINBERG) if name.startswith(f)), len(STEINBERG)), name.lower())
 
     lines += ["", "**Verified Application Versions:**"]
-    shown = sorted((n for n in programs if not HIDDEN.match(n)), key=order)
+    shown = sorted((n for n in programs if not HIDDEN.match(n) and order(n)[:2] != (False, len(STEINBERG))), key=order)
     for name in shown:
-        label = LABELS.get(name, name) + (" (3rd Party)" if order(name)[0] else "")
+        label = LABELS.get(name, name) + (" (3rd Party)" if third_party(name) else "")
         lines.append(f"*   **{label}:** `{program_version(programs[name])}`")
     if not shown:
         lines.append("*   (no Windows software found in the Wine prefix)")
