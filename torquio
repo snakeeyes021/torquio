@@ -1687,11 +1687,15 @@ replace_container() {
     distrobox rm --force "$TORQUIO_CONTAINER_NAME" >/dev/null
     $mgr rename "$new" "$TORQUIO_CONTAINER_NAME"
     distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "cd \"$SCRIPT_DIR\" && ./scripts/1-build/container_gpu_setup.sh" || true
-    # Earlier prebuilt engines are no longer needed
+    # Earlier prebuilt engines, and the snapshot the old container was made from (NVIDIA conversion), are no
+    # longer needed
     local old
     for old in $($mgr images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep "^$TORQUIO_IMAGE_REPO:"); do
         [ "$old" != "$image" ] && $mgr rmi "$old" >/dev/null 2>&1
     done
+    if [[ "$current" == "localhost/$TORQUIO_CONTAINER_NAME:gpu-"* ]] && [ "$current" != "$image" ]; then
+        $mgr rmi "$current" >/dev/null 2>&1
+    fi
     echo "Container replaced."
 }
 
