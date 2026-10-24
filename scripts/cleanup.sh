@@ -55,11 +55,6 @@ case "$LICENSE_STATE" in
         ;;
     inactive)
         echo -e "${green}No activated Steinberg licenses found in this installation.${reset}"
-        read -p "Have you deactivated any third-party plug-in licenses (e.g. Cantai)? (y/N): " confirm
-        if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-            echo "Cleanup cancelled."
-            exit 10
-        fi
         ;;
     *)
         echo -e "⚠️  ${yellow}Torquio couldn't determine whether your Steinberg licenses are deactivated (${LICENSE_STATE#unknown }).${reset}"
@@ -73,6 +68,29 @@ case "$LICENSE_STATE" in
         fi
         ;;
 esac
+# Third-party plug-in licenses Torquio can detect (scripts/plugin_license_state.py), then the rest
+PLUGIN_LICENSES=$(python3 "$SCRIPT_DIR/plugin_license_state.py" "$TORQUIO_PREFIX_DIR" 2>/dev/null || true)
+if [ -n "$PLUGIN_LICENSES" ]; then
+    echo ""
+    echo -e "⚠️  ${red}These plug-in licenses are still activated in this installation:${reset}"
+    echo ""
+    echo -e "${yellow}${PLUGIN_LICENSES}${reset}"
+    echo ""
+    echo "Deactivate them in the plug-in itself, then run the uninstall again. If you delete them while they're activated, you can no longer deactivate them from this computer."
+    echo ""
+    override="yes, I'm aware my plug-in license is active and deleting it will prevent me from deactivating it here. proceed anyways"
+    read -p "To uninstall anyway, type '$override': " confirm
+    if [[ "$confirm" != "$override" ]]; then
+        echo "Cleanup cancelled."
+        exit 10
+    fi
+else
+    read -p "Have you deactivated any other third-party plug-in licenses? (y/N): " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo "Cleanup cancelled."
+        exit 10
+    fi
+fi
 echo ""
 read -p "Have you backed up any Dorico projects you were keeping in the data directory? (y/N): " confirm
 
