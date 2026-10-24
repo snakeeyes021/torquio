@@ -323,6 +323,14 @@ rm -f "$HOME/.local/share/applications/wine-extension-dorico.desktop"
 rm -f "$HOME/.local/share/applications/wine-protocol-net-steinberg-"*.desktop
 rm -f "$HOME/.local/share/applications/wine-extension-vstsound.desktop"
 rm -f "$HOME/.local/share/applications/wine-extension-slm.desktop"
+# Launchers Wine's menu builder created for Torquio's prefixes (file types and web links pointing into its
+# data or cache directory), with the file types they registered
+for launcher in "$HOME/.local/share/applications/"wine-*.desktop; do
+    [ -f "$launcher" ] && grep -q -e "$TORQUIO_DATA_DIR" -e "$TORQUIO_CACHE_DIR" "$launcher" || continue
+    name=$(basename "$launcher" .desktop)
+    rm -f "$launcher"
+    [[ "$name" == wine-extension-* ]] && rm -f "$HOME/.local/share/mime/packages/x-wine-extension-${name#wine-extension-}.xml"
+done
 
 # Removing extracted icons
 rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/torquio-dorico.png"
@@ -333,6 +341,9 @@ rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/torquio-sam.png"
 
 # Removing MIME types
 rm -f "$HOME/.local/share/mime/packages/application-x-dorico.xml"
+rm -f "$HOME/.local/share/mime/packages/x-wine-extension-dorico.xml"
+rm -f "$HOME/.local/share/mime/packages/x-wine-extension-vstsound.xml"
+rm -f "$HOME/.local/share/mime/packages/x-wine-extension-slm.xml"
 
 echo "Removing orphaned Windows desktop shortcuts..."
 host_desktop="${XDG_DESKTOP_DIR:-$HOME/Desktop}"

@@ -37,7 +37,7 @@ fi
 
 echo "Installing the WebView2 runtime into a temporary prefix..."
 rm -rf "$SCRATCH_PREFIX"
-distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$SCRATCH_PREFIX\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export WINEDEBUG=-all; export WINEDLLOVERRIDES='mscoree=;mshtml='; wineboot -i >/dev/null 2>&1; wine \"$INSTALLER\" /silent /install; wineserver -k" || true
+distrobox enter "$TORQUIO_CONTAINER_NAME" -- bash -c "export WINEPREFIX=\"$SCRATCH_PREFIX\"; export PATH=\"$WINE_CUSTOM_BIN:\$PATH\"; export WINEDEBUG=-all; export WINEDLLOVERRIDES='mscoree=;mshtml=;winemenubuilder.exe=d'; wineboot -i >/dev/null 2>&1; wine \"$INSTALLER\" /silent /install; wineserver -k" || true
 
 APP_DIR=$(ls -d "$SCRATCH_PREFIX/drive_c/Program Files (x86)/Microsoft/EdgeWebView/Application"/[0-9]*/ 2>/dev/null | sort -V | tail -n 1)
 if [ -z "$APP_DIR" ] || [ ! -f "${APP_DIR}msedgewebview2.exe" ]; then
