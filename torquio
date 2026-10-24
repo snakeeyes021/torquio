@@ -1984,6 +1984,9 @@ if [ $# -gt 0 ]; then
         -l|--export-logs|--export_logs)
             export_logs
             ;;
+        --manifest)
+            python3 "$SCRIPT_DIR/scripts/version_manifest.py"
+            ;;
         -x|--export_key_commands)
             export_keycommands
             ;;
@@ -2029,6 +2032,7 @@ if [ $# -gt 0 ]; then
             echo "  -u, --update                Update Torquio to the latest version."
             echo "  -d, --map_folder [p] [l]    Map folder positional/interactively."
             echo "  -l, --export-logs           Zip up logs for a bug report (personal data removed)."
+            echo "      --manifest              Print the installed versions (release notes Markdown)."
             echo "  -x, --export_key_commands   Export key commands to zip."
             echo "  -m, --import_key_commands   Import key commands zip/json."
             echo "  -w, --winecfg               Launch winecfg in the container prefix."

@@ -19,6 +19,8 @@ import subprocess
 import sys
 import zipfile
 
+import version_manifest
+
 HOME = os.path.expanduser("~")
 DATA_DIR = os.environ.get("TORQUIO_DATA_DIR") or os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.join(HOME, ".local/share"), "torquio")
 PREFIX = os.environ.get("TORQUIO_PREFIX_DIR") or os.path.join(DATA_DIR, "prefix")
@@ -114,23 +116,6 @@ def run(cmd, timeout=20):
         return f"(unavailable: {type(e).__name__})"
 
 
-def installed_software():
-    """DisplayName/DisplayVersion pairs from the prefix's Uninstall registry keys (read from system.reg)."""
-    try:
-        text = open(os.path.join(PREFIX, "system.reg"), encoding="utf-8", errors="replace").read()
-    except OSError:
-        return ["(no Wine prefix found)"]
-    rows = set()
-    for section in re.split(r"\n(?=\[)", text):
-        if "\\\\Uninstall\\\\" not in section.split("\n", 1)[0]:
-            continue
-        name = re.search(r'^"DisplayName"="(.*)"$', section, re.M)
-        version = re.search(r'^"DisplayVersion"="(.*)"$', section, re.M)
-        if name:
-            rows.add(f"{name.group(1)} {version.group(1) if version else ''}".strip())
-    return sorted(rows) or ["(none found)"]
-
-
 def system_info():
     lines = [f"Exported: {datetime.datetime.now().astimezone():%Y-%m-%d %H:%M:%S %z}", ""]
     git = ["git", "-C", REPO]
@@ -167,7 +152,8 @@ def system_info():
     lines += ["== Torquio settings", config, ""]
     state = run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "steinberg_license_state.py"), PREFIX])
     lines += ["== Steinberg licenses activated in this installation", state.replace("\n", ": ", 1).replace("\n", ", "), ""]
-    lines += ["== Installed Windows software"] + installed_software() + [""]
+    manifest, warnings = version_manifest.manifest()
+    lines += ["== Version manifest (Wine engine and installed Windows software)"] + manifest + [f"Warning: {w}" for w in warnings] + [""]
     dumps = sorted(glob.glob(os.path.join(PREFIX, "drive_c/users/*/Documents/Steinberg/CrashDumps/*.dmp")), key=os.path.getmtime, reverse=True)
     lines.append("== Crash dumps (not included, listed only; newest first)")
     lines += [f"{datetime.datetime.fromtimestamp(os.path.getmtime(d)):%Y-%m-%d %H:%M}  {os.path.getsize(d):>9} bytes  {os.path.basename(d)}"
@@ -177,7 +163,7 @@ def system_info():
 
 README = b"""Torquio log export
 
-system-info.txt   Torquio version, system, container, settings and installed Windows software
+system-info.txt   Torquio version, system, container, settings, Wine engine and installed Windows software
 torquio/          Torquio's own logs (these include Wine's output while Dorico runs)
 dorico/, audio-engine/, activation-manager/, steinberg-runtime/, download-assistant/, other/
                   logs written by Dorico and the Steinberg tools inside the Wine prefix

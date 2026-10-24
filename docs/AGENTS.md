@@ -16,7 +16,7 @@ To maintain repository stability and allow clean parallel development, follow th
 *   **`main` (Current Stable Release):** Represents the production-ready, release state of Torquio. Features and bug fixes do not merge directly into `main` (with the rare exception of urgent, isolated hotfix patches).
 *   **Feature & Fix Branches (`feat/*`, `fix/*`, `test/*`, etc.):** Dedicated topic branches used for developing **AND TESTING** individual features or fixes in isolation. Never implement new logic or bugfixes directly on integration branches; always work and test within the appropriate topic branch first.
 *   **`develop` (Feature Integration Testing):** A permanent integration branch used to test multiple merged features and fixes concurrently. This is where cross-feature compatibility, Wine build interactions, and system regressions are tested together.
-*   **Release Lifecycle:** Once all features and fixes merged into `develop` are verified to work seamlessly together across real-world testing with zero regressions, `develop` is merged into `main` to create a new stable release.
+*   **Release Lifecycle:** Once all features and fixes merged into `develop` are verified to work seamlessly together across real-world testing with zero regressions, `develop` is merged into `main` to create a new stable release. The release entry's "Build Environment Artifacts" and "Verified Application Versions" sections come from `./torquio --manifest`, run on the system the release was tested on; resolve any warnings it prints first (e.g. a Wine engine built from older patches).
 
 ## Repository Context
 

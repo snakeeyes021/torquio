@@ -128,5 +128,18 @@ sudo chown $USER:$USER /opt/wine-custom
 cd ../wine64 && make install prefix=/opt/wine-custom
 cd ../wine32 && make install prefix=/opt/wine-custom
 
+# Record what this engine was built from, for `torquio --manifest`
+mkdir -p /opt/wine-custom/share/torquio
+{
+    echo "zhiyi_commit=$TARGET_COMMIT"
+    echo "torquio_commit=$(git -C "$SCRIPT_DIR" describe --always --dirty --tags 2>/dev/null)"
+    echo "built=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    for patch_file in "$PATCHES_DIR"/*.patch; do
+        if [ -f "$patch_file" ]; then
+            echo "patch=$(sha256sum "$patch_file" | cut -c1-12) $(basename "$patch_file" .patch)"
+        fi
+    done
+} > /opt/wine-custom/share/torquio/build-info
+
 touch /opt/wine-custom/.torquio_wine_build_complete
 echo "Done building Wine!"
