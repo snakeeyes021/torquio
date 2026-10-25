@@ -150,7 +150,7 @@ def system_info():
         lines.append(f"Wine: {wine[-1] if wine else '?'}")
     lines.append("")
     try:
-        config = open(os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.join(HOME, ".config"), "torquio/config.json")).read().strip()
+        config = open(paths.config_file()).read().strip()
     except OSError:
         config = "(none)"
     lines += ["== Torquio settings", config, ""]
