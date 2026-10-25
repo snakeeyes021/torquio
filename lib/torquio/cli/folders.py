@@ -54,8 +54,7 @@ def map_folder(host_folder="", map_type="", drive_letter="", strict=True):
     if map_type == "drive":
         existing = folders.drive_for(real)
         if existing:
-            # As in Bash, where "...$existing_drive\\${reset}" left echo -e a "\\\\033[0m": a literal "033[0m"
-            echo(f"{YELLOW}Warning: Folder '{real}' is already mapped to network drive {existing}\\\\033[0m")
+            echo(f"{YELLOW}Warning: Folder '{real}' is already mapped to network drive {existing}\\\\{RESET}")
             if not ui.yes(ui.ask("Are you sure you want to map it again to a different drive letter? [y/N]: ", strict)):
                 echo("Mapping cancelled.")
                 return 1

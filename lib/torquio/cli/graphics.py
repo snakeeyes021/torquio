@@ -153,9 +153,6 @@ def offer_restore(de):
         config.set_text(key, "")
 
 
-# The Bash version's configure_graphics never defined green or red, so these lines had no colour there
-_GREEN = _RED = ""
-
 AUTOMATED_WARNING = [
     f"{YELLOW}================================================================{RESET}",
     f"{YELLOW}WARNING: Enabling Automated Mode will change your desktop's{RESET}",
@@ -165,9 +162,9 @@ AUTOMATED_WARNING = [
     f"{YELLOW}You may also want to restart any currently running XWayland applications{RESET}",
     f"{YELLOW}after enabling this mode.{RESET}",
     f"{YELLOW}----------------------------------------------------------------{RESET}",
-    f"{_GREEN}Torquio will back up your current desktop scaling settings,{RESET}",
-    f"{_GREEN}and you can easily restore them at any time by switching{RESET}",
-    f"{_GREEN}back to Manual Mode.{RESET}",
+    f"{GREEN}Torquio will back up your current desktop scaling settings,{RESET}",
+    f"{GREEN}and you can easily restore them at any time by switching{RESET}",
+    f"{GREEN}back to Manual Mode.{RESET}",
     f"{YELLOW}================================================================{RESET}",
 ]
 
@@ -175,7 +172,7 @@ AUTOMATED_WARNING = [
 def toggle_management(cur_manage, supported, de):
     """Option 1. Returns True to show the screen again."""
     if session_type() == "x11":
-        echo(f"{_RED}Error: Automated Graphics Management is a Wayland-Only feature.{RESET}")
+        echo(f"{RED}Error: Automated Graphics Management is a Wayland-Only feature.{RESET}")
         echo("The proper scaling settings will differ across X11 desktop environments.")
         echo("Please consult your DE's scaling method and set WINE Prefix DPI manually using option 2.")
         echo()
