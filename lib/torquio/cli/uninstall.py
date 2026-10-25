@@ -6,11 +6,10 @@ The uninstaller never ran with set -e, so end of input at a prompt just counts a
 import os
 
 from .. import config, graphics, licenses, paths, run, uninstall, ui
-from ..ui import GRAY, GREEN, RED, RESET, WINE, YELLOW, echo
+from ..ui import BLUE, GRAY, GREEN, RED, RESET, WINE, YELLOW, echo
 from .graphics import cosmic_desc, gnome_desc, kde_desc
 
 CANCELLED = 10
-BLUE = ""  # cleanup.sh never defined $blue, so its banners had no colour
 
 
 def ask(prompt):
