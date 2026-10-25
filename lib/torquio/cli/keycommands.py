@@ -71,15 +71,34 @@ def pick_backup(downloads):
     return ui.ask("Enter path to key commands backup file (.zip or .json): ")
 
 
+def backups_in(directory):
+    """Key command backups directly in `directory` (find -maxdepth 1 order)."""
+    try:
+        return [e.path for e in os.scandir(directory)
+                if e.is_file(follow_symlinks=False)
+                and (e.name == BACKUP_NAME or fnmatch.fnmatchcase(e.name, "keycommands_*.json"))]
+    except OSError:
+        return []
+
+
+def stage(backup):
+    """Put a backup where the Dorico launcher imports it from on the next start."""
+    staged = os.path.join(paths.data_dir(), "staged_keycommands")
+    shutil.rmtree(staged, ignore_errors=True)
+    for leftover in glob.glob(os.path.join(glob.escape(paths.data_dir()), "staged_keycommands.*")):
+        if not os.path.isdir(leftover) or os.path.islink(leftover):
+            os.remove(leftover)
+    os.makedirs(staged, exist_ok=True)
+    if backup.endswith(".zip"):
+        run.succeeds(["unzip", "-o", backup, "-d", staged + "/"])
+    else:
+        shutil.copy(backup, staged + "/")
+
+
 def import_():
     echo("=== Importing Key Commands Backup ===")
     downloads = downloads_dir()
-    try:
-        backups = [e.path for e in os.scandir(downloads)
-                   if e.is_file(follow_symlinks=False)
-                   and (e.name == BACKUP_NAME or fnmatch.fnmatchcase(e.name, "keycommands_*.json"))]
-    except OSError:
-        backups = []
+    backups = backups_in(downloads)
     selected = ""
     if len(backups) == 1:
         selected = backups[0]
@@ -98,16 +117,7 @@ def import_():
         echo("No backup file selected. Import cancelled.")
         return
     print(f"Staging backup: {selected}")
-    staged = os.path.join(paths.data_dir(), "staged_keycommands")
-    shutil.rmtree(staged, ignore_errors=True)
-    for leftover in glob.glob(os.path.join(glob.escape(paths.data_dir()), "staged_keycommands.*")):
-        if not os.path.isdir(leftover) or os.path.islink(leftover):
-            os.remove(leftover)
-    os.makedirs(staged, exist_ok=True)
-    if selected.endswith(".zip"):
-        run.succeeds(["unzip", "-o", selected, "-d", staged + "/"])
-    else:
-        shutil.copy(selected, staged + "/")
+    stage(selected)
     echo("Keyboard shortcuts staged successfully! They will be automatically imported the next time you launch Dorico.")
 
 

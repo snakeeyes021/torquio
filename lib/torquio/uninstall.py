@@ -177,6 +177,16 @@ def remove_default_apps(path):
 def remove_desktop_shortcuts():
     """Windows shortcuts Steinberg's installers put on the desktop, and launchers Wine's menu builder created
     there for programs in Torquio's prefix."""
+    remove_windows_shortcuts()
+    needles = torquio_dir_patterns()
+    desktop = folders.desktop_dir()
+    for launcher in glob.glob(os.path.join(glob.escape(desktop), "*.desktop")):
+        if os.path.isfile(launcher) and _mentions(launcher, needles):
+            _rm(launcher)
+
+
+def remove_windows_shortcuts():
+    """The (non-working) Windows shortcuts Steinberg's installers put on the host's and the prefix's desktops."""
     desktop = folders.desktop_dir()
     prefix = paths.prefix_dir()
     dirs = [desktop, os.path.join(prefix, "drive_c/users/Public/Desktop")]
@@ -191,10 +201,11 @@ def remove_desktop_shortcuts():
         for entry in entries:
             if entry.is_file(follow_symlinks=False) and any(fnmatch.fnmatchcase(entry.name, p) for p in WINDOWS_SHORTCUTS):
                 _rm(entry.path)
-    needles = torquio_dir_patterns()
-    for launcher in glob.glob(os.path.join(glob.escape(desktop), "*.desktop")):
-        if os.path.isfile(launcher) and _mentions(launcher, needles):
-            _rm(launcher)
+
+
+def remove_file(path):
+    """rm -f"""
+    _rm(path)
 
 
 def container_images(mgr):

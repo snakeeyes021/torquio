@@ -30,14 +30,23 @@ import zipfile
 # FAKE_CONTAINER there is none. The repo copy is found through TORQUIO_INSTALLERS_DIR (common.sh exports it).
 FAKE_DISTROBOX = r"""
 repo="${TORQUIO_INSTALLERS_DIR%/installers}"
+# A container created during the scenario (distrobox create) exists until it's removed (distrobox rm)
+[ -z "$FAKE_CONTAINER" ] && [ -f "$HOME/.fake-container" ] && FAKE_CONTAINER=$(cat "$HOME/.fake-container")
 case "$1" in
 list)
     [ -n "$FAKE_CONTAINER" ] || exit 0
     echo "ID           | NAME                 | STATUS             | IMAGE"
     echo "0123456789ab | $FAKE_CONTAINER          | ${FAKE_STATUS-Up 2 hours}         | x"
     exit 0 ;;
-create) exit "${FAKE_CREATE_RC:-0}" ;;
-stop|rm) exit 0 ;;
+create)
+    if [ "${FAKE_CREATE_RC:-0}" = 0 ]; then
+        name=""; prev=""
+        for arg in "$@"; do [ "$prev" = "-n" ] && name="$arg"; prev="$arg"; done
+        [ "$name" = torquio-env ] && echo "$name" > "$HOME/.fake-container"
+    fi
+    exit "${FAKE_CREATE_RC:-0}" ;;
+rm) [ "$2" = torquio-env ] && rm -f "$HOME/.fake-container"; exit 0 ;;
+stop) exit 0 ;;
 enter)
     [ -n "$FAKE_CONTAINER" ] || exit 1
     [ "$6" = "vulkaninfo --summary 2>/dev/null" ] && { printf '%b' "$FAKE_VULKANINFO"; exit 0; }
@@ -104,6 +113,7 @@ FAKES = {
     "modinfo": '[ "$FAKE_NTSYNC_MODULE" = yes ]',
     "zenity": '[ -n "$FAKE_PICKED" ] && printf "%s\\n" "$FAKE_PICKED"',
     "kdialog": '[ -n "$FAKE_PICKED" ] && printf "%s\\n" "$FAKE_PICKED"',
+    "nohup": "exit 0",  # the installer's background Download Assistant start: recorded, not run
 }
 FAKE_FAILING = ["sudo", "pkexec", "docker", "gsettings", "dconf", "kwriteconfig5", "kwriteconfig6",
                 "kreadconfig5", "kscreen-doctor", "cosmic-randr", "xrandr", "modprobe",
@@ -210,8 +220,10 @@ def run_in_pty(cmd, env, cwd, stdin_text, timeout=120, piped=False):
     attrs[3] &= ~(termios.ECHO | termios.ECHONL)
     termios.tcsetattr(slave, termios.TCSANOW, attrs)
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
+    # Its own process group (as a shell runs a command), not its own session: a session leader's exit would
+    # send SIGHUP to background jobs (e.g. the installer's Download Assistant start) that survive in real use
     proc = subprocess.Popen(cmd, env=env, cwd=cwd, stdin=subprocess.PIPE if piped else slave, stdout=slave,
-                            stderr=slave, start_new_session=True)
+                            stderr=slave, preexec_fn=os.setpgrp)
     if piped:
         proc.stdin.write(stdin_text.encode())
         proc.stdin.close()

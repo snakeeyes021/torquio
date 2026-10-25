@@ -109,3 +109,10 @@ def remove_link(path):
         os.remove(path)
     except FileNotFoundError:
         pass
+
+
+def replace_link(target, link):
+    """rm -f LINK; ln -sf TARGET LINK"""
+    if os.path.islink(link) or (os.path.lexists(link) and not os.path.isdir(link)):
+        os.remove(link)
+    os.symlink(target, link)

@@ -162,6 +162,11 @@ def _update_torquio(*args):
     return update.update_torquio(menu=_flag(args, "--menu"))
 
 
+def _install(*args):
+    from .cli import install
+    return install.main(args)
+
+
 def _uninstall():
     from .cli import uninstall
     return uninstall.main()
@@ -204,6 +209,7 @@ COMMANDS = {
     "post-update": (_post_update, 0, 1),
     "update-torquio": (_update_torquio, 0, 9),
     "uninstall": (_uninstall, 0, 9),
+    "install": (_install, 0, 9),
     "unknown-argument": (_unknown_argument, 1, 0),
 }
 

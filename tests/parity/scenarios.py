@@ -127,6 +127,12 @@ LEFTOVERS = {
     "Desktop/Firefox.desktop": "Exec=firefox\n",
 }
 GNOME_RESTORE = config(manage_graphics=True, original_scale_factor=0, original_kde_policy="false", original_cosmic_policy="none")
+INSTALLERS = {"Downloads/MediaBay_Installer_win64_1.3.80.zip": "", "Downloads/MediaBay_Installer_win64_1.4.10.zip": "",
+              "Downloads/Steinberg_Download_Assistant_1.39.2_Installer_win.exe": ""}
+OPTIONAL_INSTALLERS = {"Downloads/NotePerformer-Installer-5.1.2.exe": "",
+                       "Downloads/Cantai-Windows-3.1.1-Installer-x64.exe.zip": ""}
+CANTAI_FAILS = {"scripts/2-install/install_cantai.sh": "#!/bin/bash\necho '(stub) Cantai installer'\nexit 1\n"}
+PARTIAL = {f"{PREFIX}/dosdevices/.keep": "", f"{PREFIX}/user.reg": USER_REG}
 GNOME_125 = graphics("GNOME", supported=True, connector="eDP-1", width=2560, height=1600, scale=1.25, physical_dpi=189,
                      ideal_xwayland_policy="Framebuffer Upscale (xwayland-scaling-factor=1)", target_wine_dpi=120,
                      target_xwayland_factor=1, rec_formula="Formula: 96 x 1.25 scale")
@@ -384,4 +390,44 @@ SCENARIOS = [
      "env": {**CONTAINER, "FAKE_XWAYLAND_FACTOR": "uint32 1", "FAKE_KDE_POLICY": "true"}},
     {"name": "uninstall-from-menu-cancel", "input": "2\nn\n\n12\n", "files": dict(INSTALLED), "env": CONTAINER},
     {"name": "uninstall-from-menu", "input": f"2\n{CONFIRM_ALL}7\n", "files": dict(INSTALLED_FULL), "env": CONTAINER},
+
+    # Install (stage 5)
+    {"name": "install-auto", "args": ["--install", "-y"], "files": {**INSTALLERS, **OPTIONAL_INSTALLERS},
+     "repo_files": {"scripts/2-install/install_cantai.sh": "#!/bin/bash\necho '(stub) Cantai installer'\n"},
+     "compare_files": [CONFIG], "env": {"FAKE_IMAGE_PRESENT": "yes", "FAKE_IMAGE": "current"}},
+    {"name": "install-auto-no-prebuilt", "args": ["--install", "--yes"], "files": dict(INSTALLERS),
+     "compare_files": [CONFIG], "env": {"FAKE_PULL_RC": "1", "FAKE_IMAGE": "current"}},
+    {"name": "install-auto-missing-installers", "args": ["--install", "-y"],
+     "files": {"Downloads/Steinberg_Download_Assistant_1.39.2_Installer_win.exe": ""}},
+    {"name": "install-wizard-resume", "args": ["--install"],
+     "input": "1\n\n2\ny\nMusic\n2\n\n\n",
+     "files": {**INSTALLERS, **PARTIAL, "Music/.keep": "", "Downloads/keycommands_en.json": "{}",
+               **config(manage_graphics=True, freetype_interpreter=40)},
+     "repo_files": CANTAI_FAILS, "compare_files": [CONFIG],
+     "env": {**CONTAINER, "FAKE_IMAGE_PRESENT": "yes", "FAKE_XWAYLAND_FACTOR": "uint32 1"}},
+    {"name": "install-wizard-fresh-drive", "args": ["--install"], "input": "y\n1\ny\nMusic\n\nn\ny\nother.json\n\n",
+     "files": {**INSTALLERS, **OPTIONAL_INSTALLERS, "Music/.keep": "", "Downloads/keycommands_en.json": "{}",
+               "other.json": "{}"},
+     "repo_files": CANTAI_FAILS, "compare_files": [CONFIG], "env": {"FAKE_IMAGE_PRESENT": "yes"}},
+    {"name": "install-wizard-no-mapping-bad-path", "args": ["--install"], "input": "n\n\ny\nNowhere\ny\nmissing.zip\nn\n",
+     "files": dict(INSTALLERS), "compare_files": [CONFIG]},
+    {"name": "install-wizard-x11", "args": ["--install"], "input": "\n1\nn\nn\nn\n", "files": dict(INSTALLERS),
+     "env": {"XDG_SESSION_TYPE": "x11"}, "compare_files": [CONFIG]},
+    {"name": "install-existing-config-only", "args": ["--install"], "input": "1\ny\n2\nn\nn\n\n",
+     "files": {**INSTALLED_FULL, **config(manage_graphics=False)}, "compare_files": [CONFIG], "env": CONTAINER},
+    {"name": "install-existing-reinstall-software", "args": ["--install"], "input": "2\n\n\nn\nn\n\n",
+     "files": {**INSTALLED_FULL, **INSTALLERS}, "compare_files": [CONFIG], "env": CONTAINER},
+    {"name": "install-existing-recreate-container", "args": ["--install"], "input": "3\n\n\nn\nn\n\n",
+     "files": dict(INSTALLED_FULL), "compare_files": [CONFIG],
+     "env": {"FAKE_MACHINE_ID": "0123456789abcdef0123456789abcdef", "FAKE_IMAGE_PRESENT": "yes", "FAKE_IMAGE": "current"},
+     "fakes": {}},
+    {"name": "install-existing-fresh-cancelled", "args": ["--install"], "input": "4\nno\n",
+     "files": {**INSTALLED_FULL, **STEINBERG_ACTIVE}, "env": CONTAINER},
+    {"name": "install-existing-cancel", "args": ["--install"], "input": "5\n", "files": dict(INSTALLED_FULL), "env": CONTAINER},
+    {"name": "install-existing-invalid", "args": ["--install"], "input": "9\n", "files": dict(INSTALLED_FULL), "env": CONTAINER},
+    {"name": "install-partial-cancel", "args": ["--install"], "input": "3\n", "files": dict(PARTIAL)},
+    {"name": "install-cancel-at-manifest", "args": ["--install"], "input": "n\n\nn\nn\nn\n", "files": dict(INSTALLERS),
+     "compare_files": [CONFIG]},
+    {"name": "install-eof", "args": ["--install"], "input": "n\n\x04", "files": dict(INSTALLERS)},
+    {"name": "install-from-menu-cancel", "input": "1\n5\n\n12\n", "files": dict(INSTALLED_FULL), "env": CONTAINER},
 ]
