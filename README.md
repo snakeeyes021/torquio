@@ -51,7 +51,7 @@ Download the following files from the Steinberg download pages for [Steinberg Do
 *   `Steinberg_Download_Assistant_*_Installer_win.exe` (Mandatory)
 *   `MediaBay_Installer_win64.zip` (Mandatory)
 *   `NotePerformer-Installer-*.exe` (3rd-party, Optional)
-*   `Cantai-Windows-Installer-*.exe.zip` (3rd-party, Optional; [Cantai](https://cantai.app) sings your lyrics. Torquio also adds its "Auto & Cantai" playback template to Dorico)
+*   `Cantai-Windows-Installer-*.exe.zip` (3rd-party, Optional; Torquio also adds its "Auto & Cantai" playback template to Dorico)
 
 *Note: You do not need to download the Dorico installer itself. The Download Assistant will handle that once the environment is built.*
 
