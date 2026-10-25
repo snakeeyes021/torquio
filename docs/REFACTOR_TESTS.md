@@ -1,5 +1,10 @@
 # Python port (v0.6.0): manual test checklist
 
+**Where to start:** the port is complete on `develop`. If you only have time for part of this, do these first:
+the v0.5.0 → develop update in stage 3 (the handover every existing user goes through), a fresh install in a VM
+(stage 5), launching Dorico and signing in to the Activation Manager (stage 6), and the full uninstall
+(stage 4). Everything else re-checks screens that the automated comparison already matched byte for byte.
+
 Everything here needs a human or a real system; the rest is covered automatically (unit tests, the parity
 harness in `tests/parity/`, and read-only comparisons on a real install). Grows with each stage of
 `docs/REFACTOR.md`; worked through once before the v0.6.0 release. "Same as before" means the same as v0.5.0
@@ -139,3 +144,15 @@ After updating (or Fix Icons & Refresh Launchers), `~/.local/bin/torquio-dorico`
 - [ ] With Cantai installed: start Dorico, play a Cantai part; rendering works (GPU if available).
 - [ ] Logs: each launch writes `~/.local/share/torquio/logs/torquio_dorico_*.log` (or `_sam_`, `_sda_`) with the
       same content as before.
+
+## Stage 7: entry point (`torquio` is now Python)
+
+- [ ] `torquio` (menu), `./torquio` from the folder, and `~/.local/bin/torquio` all start; the menu, colours and
+      header look as before; Exit, Ctrl+C at the menu prompt (ends quietly, no traceback) and Ctrl+D.
+- [ ] Every main-menu option once (installed and not installed), returning to the menu each time.
+- [ ] Flags: `-s`, `-g`, `-l`, `--manifest`, `-x`, `-m`, `-w`, `-k`, `-b`, `-e some.exe`, `-d ~/Music drive`,
+      `-f`, `--fix-identity`, `--setup-gpu`, `--enable-ntsync`, an unknown flag (flag list, exit code 1).
+- [ ] `~/.local/share/torquio/logs/torquio_main_*.log` records each session as before.
+- [ ] Update from v0.5.0 once more (stage 3's steps) now that the entry point is Python: the handover runs the
+      new `torquio --post-update`.
+- [ ] On a system with an old Python (if handy): the "needs Python 3.9 or newer" message.

@@ -1,6 +1,7 @@
 # Plan: Torquio in Python (v0.6.0)
 
-Status: **approved** (2026-10-24). Tracked as the v0.6.0 epic in `BACKLOG.md` ("Defined Work").
+Status: **done** (stages 0-7 merged to develop, 2026-10-24); manual testing before the v0.6.0 release follows
+`docs/REFACTOR_TESTS.md`. Tracked as the v0.6.0 epic in `BACKLOG.md` ("Defined Work").
 
 ## 1. Goal
 
@@ -46,10 +47,10 @@ a faithful translation).
 ## 4. Target layout
 
 ```
-torquio                          # entry point (Bash during the port; at the end a small Python script)
+torquio                          # entry point (a small Python script; Bash until stage 7)
 lib/torquio/                     # the package (not at the repo root: `torquio` is already a file there)
 lib/torquio_bridge.py            # runs __main__ for Bash (a script, so the current directory can't shadow the package)
-    __main__.py                  # internal commands Bash calls during the port (torquio_py in common.sh)
+    __main__.py                  # internal commands for the install.sh/cleanup.sh wrappers (torquio_py in common.sh)
     paths.py                     # repo dir, XDG data/cache/config dirs, prefix, container name, overrides
     config.py                    # ~/.config/torquio/config.json (same keys and value types as today)
     ui.py                        # colours, clear, header, prompts (y/N, [Y/n], typed overrides), Ctrl+C
@@ -189,6 +190,8 @@ Fixed or changed on purpose, each in its own commit (everything else is meant to
 - The launchers in `~/.local/bin` are stubs that run the Torquio folder's code, so they need that folder where
   it was installed (as `~/.local/bin/torquio`, a link to it, always did); `torquio_graphics.py` is no longer
   copied there.
+- `torquio` checks the Python version before starting its session log, so on an old Python the message isn't
+  logged (and without any `python3`, the shell's own "not found" message appears instead of Torquio's).
 - Key command export after mapping a Desktop folder in the same session: Bash had sourced `user-dirs.dirs`
   by then, so a localised Downloads folder could be used; it now always uses `$XDG_DOWNLOAD_DIR` or
   `~/Downloads`, as the code intends.

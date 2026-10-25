@@ -20,7 +20,7 @@ Rewrite the host-side Bash in standard-library Python (3.9+) with no user-visibl
 *   [x] **Stage 4, uninstall:** `cleanup.sh`.
 *   [x] **Stage 5, install:** `install.sh` and the host-side `install_*.sh` helpers, launcher and icon installation.
 *   [x] **Stage 6, launchers:** `torquio-dorico`, `torquio-sam`, `torquio-sda-handler`, graphics automation; the Dorico runner as a template file.
-*   [ ] **Stage 7, entry point:** menu loop and flag parsing; `torquio` becomes a small Python entry point; dead Bash removed; docs updated. Full regression pass, then release v0.6.0.
+*   [x] **Stage 7, entry point:** menu loop and flag parsing; `torquio` becomes a small Python entry point; dead Bash removed; docs updated. Full regression pass, then release v0.6.0.
 
 
 ## Undefined Work (Backlog)

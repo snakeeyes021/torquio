@@ -35,7 +35,7 @@ Torquio relies on containerizing Windows apps without messing up your host syste
 
 * **Keep it in the box:** Torquio uses Distrobox to keep Wine completely contained. Avoid writing scripts that install Wine packages or Windows dependencies directly onto the user's host OS.
 * **Use dynamic paths:** We have standard, XDG-compliant path variables defined in `scripts/common.sh` (like `TORQUIO_PREFIX_DIR`), and the same locations in Python in `lib/torquio/paths.py`. Use those so your code works on everyone's machine.
-* **Python:** Torquio's Bash is being ported to Python (`docs/REFACTOR.md`). Python code goes in `lib/torquio/`, uses only the standard library and must run on Python 3.9.
+* **Python:** Torquio's host side is Python (`lib/torquio/`; Bash remains only inside the container and in two thin wrappers). It uses only the standard library and must run on Python 3.9. Modules outside `cli/` and `launch/` don't print or prompt; they return values, so a GUI can use them too.
 * **Mind the host integration:** We intentionally disabled Wine's automatic desktop integration. This means if you need to add an icon or a `.desktop` file, you'll need to manually craft it in the `desktop_stubs/` directory and ensure the installer script copies it over.
 
 ## Testing Your Changes
