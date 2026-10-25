@@ -1,0 +1,36 @@
+name: Tests
+
+# The unit tests (python3 -m unittest) on the oldest Python Torquio needs (3.9) and the newest, plus
+# ShellCheck on the Bash. Takes seconds; nothing is built and no container image is touched. The parity
+# harness (tests/parity) isn't run here: it compares against a local branch and is run by hand per stage.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.9', '3']
+    container: python:${{ matrix.python }}-slim
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Unit tests
+        run: python3 -m unittest -v
+
+  shellcheck:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: ShellCheck (errors only for now; the Bash is being ported to Python)
+        run: |
+          shellcheck --version
+          shellcheck -S error torquio scripts/*.sh scripts/1-build/*.sh scripts/2-install/*.sh \
+            scripts/3-runtime_handlers/torquio-dorico scripts/3-runtime_handlers/torquio-sam \
+            scripts/3-runtime_handlers/torquio-sda-handler
