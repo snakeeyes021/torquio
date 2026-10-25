@@ -118,3 +118,24 @@ Destructive: use a VM or a system where you're ready to reinstall (stage 5's tes
       stays activated; Fresh Reinstallation — goes through the uninstaller's guards; Cancel).
 - [ ] `torquio -i -y` (automatic install with default settings).
 - [ ] Without the mandatory installers: the error names the missing ones and nothing is changed.
+
+## Stage 6: launchers
+
+After updating (or Fix Icons & Refresh Launchers), `~/.local/bin/torquio-dorico`, `torquio-sam` and
+`torquio-sda-handler` are short Python files that name your Torquio folder.
+
+- [ ] Start Dorico from the application menu; it opens as before. Open a `.dorico` file from the file manager;
+      Dorico opens it.
+- [ ] Automated Mode on: change the display scale (e.g. 100% → 125%), start Dorico; the first time it asks to
+      change the XWayland setting; Dorico's UI size follows. With Dorico already running and the scale changed,
+      starting it again asks whether to restart Wine.
+- [ ] Activation Manager from the menu; sign in through the web login: the browser's "open link" returns to the
+      Activation Manager, which signs in.
+- [ ] Download Assistant from the menu; sign in through the web login likewise. Install something small (or
+      Dorico on a fresh install): the Windows shortcuts that installers put on the desktop disappear, and after
+      installing Dorico its icon appears in the menu.
+- [ ] Set the system clock off by an hour and open the Activation Manager: a warning dialog appears (set the
+      clock back afterwards).
+- [ ] With Cantai installed: start Dorico, play a Cantai part; rendering works (GPU if available).
+- [ ] Logs: each launch writes `~/.local/share/torquio/logs/torquio_dorico_*.log` (or `_sam_`, `_sda_`) with the
+      same content as before.

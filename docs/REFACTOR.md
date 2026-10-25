@@ -183,6 +183,12 @@ Fixed or changed on purpose, each in its own commit (everything else is meant to
   colour).
 - Edge cases where Bash printed its own error (`[: : integer expression expected`, e.g. graphics data without
   `target_xwayland_factor`) now just take the same branch silently.
+- Launchers in Automated Mode: Dorico, the Activation Manager and the Download Assistant start on desktops the
+  scaling automation doesn't cover, on COSMIC before its XWayland setting exists, and on KDE when kreadconfig
+  fails (the Bash launchers stopped silently there: a failing command in an assignment under `set -e`).
+- The launchers in `~/.local/bin` are stubs that run the Torquio folder's code, so they need that folder where
+  it was installed (as `~/.local/bin/torquio`, a link to it, always did); `torquio_graphics.py` is no longer
+  copied there.
 - Key command export after mapping a Desktop folder in the same session: Bash had sourced `user-dirs.dirs`
   by then, so a localised Downloads folder could be used; it now always uses `$XDG_DOWNLOAD_DIR` or
   `~/Downloads`, as the code intends.
