@@ -16,6 +16,7 @@ echo "========================================="
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 source "$SCRIPT_DIR/scripts/common.sh"
+torquio_require_python
 
 print_header() {
     local wine="\033[38;5;125m"
@@ -1421,7 +1422,7 @@ export_logs() {
     echo "=== Export Logs ==="
     echo "Collecting logs..."
     local zip_file
-    zip_file=$(python3 "$SCRIPT_DIR/scripts/export_logs.py") || { echo "Error: the logs could not be exported."; return; }
+    zip_file=$(torquio_py export-logs) || { echo "Error: the logs could not be exported."; return; }
     echo ""
     echo "Saved: $zip_file"
     echo ""
@@ -1786,7 +1787,7 @@ fix_machine_identity() {
     echo "them see a new computer, so deactivate them first and activate them again afterwards. Steinberg"
     echo "licenses aren't affected. It's unlikely to ever matter, but it's worth doing once."
     echo ""
-    plugins=$(python3 "$SCRIPT_DIR/scripts/plugin_license_state.py" "$TORQUIO_PREFIX_DIR" 2>/dev/null || true)
+    plugins=$(torquio_py plugin-licenses "$TORQUIO_PREFIX_DIR" 2>/dev/null || true)
     if [ -n "$plugins" ]; then
         echo -e "${yellow}Still activated:${reset}"
         echo ""
@@ -2223,7 +2224,7 @@ if [ $# -gt 0 ]; then
             export_logs
             ;;
         --manifest)
-            python3 "$SCRIPT_DIR/scripts/version_manifest.py"
+            torquio_py manifest
             ;;
         -x|--export_key_commands)
             export_keycommands

@@ -16,6 +16,7 @@ echo "========================================="
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$SCRIPT_DIR/scripts/common.sh"
+torquio_require_python
 
 AUTO_ACCEPT=false
 if [[ "$1" == "-y" ]] || [[ "$1" == "--yes" ]]; then

@@ -82,45 +82,35 @@ mkdir -p "$TORQUIO_DATA_DIR"
 mkdir -p "$TORQUIO_CACHE_DIR"
 mkdir -p "$TORQUIO_INSTALLERS_DIR"
 
-# Configuration Helper: Read value from ~/.config/torquio/config.json
-get_config_val() {
-    local key="$1"
-    local default="$2"
-    local config_file="$HOME/.config/torquio/config.json"
-    if [ ! -f "$config_file" ]; then
-        echo "$default"
-        return
-    fi
-    python3 -c 'import sys, json; d=json.load(open(sys.argv[1])); v=d.get(sys.argv[2], sys.argv[3]); print(str(v).lower() if isinstance(v, bool) else v)' "$config_file" "$key" "$default" 2>/dev/null || echo "$default"
+# Torquio's Python code (lib/torquio, being ported from Bash: see docs/REFACTOR.md). Bash calls into it only
+# through this: torquio_py COMMAND [ARGS...] (the commands are listed in lib/torquio/__main__.py).
+torquio_py() {
+    python3 "$TORQUIO_REPO_DIR/lib/torquio_bridge.py" "$@"
 }
 
-# Configuration Helper: Write value to ~/.config/torquio/config.json
-set_config_val() {
-    local key="$1"
-    local val="$2"
-    local config_file="$HOME/.config/torquio/config.json"
-    mkdir -p "$(dirname "$config_file")"
-    if [ ! -f "$config_file" ]; then
-        echo "{}" > "$config_file"
+# Torquio needs Python 3.9 or newer on the host. The entry points (torquio, install.sh, cleanup.sh) check
+# before anything uses it; not done on sourcing, because the container's scripts source this file too.
+torquio_require_python() {
+    local version
+    if ! version=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null); then
+        echo "Torquio needs Python 3.9 or newer, and python3 wasn't found; install your distribution's python3 package." >&2
+        exit 1
     fi
-    python3 -c '
-import sys, json
-f = sys.argv[1]
-key = sys.argv[2]
-val = sys.argv[3]
-try:
-    d = json.load(open(f))
-except Exception:
-    d = {}
-if val.lower() == "true":
-    val = True
-elif val.lower() == "false":
-    val = False
-elif val.isdigit():
-    val = int(val)
-d[key] = val
-json.dump(d, open(f, "w"), indent=4)
-' "$config_file" "$key" "$val" 2>/dev/null || true
+    if ! python3 -c 'import sys; sys.exit(sys.version_info < (3, 9))' 2>/dev/null; then
+        echo "Torquio needs Python 3.9 or newer (yours is $version); install a newer python3 package." >&2
+        exit 1
+    fi
+}
+
+# Configuration Helper: Read value from ~/.config/torquio/config.json (booleans print as true/false)
+get_config_val() {
+    torquio_py config-get "$1" "$2" 2>/dev/null || echo "$2"
+}
+
+# Configuration Helper: Write value to ~/.config/torquio/config.json (true/false and digits are stored as
+# JSON booleans and numbers)
+set_config_val() {
+    torquio_py config-set "$1" "$2" 2>/dev/null || true
 }
 
 get_xwayland_scaling_factor() {

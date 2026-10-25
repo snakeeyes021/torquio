@@ -1,12 +1,10 @@
-#!/usr/bin/env python3
 """Collect Torquio, Wine and Steinberg logs plus a system summary into one zip for bug reports.
 
 Personal data is redacted from every file (email addresses, sign-in tokens, the Steinberg hardware ID and
 license grant IDs). License data, registry files and crash dumps are never included; crash dumps are only
 listed. Project file names still appear in the logs.
 
-Usage: export_logs.py [OUTPUT_DIR]   (default: the XDG download directory)
-Prints the path of the zip it wrote.
+Usage: torquio --export-logs (main() takes an output folder; default: the XDG download directory)
 """
 import datetime
 import getpass
@@ -16,16 +14,15 @@ import platform
 import re
 import socket
 import subprocess
-import sys
 import zipfile
 
-import version_manifest
+from . import licenses, manifest as version_manifest, paths
 
-HOME = os.path.expanduser("~")
-DATA_DIR = os.environ.get("TORQUIO_DATA_DIR") or os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.join(HOME, ".local/share"), "torquio")
-PREFIX = os.environ.get("TORQUIO_PREFIX_DIR") or os.path.join(DATA_DIR, "prefix")
-CONTAINER = os.environ.get("TORQUIO_CONTAINER_NAME") or "torquio-env"
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+HOME = paths.home()
+DATA_DIR = paths.data_dir()
+PREFIX = paths.prefix_dir()
+CONTAINER = paths.container_name()
+REPO = paths.repo_dir()
 MAX_FILE = 20 << 20  # keep only the last 20 MB of any single log
 
 # (folder in the zip, glob relative to the prefix's drive_c/users/<user>/)
@@ -116,6 +113,13 @@ def run(cmd, timeout=20):
         return f"(unavailable: {type(e).__name__})"
 
 
+def call(function):
+    try:
+        return function().strip()
+    except Exception as e:
+        return f"(unavailable: {type(e).__name__})"
+
+
 def system_info():
     lines = [f"Exported: {datetime.datetime.now().astimezone():%Y-%m-%d %H:%M:%S %z}", ""]
     git = ["git", "-C", REPO]
@@ -150,9 +154,9 @@ def system_info():
     except OSError:
         config = "(none)"
     lines += ["== Torquio settings", config, ""]
-    state = run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "steinberg_license_state.py"), PREFIX])
+    state = call(lambda: licenses.steinberg_state(PREFIX))
     lines += ["== Steinberg licenses activated in this installation", state.replace("\n", ": ", 1).replace("\n", ", "), ""]
-    plugins = run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "plugin_license_state.py"), PREFIX])
+    plugins = call(lambda: licenses.format_plugins(licenses.active_plugins(PREFIX)))
     lines += ["== Plug-in licenses activated in this installation", ", ".join(line.split("\t")[0] for line in plugins.splitlines()) or "(none detected)", ""]
     manifest, warnings = version_manifest.manifest()
     lines += ["== Version manifest (Wine engine and installed Windows software)"] + manifest + [f"Warning: {w}" for w in warnings] + [""]
@@ -177,8 +181,9 @@ Still present: names and folder paths of projects opened in Dorico.
 """
 
 
-def main():
-    out_dir = sys.argv[1] if len(sys.argv) > 1 else run(["xdg-user-dir", "DOWNLOAD"]) or os.path.join(HOME, "Downloads")
+def main(out_dir=None):
+    """Write the zip and print its path."""
+    out_dir = out_dir or run(["xdg-user-dir", "DOWNLOAD"]) or os.path.join(HOME, "Downloads")
     if not os.path.isdir(out_dir):
         out_dir = os.path.join(HOME, "Downloads")
     os.makedirs(out_dir, exist_ok=True)
@@ -205,6 +210,3 @@ def main():
             z.writestr(f"{folder}/{name}", redact(data, folder))
     print(zip_path)
 
-
-if __name__ == "__main__":
-    main()

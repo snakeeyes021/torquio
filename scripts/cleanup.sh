@@ -14,6 +14,7 @@ echo "========================================="
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
+torquio_require_python
 
 wine="\033[38;5;125m"
 gray="\033[38;5;244m"
@@ -33,8 +34,8 @@ echo ""
 # License check: refuse to delete a prefix that still holds activated licenses (Steinberg's, and plug-ins
 # Torquio can detect, e.g. Cantai) unless the user explicitly accepts it (e.g. they can't deactivate and will
 # do it from their account online).
-LICENSE_STATE=$(python3 "$SCRIPT_DIR/steinberg_license_state.py" "$TORQUIO_PREFIX_DIR" 2>/dev/null || echo "unknown the license check failed to run")
-PLUGIN_LICENSES=$(python3 "$SCRIPT_DIR/plugin_license_state.py" "$TORQUIO_PREFIX_DIR" 2>/dev/null || true)
+LICENSE_STATE=$(torquio_py steinberg-licenses "$TORQUIO_PREFIX_DIR" 2>/dev/null || echo "unknown the license check failed to run")
+PLUGIN_LICENSES=$(torquio_py plugin-licenses "$TORQUIO_PREFIX_DIR" 2>/dev/null || true)
 ACTIVE_LICENSES=""
 DEACTIVATE_HINTS=()
 if [[ "$LICENSE_STATE" == active* ]]; then
