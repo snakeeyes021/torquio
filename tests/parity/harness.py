@@ -300,7 +300,7 @@ def run_scenario(scenario, repo_copy, workdir):
         path = os.path.join(home, rel)
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w") as f:
-            f.write(text)
+            f.write(text.replace("<HOME>", home))
     bindir = os.path.join(workdir, "fakebin")
     scenario_bin = os.path.join(workdir, "scenario-bin")  # the scenario's own fakes, ahead of the defaults
     shutil.rmtree(scenario_bin, ignore_errors=True)

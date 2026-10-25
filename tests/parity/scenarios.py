@@ -2,7 +2,8 @@
     name           short identifier (run.py takes names to run a subset)
     args           arguments to ./torquio
     input          what the user types (all at once; echo is off, so it doesn't appear in the output)
-    files          {path relative to $HOME: contents} created before the run
+    files          {path relative to $HOME: contents} created before the run ("<HOME>" in the contents is
+                   replaced by the scratch $HOME; None leaves a file out)
     compare_files  paths relative to $HOME whose contents must match afterwards
     timeout        seconds (default 120)
     env            environment variables to set (None removes one), including the FAKE_* ones below
@@ -88,6 +89,44 @@ UPSTREAM_AHEAD = (f"git checkout -q -b parity-upstream; {GIT} commit -q --allow-
                   f"{GIT} commit -q --allow-empty -m 'Fix for KDE scaling'; git checkout -q -B parity-local HEAD~2; "
                   "git branch -q -u parity-upstream")
 UPSTREAM_SAME = "git checkout -q -b parity-upstream; git checkout -q -b parity-local; git branch -q -u parity-upstream"
+ACTIVATION_DAT = f"{PREFIX}/drive_c/users/me/AppData/Roaming/Steinberg/Activation Manager/Data/activation.dat"
+STEINBERG_ACTIVE = {ACTIVATION_DAT: json.dumps({"ProductPackages": [
+    {"ProductPackage": "Dorico Pro 6", "LicensedItems": [{"jwt": "x"}]},
+    {"ProductPackage": "HALion Sonic", "LicensedItems": [{"jwt": "y"}]}]})}
+STEINBERG_INACTIVE = {ACTIVATION_DAT: json.dumps({"ProductPackages": []})}
+AM_WITHOUT_DATA = {f"{PREFIX}/drive_c/Program Files/Steinberg/Activation Manager/x.exe": ""}
+PROJECTS = {f"{PREFIX}/drive_c/users/me/Documents/Mine/Song {i}.dorico": "" for i in range(12)}
+PROJECTS_SKIPPED = {
+    f"{PREFIX}/drive_c/users/me/AppData/Roaming/Steinberg/Dorico 6/AutoSave/a.dorico": "",
+    f"{PREFIX}/drive_c/Program Files/Steinberg/Dorico 6/Tutorials/t.dorico": "",
+    f"{PREFIX}/drive_c/users/Public/Documents/Dorico Example Projects/e.dorico": "",
+    f"{PREFIX}/drive_c/users/me/Temp/Upper.DORICO": "",
+}
+CONFIRM_ALL = "y\ny\nyes, permanently delete everything\n"
+LEFTOVERS = {
+    ".local/bin/torquio-dorico": "", ".local/bin/torquio-sam": "", ".local/bin/torquio_graphics.py": "",
+    ".local/bin/unrelated-tool": "",
+    ".local/share/applications/Dorico.desktop": "", ".local/share/applications/Steinberg Activation Manager.desktop": "",
+    ".local/share/applications/wine-protocol-net-steinberg-sam.desktop": "",
+    ".local/share/applications/wine-extension-dorico.desktop": "",
+    ".local/share/applications/wine-extension-txt.desktop": "Exec=env WINEPREFIX=<HOME>/.local/share/torquio/prefix wine start\n",
+    ".local/share/applications/wine-extension-other.desktop": "Exec=env WINEPREFIX=/elsewhere wine start\n",
+    ".local/share/mime/packages/x-wine-extension-txt.xml": "", ".local/share/mime/packages/x-wine-extension-other.xml": "",
+    ".local/share/mime/packages/application-x-dorico.xml": "", ".local/share/mime/dorico/x.xml": "",
+    ".local/share/applications/wine/Programs/Steinberg/Dorico 6.desktop": "Path=<HOME>/.local/share/torquio/prefix/drive_c\n",
+    ".local/share/applications/wine/Programs/Other/Notepad.desktop": "Path=/opt/other\n",
+    ".config/menus/applications-merged/wine-Programs-Steinberg-Dorico 6.menu": "<Menu><Filename>wine-Programs-Steinberg-Dorico 6.desktop</Filename><Directory>wine-Programs-Steinberg.directory</Directory></Menu>",
+    ".config/menus/applications-merged/wine-Programs-Other-Notepad.menu": "<Menu><Filename>wine-Programs-Other-Notepad.desktop</Filename><Directory>wine-Programs-Other.directory</Directory></Menu>",
+    ".config/menus/applications-merged/wine-empty.menu": "<Menu></Menu>",
+    ".local/share/desktop-directories/wine-Programs-Steinberg.directory": "",
+    ".local/share/desktop-directories/wine-Programs-Other.directory": "",
+    ".local/share/icons/hicolor/256x256/apps/torquio-dorico.png": "", ".local/share/icons/hicolor/256x256/apps/other.png": "",
+    ".config/mimeapps.list": "[Default Applications]\napplication/x-dorico=Dorico.desktop;\ntext/plain=gedit.desktop\nx-scheme-handler/net-steinberg-sam=Steinberg Activation Manager.desktop\n",
+    "Desktop/Dorico 6.lnk": "", "Desktop/HALion Sonic.lnk": "", "Desktop/Notes.lnk": "",
+    "Desktop/wine-Dorico.desktop": "Exec=env WINEPREFIX=<HOME>/.local/share/torquio/data wine x\n",
+    "Desktop/Firefox.desktop": "Exec=firefox\n",
+}
+GNOME_RESTORE = config(manage_graphics=True, original_scale_factor=0, original_kde_policy="false", original_cosmic_policy="none")
 GNOME_125 = graphics("GNOME", supported=True, connector="eDP-1", width=2560, height=1600, scale=1.25, physical_dpi=189,
                      ideal_xwayland_policy="Framebuffer Upscale (xwayland-scaling-factor=1)", target_wine_dpi=120,
                      target_xwayland_factor=1, rec_formula="Formula: 96 x 1.25 scale")
@@ -318,4 +357,31 @@ SCENARIOS = [
     {"name": "wine-tools-gpu-chooser-none", "input": "8\n13\n2\n\n4\n14\n12\n", "files": INSTALLED_FULL,
      "compare_files": [CONFIG], "env": {**CONTAINER, "FAKE_CONTAINER_NVIDIA": "yes"}},
     {"name": "refresh-launchers-menu", "input": "5\n\n12\n", "files": INSTALLED_FULL, "env": CONTAINER},
+
+    # Uninstall (stage 4)
+    {"name": "uninstall-steinberg-active-cancel", "args": ["--uninstall"], "input": "no\n",
+     "files": {**INSTALLED, **STEINBERG_ACTIVE}},
+    {"name": "uninstall-steinberg-and-cantai-active-override", "args": ["--uninstall"],
+     "input": "yes, I'm aware my license is active and deleting it will prevent me from ever deactivating it. proceed anyways\nn\n",
+     "files": {**INSTALLED, **STEINBERG_ACTIVE, **CANTAI_ACTIVE}},
+    {"name": "uninstall-cantai-active-unknown-steinberg", "args": ["--uninstall"], "input": "\n",
+     "files": {**INSTALLED, **AM_WITHOUT_DATA, **CANTAI_ACTIVE}},
+    {"name": "uninstall-unknown-override", "args": ["--uninstall"],
+     "input": "no, I promise, I've deactivated my license\nn\n", "files": {**INSTALLED, **AM_WITHOUT_DATA}},
+    {"name": "uninstall-unreadable-activation", "args": ["--uninstall"], "input": "x\n",
+     "files": {**INSTALLED, ACTIVATION_DAT: "{broken"}},
+    {"name": "uninstall-projects-cancel", "args": ["--uninstall"], "input": "y\nno\n",
+     "files": {**INSTALLED, **STEINBERG_INACTIVE, **PROJECTS, **PROJECTS_SKIPPED}},
+    {"name": "uninstall-final-confirmation-wrong", "args": ["--uninstall"], "input": "y\ny\nyes\n",
+     "files": {**INSTALLED, **STEINBERG_INACTIVE}},
+    {"name": "uninstall-eof", "args": ["--uninstall"], "input": "y\n\x04", "files": dict(INSTALLED)},
+    {"name": "uninstall-everything", "args": ["--uninstall"], "input": CONFIRM_ALL,
+     "files": {**INSTALLED_FULL, **LEFTOVERS, **config(ai_gpu="auto")}, "compare_files": [".config/mimeapps.list"],
+     "env": {**CONTAINER, "FAKE_IMAGES": f"{OLD_PREBUILT}\\nlocalhost/torquio-env:gpu-20260101000000\\nlocalhost/other:1\\n"}},
+    {"name": "uninstall-with-projects-and-restore", "args": ["--uninstall"],
+     "input": "y\nyes, I've saved my projects elsewhere or I'm ok with losing them\nyes, permanently delete everything\n\nn\n\n",
+     "files": {**INSTALLED, **PROJECTS, **GNOME_RESTORE, COSMIC_FILE: "fractional\n"},
+     "env": {**CONTAINER, "FAKE_XWAYLAND_FACTOR": "uint32 1", "FAKE_KDE_POLICY": "true"}},
+    {"name": "uninstall-from-menu-cancel", "input": "2\nn\n\n12\n", "files": dict(INSTALLED), "env": CONTAINER},
+    {"name": "uninstall-from-menu", "input": f"2\n{CONFIRM_ALL}7\n", "files": dict(INSTALLED_FULL), "env": CONTAINER},
 ]

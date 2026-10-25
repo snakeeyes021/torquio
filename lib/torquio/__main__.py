@@ -162,6 +162,11 @@ def _update_torquio(*args):
     return update.update_torquio(menu=_flag(args, "--menu"))
 
 
+def _uninstall():
+    from .cli import uninstall
+    return uninstall.main()
+
+
 def _export_logs():
     from .cli import tools
     tools.export_logs()
@@ -198,6 +203,7 @@ COMMANDS = {
     "manage-wine": (_manage_wine, 0, 0),
     "post-update": (_post_update, 0, 1),
     "update-torquio": (_update_torquio, 0, 9),
+    "uninstall": (_uninstall, 0, 9),
     "unknown-argument": (_unknown_argument, 1, 0),
 }
 
