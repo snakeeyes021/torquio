@@ -9,6 +9,8 @@
     fakes          {program: sh script body} replacing a program for this scenario
     repo_files     {path in the repo: contents} swapped in for this scenario (both copies)
     piped          True: input comes from a pipe, not the terminal (catches input read ahead and lost)
+    git_setup      shell commands run in both repo copies first (e.g. an upstream branch with updates);
+                   undone afterwards
 
 The fake container (harness.py) is set up by environment variables:
     FAKE_CONTAINER        its name in `distrobox list` (unset: there is no container)
@@ -22,6 +24,16 @@ The fake container (harness.py) is set up by environment variables:
     FAKE_NTSYNC_MODULE    "yes": `modinfo ntsync` succeeds
     FAKE_MUTTER_WAYLAND   "yes": `gsettings list-schemas` lists org.gnome.mutter.wayland
     FAKE_PICKED           what the zenity/kdialog file and folder pickers return (unset: cancelled)
+    FAKE_CONTAINER_NVIDIA "yes": the container has the NVIDIA libraries
+    FAKE_VULKANINFO       `vulkaninfo --summary` output in the container (printf %b)
+    FAKE_IMAGE_PRESENT    "yes": the prebuilt image is already downloaded
+    FAKE_IMAGES           `podman images` output (printf %b)
+    FAKE_PULL_RC, FAKE_COMMIT_RC, FAKE_CREATE_RC, FAKE_NEW_WINE_RC, FAKE_BUILD_RC
+                          exit codes of image download, snapshot, container creation, the new container's
+                          Wine check and the engine build (default 0)
+    FAKE_XEV              "yes": xev is installed in the container
+A container machine ID written by the scenario (fix identity, re-created container) is kept in
+~/.fake-machine-id and read back from there.
 
 State-changing calls to the fakes are recorded in ~/.fake-calls and compared.
 """
@@ -64,6 +76,18 @@ MAPPABLE = {"Music/.keep": "", f"{PREFIX}/dosdevices/.keep": ""}
 DORICO_APPDATA = f"{PREFIX}/drive_c/users/me/AppData/Roaming/Steinberg/Dorico 6"
 KEYCOMMANDS = {f"{DORICO_APPDATA}/keycommands_en.json": '{"a": 1}', f"{DORICO_APPDATA}/keycommands_de.json": '{"b": 2}',
                f"{DORICO_APPDATA}/Old/keycommands_old.json": "{}"}
+VKD3D_CURRENT = {f".local/share/torquio/vkd3d-proton/3.0.1/{dll}": "" for dll in ("d3d12.dll", "d3d12core.dll")}
+INSTALLED_FULL = {**INSTALLED, **VKD3D_CURRENT, f"{PREFIX}/system.reg": "WINE REGISTRY Version 2\n"}
+VULKANINFO_TWO = ("GPU0:\\n\\tdeviceType         = PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU\\n\\tdeviceName         = Intel(R) Graphics\\n"
+                  "GPU1:\\n\\tdeviceType         = PHYSICAL_DEVICE_TYPE_DISCRETE_GPU\\n\\tdeviceName         = NVIDIA RTX 4060\\n"
+                  "GPU2:\\n\\tdeviceType         = PHYSICAL_DEVICE_TYPE_CPU\\n\\tdeviceName         = llvmpipe\\n")
+OLD_PREBUILT = "ghcr.io/snakeeyes021/torquio-env:build-000000000000"
+CANTAI_ACTIVE = {f"{PREFIX}/drive_c/users/me/AppData/Roaming/Cantai/Cantai.settings": '<VALUE name="activationToken" val="tok"/>'}
+GIT = "git -c user.name=parity -c user.email=parity@localhost"
+UPSTREAM_AHEAD = (f"git checkout -q -b parity-upstream; {GIT} commit -q --allow-empty -m 'Faster key commands'; "
+                  f"{GIT} commit -q --allow-empty -m 'Fix for KDE scaling'; git checkout -q -B parity-local HEAD~2; "
+                  "git branch -q -u parity-upstream")
+UPSTREAM_SAME = "git checkout -q -b parity-upstream; git checkout -q -b parity-local; git branch -q -u parity-upstream"
 GNOME_125 = graphics("GNOME", supported=True, connector="eDP-1", width=2560, height=1600, scale=1.25, physical_dpi=189,
                      ideal_xwayland_policy="Framebuffer Upscale (xwayland-scaling-factor=1)", target_wine_dpi=120,
                      target_xwayland_factor=1, rec_formula="Formula: 96 x 1.25 scale")
@@ -223,4 +247,75 @@ SCENARIOS = [
     {"name": "piped-graphics-menu", "input": "4\n3\n3\n5\n12\n", "piped": True, "repo_files": GNOME_125,
      "files": dict(INSTALLED), "env": CONTAINER},
     {"name": "piped-menu-settings-not-installed", "input": "6\n1\n2\n7\n", "piped": True, "compare_files": [CONFIG]},
+
+    # Update Torquio and what runs after it (stage 3)
+    {"name": "update-no-upstream", "args": ["--update"]},
+    {"name": "update-up-to-date", "args": ["--update"], "git_setup": UPSTREAM_SAME},
+    {"name": "update-local-changes", "args": ["--update"],
+     "git_setup": UPSTREAM_AHEAD + "; echo changed >> README.md"},
+    {"name": "update-cancel", "args": ["--update"], "input": "n\n", "git_setup": UPSTREAM_AHEAD},
+    {"name": "update-install-not-installed", "args": ["--update"], "input": "\n", "git_setup": UPSTREAM_AHEAD},
+    {"name": "update-eof", "args": ["--update"], "input": "\x04", "git_setup": UPSTREAM_AHEAD},
+    {"name": "update-from-menu", "input": "4\n\n\n7\n", "git_setup": UPSTREAM_AHEAD},
+    {"name": "update-from-menu-eof", "input": "4\n\x04", "git_setup": UPSTREAM_AHEAD, "timeout": 30},
+    {"name": "update-install-installed", "args": ["--update"], "input": "y\n", "git_setup": UPSTREAM_AHEAD,
+     "files": INSTALLED_FULL, "env": {**CONTAINER, "FAKE_CONTAINER_NVIDIA": "yes"}},
+    {"name": "post-update-current", "args": ["--post-update", "HEAD"], "files": INSTALLED_FULL,
+     "env": {**CONTAINER, "FAKE_CONTAINER_NVIDIA": "yes"}},
+    {"name": "post-update-menu", "args": ["--post-update", "HEAD", "--menu"], "input": "\n12\n",
+     "files": INSTALLED_FULL, "env": {**CONTAINER, "FAKE_CONTAINER_NVIDIA": "yes"}},
+    {"name": "post-update-engine-changed", "args": ["--post-update", "HEAD~3"], "input": "n\n",
+     "files": INSTALLED_FULL, "env": {**CONTAINER, "FAKE_IMAGE": OLD_PREBUILT, "FAKE_CONTAINER_NVIDIA": "yes"}},
+    {"name": "post-update-download-engine", "args": ["--post-update", "HEAD"], "input": "\n",
+     "files": INSTALLED_FULL,
+     "env": {**CONTAINER, "FAKE_IMAGE": OLD_PREBUILT, "FAKE_CONTAINER_NVIDIA": "yes",
+             "FAKE_IMAGES": f"{OLD_PREBUILT}\\nghcr.io/snakeeyes021/torquio-env:build-111111111111\\ndocker.io/library/ubuntu:24.04\\n"}},
+    {"name": "post-update-new-container-broken", "args": ["--post-update", "HEAD"], "input": "\n",
+     "files": INSTALLED_FULL,
+     "env": {**CONTAINER, "FAKE_IMAGE": OLD_PREBUILT, "FAKE_CONTAINER_NVIDIA": "yes", "FAKE_NEW_WINE_RC": "1"}},
+    {"name": "post-update-image-unavailable", "args": ["--post-update", "HEAD"], "input": "\nn\n",
+     "files": INSTALLED_FULL,
+     "env": {**CONTAINER, "FAKE_IMAGE": OLD_PREBUILT, "FAKE_CONTAINER_NVIDIA": "yes", "FAKE_PULL_RC": "1"}},
+    {"name": "post-update-compiled-engine", "args": ["--post-update", "HEAD"], "input": "y\n",
+     "files": INSTALLED_FULL,
+     "env": {**CONTAINER, "FAKE_IMAGE": "localhost/torquio-env:latest", "FAKE_BUILD_INFO": "",
+             "FAKE_CONTAINER_NVIDIA": "yes"}},
+    {"name": "post-update-identity", "args": ["--post-update", "HEAD"], "input": "y\n", "files": INSTALLED_FULL,
+     "env": {**CONTAINER, "FAKE_MACHINE_ID": "0123456789abcdef0123456789abcdef", "FAKE_CONTAINER_NVIDIA": "yes"}},
+    {"name": "post-update-nvidia", "args": ["--post-update", "HEAD"], "input": "\n", "files": INSTALLED_FULL,
+     "env": CONTAINER},
+    {"name": "post-update-not-installed", "args": ["--post-update", "HEAD"]},
+
+    # Engine, container, identity, GPU (stage 3)
+    {"name": "rebuild-wine", "args": ["--rebuild-wine"], "files": INSTALLED_FULL, "env": CONTAINER},
+    {"name": "rebuild-wine-fails", "args": ["--rebuild-wine"], "files": INSTALLED_FULL,
+     "env": {**CONTAINER, "FAKE_BUILD_RC": "3"}},
+    {"name": "rebuild-wine-no-container", "args": ["--rebuild-wine"]},
+    {"name": "setup-gpu-nvidia-snapshot", "args": ["--setup-gpu"], "input": "\n", "files": INSTALLED_FULL,
+     "env": {**CONTAINER, "FAKE_IMAGE": "localhost/torquio-env:gpu-20260101000000",
+             "FAKE_IMAGES": "localhost/torquio-env:gpu-20260101000000\\n"}},
+    {"name": "setup-gpu-snapshot-fails", "args": ["--setup-gpu"], "input": "y\n", "files": INSTALLED_FULL,
+     "env": {**CONTAINER, "FAKE_IMAGE": "localhost/torquio-env:latest", "FAKE_COMMIT_RC": "1"}},
+    {"name": "setup-gpu-declined", "args": ["--setup-gpu"], "input": "n\n", "files": INSTALLED_FULL, "env": CONTAINER},
+    {"name": "setup-gpu-ready", "args": ["--setup-gpu"], "files": INSTALLED_FULL,
+     "env": {**CONTAINER, "FAKE_CONTAINER_NVIDIA": "yes"}},
+    {"name": "fix-identity-stable", "args": ["--fix-identity"], "env": CONTAINER},
+    {"name": "fix-identity-no-container", "args": ["--fix-identity"]},
+    {"name": "fix-identity-cantai-active", "args": ["--fix-identity"], "files": CANTAI_ACTIVE,
+     "env": {**CONTAINER, "FAKE_MACHINE_ID": "0123456789abcdef0123456789abcdef"}},
+    {"name": "fix-identity-change", "args": ["--fix-identity"], "input": "y\n",
+     "env": {**CONTAINER, "FAKE_MACHINE_ID": "0123456789abcdef0123456789abcdef"}},
+    {"name": "fix-identity-decline", "args": ["--fix-identity"], "input": "\n",
+     "env": {**CONTAINER, "FAKE_MACHINE_ID": "0123456789abcdef0123456789abcdef"}},
+    {"name": "wine-tools-programs", "input": "8\n1\n\n2\n\n3\n\n4\n\n5\n\n6\n\n7\n\n10\n11\n\n14\n12\n",
+     "files": INSTALLED_FULL, "env": CONTAINER},
+    {"name": "wine-tools-xev", "input": "8\n8\nn\n8\n\n\n14\n12\n", "files": INSTALLED_FULL, "env": CONTAINER},
+    {"name": "wine-tools-engine", "input": "8\n12\nn\n\n12\ny\n\n14\n12\n", "files": INSTALLED_FULL,
+     "env": {**CONTAINER, "FAKE_CONTAINER_NVIDIA": "yes"}},
+    {"name": "wine-tools-gpu-chooser", "input": "8\n13\n2\n2\n2\n9\n3\n1\n4\n14\n12\n",
+     "files": INSTALLED_FULL, "compare_files": [CONFIG],
+     "env": {**CONTAINER, "FAKE_CONTAINER_NVIDIA": "yes", "FAKE_VULKANINFO": VULKANINFO_TWO}},
+    {"name": "wine-tools-gpu-chooser-none", "input": "8\n13\n2\n\n4\n14\n12\n", "files": INSTALLED_FULL,
+     "compare_files": [CONFIG], "env": {**CONTAINER, "FAKE_CONTAINER_NVIDIA": "yes"}},
+    {"name": "refresh-launchers-menu", "input": "5\n\n12\n", "files": INSTALLED_FULL, "env": CONTAINER},
 ]

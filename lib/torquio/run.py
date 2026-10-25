@@ -52,3 +52,11 @@ def succeeds(cmd, timeout=None, **kwargs):
 def have(program):
     """`command -v program` for programs on PATH."""
     return shutil.which(program) is not None
+
+
+def check(code, strict):
+    """A command's exit code under the Bash version's set -e: when `strict` (set -e in force), a failure stops
+    Torquio with that code, as it did; otherwise it's just returned."""
+    if code != 0 and strict:
+        raise SystemExit(code)
+    return code

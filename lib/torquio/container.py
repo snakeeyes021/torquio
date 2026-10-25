@@ -52,3 +52,35 @@ def enter(*cmd):
 def enter_bash(script):
     """Run a Bash script inside the container without input; returns its output."""
     return enter("bash", "-c", script)
+
+
+def has_nvidia_host():
+    return os.path.exists("/proc/driver/nvidia/version")
+
+
+def has_nvidia_libraries():
+    """Whether the container has the host's NVIDIA libraries (distrobox --nvidia)."""
+    return run.interactive(["distrobox", "enter", paths.container_name(), "--", "test", "-e",
+                            "/usr/lib/x86_64-linux-gnu/libGLX_nvidia.so.0"], stderr=run.DEVNULL) == 0
+
+
+def vulkan_gpus():
+    """["type|name"] for the GPUs Vulkan sees in the container, without CPU emulations."""
+    out = run.capture(["distrobox", "enter", paths.container_name(), "--", "bash", "-c",
+                       "vulkaninfo --summary 2>/dev/null"], stderr=None, stdin=None)[1]
+    gpus, kind = [], ""
+    for line in out.splitlines():
+        fields = line.split(" = ")
+        if "deviceType" in line:
+            kind = fields[1] if len(fields) > 1 else ""
+        if "deviceName" in line:
+            gpus.append(f"{kind}|{fields[1] if len(fields) > 1 else ''}")
+    return [g for g in gpus if not g.startswith("PHYSICAL_DEVICE_TYPE_CPU")]
+
+
+def pull_image(image):
+    """Download a prebuilt image unless it's already here; True if it's available."""
+    mgr = manager()
+    if run.succeeds([mgr, "image", "inspect", image]):
+        return True
+    return run.interactive([mgr, "pull", image]) == 0

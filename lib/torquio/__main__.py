@@ -116,6 +116,52 @@ def _unknown_argument(arg):
     usage.unknown_argument(arg)
 
 
+def _flag(args, flag):
+    """Whether the Bash caller passed `flag` (e.g. --quiet); other arguments are ignored, as in Bash."""
+    return flag in args
+
+
+def _refresh_launchers(*args):
+    from .cli import update
+    update.refresh_launchers(pause=not _flag(args, "--no-pause"))
+
+
+def _update_wine_engine():
+    from .cli import engine
+    return engine.update_wine_engine()
+
+
+def _rebuild_wine():
+    from .cli import engine
+    return engine.rebuild_wine()
+
+
+def _fix_machine_identity(*args):
+    from .cli import engine
+    return engine.fix_machine_identity(quiet=_flag(args, "--quiet"))
+
+
+def _setup_gpu_access(*args):
+    from .cli import engine
+    return engine.setup_gpu_access(quiet=_flag(args, "--quiet"))
+
+
+def _manage_wine():
+    from .cli import wine_tools
+    wine_tools.manage()
+
+
+def _post_update(old_head=""):
+    from .cli import update
+    return update.post_update(old_head)
+
+
+def _update_torquio(*args):
+    """Exit code 100 (update.UPDATED) tells the Bash caller to exec the updated copy with --post-update."""
+    from .cli import update
+    return update.update_torquio(menu=_flag(args, "--menu"))
+
+
 def _export_logs():
     from .cli import tools
     tools.export_logs()
@@ -144,6 +190,14 @@ COMMANDS = {
     "manage-settings": (_manage_settings, 0, 0),
     "check-for-updates": (_check_for_updates, 0, 0),
     "pending-updates": (_pending_updates, 0, 0),
+    "refresh-launchers": (_refresh_launchers, 0, 9),
+    "update-wine-engine": (_update_wine_engine, 0, 0),
+    "rebuild-wine": (_rebuild_wine, 0, 0),
+    "fix-machine-identity": (_fix_machine_identity, 0, 9),
+    "setup-gpu-access": (_setup_gpu_access, 0, 9),
+    "manage-wine": (_manage_wine, 0, 0),
+    "post-update": (_post_update, 0, 1),
+    "update-torquio": (_update_torquio, 0, 9),
     "unknown-argument": (_unknown_argument, 1, 0),
 }
 

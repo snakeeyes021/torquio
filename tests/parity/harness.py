@@ -36,11 +36,18 @@ list)
     echo "ID           | NAME                 | STATUS             | IMAGE"
     echo "0123456789ab | $FAKE_CONTAINER          | ${FAKE_STATUS-Up 2 hours}         | x"
     exit 0 ;;
+create) exit "${FAKE_CREATE_RC:-0}" ;;
+stop|rm) exit 0 ;;
 enter)
     [ -n "$FAKE_CONTAINER" ] || exit 1
+    [ "$6" = "vulkaninfo --summary 2>/dev/null" ] && { printf '%b' "$FAKE_VULKANINFO"; exit 0; }
     case "$*" in
-    *machine-id*)
-        if [ "$FAKE_MACHINE_ID" = derived ]; then
+    *"sudo tee /var/lib/dbus/machine-id"*)
+        printf '%s' "$6" | sed -n 's/.*echo \([0-9a-f]*\) | sudo tee.*/\1/p' > "$HOME/.fake-machine-id" ;;
+    *"cat /var/lib/dbus/machine-id"*)
+        if [ -f "$HOME/.fake-machine-id" ]; then
+            cat "$HOME/.fake-machine-id"
+        elif [ "$FAKE_MACHINE_ID" = derived ]; then
             printf 'torquio:%s' "$(cat /etc/machine-id)" | sha256sum | cut -c1-32
         else
             printf '%s\n' "$FAKE_MACHINE_ID"
@@ -56,22 +63,33 @@ enter)
             printf '%b' "$FAKE_BUILD_INFO"
         fi ;;
     *vulkaninfo*) printf '%b' "$FAKE_PROBE" ;;
-    esac
-    exit 0 ;;
+    *"test -x"*) exit "${FAKE_NEW_WINE_RC:-0}" ;;
+    *libGLX_nvidia*) [ "$FAKE_CONTAINER_NVIDIA" = yes ] ;;
+    *"command -v xev"*) [ "$FAKE_XEV" = yes ] ;;
+    *"build_wine.sh --rebuild"*) echo "(fake) building Wine"; exit "${FAKE_BUILD_RC:-0}" ;;
+    *extract_icons.sh*|*setup_prefix.sh*|*container_gpu_setup.sh*) echo "(fake) ran ${6##*./}" ;;
+    *) exit 0 ;;
+    esac ;;
+*) exit 1 ;;
 esac
-exit 1
 """
 FAKE_PODMAN = r"""
 repo="${TORQUIO_INSTALLERS_DIR%/installers}"
-if [ "$1 $2" = "container inspect" ] && [ -n "$FAKE_CONTAINER" ]; then
+case "$1 $2" in
+"container inspect")
+    [ -n "$FAKE_CONTAINER" ] || exit 125
     if [ "$FAKE_IMAGE" = current ]; then
         echo "ghcr.io/snakeeyes021/torquio-env:build-$(git -C "$repo" rev-parse HEAD:scripts/1-build | cut -c1-12)"
     else
         printf '%s\n' "$FAKE_IMAGE"
-    fi
-    exit 0
-fi
-exit 125
+    fi ;;
+"image inspect") [ "$FAKE_IMAGE_PRESENT" = yes ] ;;
+"images "*) printf '%b' "$FAKE_IMAGES" ;;
+"pull "*) echo "(fake) pulling $2"; exit "${FAKE_PULL_RC:-0}" ;;
+"commit "*) exit "${FAKE_COMMIT_RC:-0}" ;;
+"rename "*|"rmi "*) exit 0 ;;
+*) exit 125 ;;
+esac
 """
 
 FAKES = {
@@ -94,6 +112,7 @@ FAKE_FAILING = ["sudo", "pkexec", "docker", "gsettings", "dconf", "kwriteconfig5
 MASKS = [
     (re.compile(r"\b\w{3} \w{3} [ \d]\d \d\d:\d\d:\d\d [A-Z]+ \d{4}\b"), "<DATE>"),  # date
     (re.compile(r"\d{4}-\d\d-\d\d[_ ]\d\d[-:]\d\d[-:]\d\d"), "<STAMP>"),
+    (re.compile(r"\b20\d{12}\b"), "<STAMP>"),  # date +%Y%m%d%H%M%S (container snapshots)
 ]
 
 
@@ -118,6 +137,7 @@ def make_copy(repo, ref, dest, with_working_tree=False):
         if git("status", "--porcelain", cwd=dest):
             git("-c", "user.name=parity", "-c", "user.email=parity@localhost", "commit", "-q", "-m",
                 "working tree", cwd=dest)
+    git("update-ref", "refs/parity/base", "HEAD", cwd=dest)  # what GIT_TEARDOWN returns to
 
 
 # Every call to a fake except these read-only ones is recorded in ~/.fake-calls, which is compared too: the
@@ -156,6 +176,13 @@ def environment(home, bindir, extra=None):
     return env
 
 
+# Undoes a scenario's git_setup: back to the detached commit the copy was made at, scenario branches deleted
+GIT_TEARDOWN = r"""
+git checkout -q -f --detach "$(git rev-parse --verify -q refs/parity/base)"
+git for-each-ref --format='%(refname:short)' refs/heads/ | xargs -r git branch -q -D
+"""
+
+
 def overlay(repo_copy, files):
     """Replace files in the repo copy for one scenario; returns what to put back."""
     originals = {}
@@ -185,18 +212,20 @@ def run_in_pty(cmd, env, cwd, stdin_text, timeout=120, piped=False):
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
     proc = subprocess.Popen(cmd, env=env, cwd=cwd, stdin=subprocess.PIPE if piped else slave, stdout=slave,
                             stderr=slave, start_new_session=True)
-    os.close(slave)
     if piped:
         proc.stdin.write(stdin_text.encode())
         proc.stdin.close()
     elif stdin_text:
         os.write(master, stdin_text.encode())
-    out, deadline, killed = bytearray(), time.monotonic() + timeout, False
+    # Our end of the terminal stays open until the program has exited and its output has gone quiet (the
+    # session log's tee finishes after Bash exits): Linux may drop unread output once the last writer closes.
+    out, deadline, killed, quiet_since = bytearray(), time.monotonic() + timeout, False, None
+    slave_open = True
     while True:
         if time.monotonic() > deadline and not killed:
             os.killpg(proc.pid, signal.SIGKILL)
             killed = True
-        ready, _, _ = select.select([master], [], [], 0.5)
+        ready, _, _ = select.select([master], [], [], 0.1)
         if ready:
             try:
                 data = os.read(master, 65536)
@@ -205,8 +234,18 @@ def run_in_pty(cmd, env, cwd, stdin_text, timeout=120, piped=False):
             if not data:
                 break
             out += data
-        elif proc.poll() is not None and killed:
-            break
+            quiet_since = None
+            continue
+        if proc.poll() is None:
+            continue
+        quiet_since = quiet_since or time.monotonic()
+        if slave_open and time.monotonic() - quiet_since > 0.5:
+            os.close(slave)
+            slave_open = False
+        elif not slave_open and time.monotonic() - quiet_since > 5:
+            break  # something still holds the terminal (e.g. a background process); stop waiting
+    if slave_open:
+        os.close(slave)
     os.close(master)
     code = proc.wait()
     return out.decode("utf-8", "replace").replace("\r\n", "\n"), (-9 if killed else code)
@@ -246,7 +285,8 @@ def snapshot(home, compare_files, replacements):
                 contents[rel] = mask(f.read(), replacements)
         except OSError:
             contents[rel] = None
-    return sorted(names), contents
+    # A set: two sessions in the same second share a log file name, so their number depends on timing
+    return sorted(set(names)), contents
 
 
 def run_scenario(scenario, repo_copy, workdir):
@@ -270,10 +310,14 @@ def run_scenario(scenario, repo_copy, workdir):
     if shutil.which("unshare"):
         cmd = ["unshare", "--map-current-user", "--net", "--", *cmd]
     originals = overlay(repo_copy, scenario.get("repo_files", {}))
+    if scenario.get("git_setup"):
+        subprocess.run(["bash", "-ec", scenario["git_setup"]], cwd=repo_copy, check=True, capture_output=True)
     try:
         output, code = run_in_pty(cmd, env, home, scenario.get("input", ""), scenario.get("timeout", 120),
                                   scenario.get("piped", False))
     finally:
+        if scenario.get("git_setup"):
+            subprocess.run(["bash", "-c", GIT_TEARDOWN], cwd=repo_copy, capture_output=True)
         restore(repo_copy, originals)
     replacements = [(repo_copy, "<REPO>"), (home, "<HOME>"), (workdir, "<TMP>")]
     names, contents = snapshot(home, scenario.get("compare_files", []) + [".fake-calls"], replacements)
