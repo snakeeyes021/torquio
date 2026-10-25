@@ -103,3 +103,18 @@ Destructive: use a VM or a system where you're ready to reinstall (stage 5's tes
 - [ ] With Automated Mode on before uninstalling: it offers to restore the desktop's XWayland setting (with
       blue rules around the explanation now), and restores it.
 - [ ] Uninstall from the main menu, cancelled: "Press [Enter] to return to the main menu..." and the menu again.
+
+## Stage 5: install
+
+- [ ] Fresh install in a VM (Fedora Workstation and/or Silverblue; KDE too if possible), with the MediaBay and
+      Download Assistant installers in ~/Downloads: the wizard's four steps, the manifest, the prebuilt engine
+      download, then the Download Assistant opens. Install Dorico through it; the menu entry, icons and
+      `.dorico` file association appear; Dorico starts.
+- [ ] The wizard's folder mapping (drive and Desktop shortcut) and key command import (from a backup made in
+      stage 2) take effect after the install.
+- [ ] With Cantai's installer in ~/Downloads: Cantai is installed and its playback template appears in Dorico.
+- [ ] Re-running the installer on a complete install: each option of the "existing installation" menu
+      (Configure Settings Only; Re-run Windows Software Installers; Recreate Distrobox Container Only — Cantai
+      stays activated; Fresh Reinstallation — goes through the uninstaller's guards; Cancel).
+- [ ] `torquio -i -y` (automatic install with default settings).
+- [ ] Without the mandatory installers: the error names the missing ones and nothing is changed.
