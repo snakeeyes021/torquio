@@ -147,8 +147,8 @@ released after the last stage; develop stays usable throughout.
 |---|---|---|---|
 | 0 | Foundation | `lib/torquio/` skeleton, `paths`, `config` (replaces the Python one-liners in `common.sh`), `ui`, `run`; the manifest, log export and license checks move into the package (their old paths had only internal callers, so they're removed rather than wrapped; `torquio_graphics.py` stays until stage 6, because the launchers in `~/.local/bin` use a copy of it); Python version check; unit-test and parity harness, CI workflow | unit tests; parity of everything (nothing visible changes) |
 | 1 | Read-only | dashboard (`show_status`), graphics diagnostics, header, help text, manifest | parity (dashboard on installed / not installed / no container) |
-| 2 | Maintenance | Wine Tools menu and actions, GPU (setup, chooser, Vulkan list), ntsync, key commands, folder mappings, run custom exe, Settings, update check | parity of menus; real: GPU chooser, mappings, key command export/import |
-| 3 | Engine and container | `replace_container`, engine update/rebuild, `engine_outdated`, identity, self-update and `--post-update` | unit tests; real: update from v0.5.0 (handover), engine swap and back, NVIDIA conversion, Cantai stays activated |
+| 2 | Maintenance | Configure Graphics (and applying graphics settings), ntsync, key commands, folder mappings, run custom exe, prefix settings, Settings, update check, log export screen | parity of menus and of the commands sent to the container and desktop; real: mappings, key command export/import |
+| 3 | Engine and container | `replace_container`, engine update/rebuild, `engine_outdated`, identity, GPU (setup, chooser, Vulkan list; they re-create the container), the Wine Tools menu (it calls all of these), self-update and `--post-update` | unit tests; real: update from v0.5.0 (handover), engine swap and back, NVIDIA conversion, Cantai stays activated |
 | 4 | Uninstall | `cleanup.sh` (guards, project check, leftovers, display-scaling restore) | parity of guards with fixtures; real: uninstall, then sweep for leftovers |
 | 5 | Install | `install.sh` and the host-side `install_*.sh`, launcher/icon installation | real: install from scratch (prebuilt and compile-from-source paths), repair, recreate container |
 | 6 | Launchers | `torquio-dorico`, `torquio-sam`, `torquio-sda-handler`, graphics automation; runner template | real: launch Dorico on GNOME (and KDE if available), scaling, web logins (SAM, SDA), opening .dorico files |
@@ -161,14 +161,29 @@ released after the last stage; develop stays usable throughout.
 | Interactive programs (winetricks output, `sudo` prompts, distrobox's first-start setup, podman's download progress) don't reach the terminal as before | `run.py` has one helper for interactive commands (inherits the terminal) and one for captured output, chosen deliberately per call; parity and real tests cover each install/update flow |
 | The session log mirror behaves differently | `session_log.py` reproduces today's redirection exactly: stdout and stderr go through a `tee -i` child into the log, so child programs see the same pipe they see today |
 | Ctrl+C prints a Python traceback | one handler in `cli/`: prints what the Bash version prints (or nothing) and exits with the same code |
-| Prompt behaviour at end of input (scripts, pipes) differs | `ui.py` prompt helpers mirror `read -p` (empty answer on end of input, defaults applied the same way); covered by the parity harness's scripted input |
+| Prompt behaviour at end of input (scripts, pipes) differs | `ui.ask` mirrors `read -p`: at end of input it stops Torquio with exit code 1 where `set -e` did (no `|| true`, not called from an `if`), and returns the partial answer elsewhere; covered by scenarios that end input early |
+| Python reads ahead and swallows input meant for the Bash code after it (found in stage 2: piped input lost the main menu's next answer) | `ui.read` reads stdin a byte at a time, as Bash's `read` does; scenarios with piped input |
 | Background container commands swallow keyboard input meant for a prompt | `run.py` gives non-interactive commands no input (`stdin=DEVNULL`) by default |
 | The update handover breaks for people updating from v0.4.0/v0.5.0 | stage 3 tests a real update from v0.5.0; `--post-update` keeps working forever |
 | Installed launchers can't find the package | stubs with the repo path filled in at install time (as `torquio-sda-handler` does today); tested in stage 6 with a fresh install and an update |
 | Mixed Bash/Python period adds moving parts | Bash only calls into Python through `torquio_py <command>` in `common.sh` (one place); each stage merged only when fully tested |
 | Host Python older than 3.9 | checked at startup (in the Bash entry point while it exists, then in the Python one, written so it still parses on old Pythons) with a clear message, e.g. "Torquio needs Python 3.9 or newer (yours is 3.6); install a newer python3 package." Affects openSUSE Leap 15 and RHEL 8 (default `python3` is 3.6); today nothing checks |
 
-## 10. Conventions
+## 10. Deliberate differences so far
+
+Fixed or changed on purpose, each in its own commit (everything else is meant to be identical):
+
+- Log export: the settings are read from `~/.config/torquio/config.json`, where Torquio writes them (it looked
+  under `$XDG_CONFIG_HOME`).
+- Configure Graphics: the Wayland-only error and the "back up your current desktop scaling settings" lines
+  have their intended colours; a folder already mapped to a drive letter no longer shows a stray `033[0m`.
+- Edge cases where Bash printed its own error (`[: : integer expression expected`, e.g. graphics data without
+  `target_xwayland_factor`) now just take the same branch silently.
+- Key command export after mapping a Desktop folder in the same session: Bash had sourced `user-dirs.dirs`
+  by then, so a localised Downloads folder could be used; it now always uses `$XDG_DOWNLOAD_DIR` or
+  `~/Downloads`, as the code intends.
+
+## 11. Conventions
 
 - PEP 8, readable names, docstrings and comments in the style of the existing Python scripts (say why, not
   what); type hints where they help.
