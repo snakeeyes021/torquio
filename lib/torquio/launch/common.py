@@ -51,17 +51,6 @@ def question(text, title, width=None):
     return None
 
 
-def kde_policy_strict():
-    """graphics.kde_xwayland_policy(), stopping like the Bash launcher (set -e) when kreadconfig fails."""
-    tool = graphics.kde_tool("read")
-    for key in ("XwaylandClientsScale", "XwaylandClientScale"):
-        code, out = run.capture([tool, "--file", "kdeglobals", "--group", "KScreen", "--key", key])
-        run.check(code, True)
-        if out.rstrip("\n"):
-            return out.rstrip("\n")
-    return ""
-
-
 def manage_graphics(restartable):
     """Before a launch, in Automated Mode: bring the Wine DPI and the desktop's XWayland policy in line with the
     current monitor. `restartable`: Wine may be restarted to apply a change (not when opening a file or a
@@ -71,8 +60,7 @@ def manage_graphics(restartable):
     code, data = graphics.query_status(show_errors=True)
     run.check(code, True)
     if not graphics.supported(data):
-        # As in Bash, where SUPPORTED=$(... | grep ...) failing stopped the launcher (set -e)
-        raise SystemExit(1)
+        return
     de = graphics.field(data, "de", "string")
     target_dpi = graphics.field(data, "target_wine_dpi", "int")
     target_factor = graphics.field(data, "target_xwayland_factor", "int")
@@ -93,12 +81,9 @@ def manage_graphics(restartable):
             desired = current
         host_change = bool(desired) and current != desired
     elif de == "KDE":
-        current = kde_policy_strict() or "true"
+        current = graphics.kde_xwayland_policy() or "true"
         host_change = current != "true"
     elif de == "COSMIC":
-        # As in Bash, where CURRENT_POLICY=$(cat ...) failing stopped the launcher (set -e)
-        if not os.path.isfile(graphics.cosmic_policy_file()):
-            raise SystemExit(1)
         current = graphics.cosmic_xwayland_policy()
         desired = current if graphics.unscaled(scale) else "fractional"
         host_change = current != desired
