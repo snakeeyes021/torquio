@@ -6,9 +6,21 @@ This document is the single source of truth for all tasks, bugs, and enhancement
 This section tracks epics that have been broken down into concrete, actionable subtasks.
 
 *   [ ] **Release plan:**
-    *   [ ] **v0.5.0:** Plug-in window icons, version manifest generation and the prebuilt container image (all done).
-    *   [ ] **v0.6.0:** Refactor in Python.
+    *   [x] **v0.5.0:** Plug-in window icons, version manifest generation and the prebuilt container image (released 2026-10-24).
+    *   [ ] **v0.6.0:** Refactor in Python (epic below).
     *   [ ] **v0.7.0:** Flatpak GUI app on Flathub.
+
+### Epic: Torquio in Python (v0.6.0)
+Rewrite the host-side Bash in standard-library Python (3.9+) with no user-visible change, as a core library plus a thin CLI that the v0.7.0 GUI can reuse. The full plan (layout, contracts that must never break, parity testing, risks) is in `docs/REFACTOR.md`. Each stage is its own branch, tested for parity and merged to develop on its own; the Bash `torquio` stays the entry point until stage 7.
+
+*   [ ] **Stage 0, foundation:** `lib/torquio/` skeleton with `paths`, `config` (replacing the Python one-liners in `common.sh`), `ui` and `run`; the three existing Python scripts moved into the package (old paths kept as wrappers); Python version check; unit-test and parity harness; CI workflow.
+*   [ ] **Stage 1, read-only screens:** dashboard, graphics diagnostics, header, help text, manifest.
+*   [ ] **Stage 2, maintenance:** Wine Tools menu and actions, GPU setup and chooser, ntsync, key commands, folder mappings, custom exe, Settings, update check.
+*   [ ] **Stage 3, engine and container:** `replace_container`, engine update/rebuild, `engine_outdated`, machine identity, self-update and `--post-update`.
+*   [ ] **Stage 4, uninstall:** `cleanup.sh`.
+*   [ ] **Stage 5, install:** `install.sh` and the host-side `install_*.sh` helpers, launcher and icon installation.
+*   [ ] **Stage 6, launchers:** `torquio-dorico`, `torquio-sam`, `torquio-sda-handler`, graphics automation; the Dorico runner as a template file.
+*   [ ] **Stage 7, entry point:** menu loop and flag parsing; `torquio` becomes a small Python entry point; dead Bash removed; docs updated. Full regression pass, then release v0.6.0.
 
 
 ## Undefined Work (Backlog)
@@ -28,7 +40,6 @@ This section tracks high-level goals and ideas that have not yet been broken dow
     *   [ ] **Automate MediaBay Update:** Currently stubbed. On a fresh install the SDA downloads the latest MediaBay (1.4.10 as of 2026-10-22) and runs it through the Steinberg Install Assistant, which fails with error 231: `preinstall.ps1: not trusted` (Setup.exe verifies the script's Authenticode signature, which Wine can't verify for PowerShell scripts). The SDA then opens Steinberg's "component update error" page, and the older MediaBay from the user's zip stays installed. The script only stops a running MediaBay server before an update; deleting it (as `install_mediabay.sh` does) is safe, and Setup.exe also installs `LibraryManager.msi` and registers bundled content, so keep using Setup.exe rather than `MediaBay.msi`. A watcher can't fix the SDA's own attempt: it installs straight from inside the downloaded zip ~0.1 s after the download completes. Plan: install the latest MediaBay before the SDA first runs, so it never attempts the update. Blocked on finding a stable public download URL (Steinberg's download pages were offline at the time).
 *   [ ] **Automated 1st-Party Downloads:** Investigate and implement automated download fallbacks for 1st-party Steinberg components (SDA, MediaBay) if they are missing from the `installers/` directory. A stable public MediaBay URL would also unblock "Automate MediaBay Update" above.
 *   [ ] **Reverse engineer the download assistant:** Create a Torquio download assistant that performs essentially the same functions as the Steinberg Download Assistant. This would require a bit of work keeping up with updates manually for the developers, but it would allow Torquio to install all Dorico components WITHOUT requiring the user sign in to the download assistant. We can include the download assistant in the install, and any installs we do perform, it would be nice if they were backwards-compatible/detected by the SDA so that the SDA could update them if the user chose. Essentially, a drop-in fully cross-compatible alternative whose sole function is to not require the user to have to sign in to a download app (meaning, the entire install process can run start to finish without any user intervention. They install grab Torquio, hit "install everything," and when it's done 15-30 minutes later, it's just ready to be used; activate your license using the activation manager and you're off to the races).
-*   [ ] **Refactor in python:** For better legibility and maintainability.
 *   [ ] **Create Flatpak GUI app:** Create graphical frontend for Torquio, distribute via Flathub.
 *   [ ] **Eventually switch to Wine Wayland driver:** Once it is no longer buggy and has client side decorations implemented for GNOME. This makes moot a number of currently implemented workarounds/QOL features.
 *   [ ] **Pre-install distrobox's base packages in the image (low priority):** The first start of every new container spends about a minute in distrobox's "Installing basic packages..." (`apt-get update` plus ~50 packages: sudo, locales, bash-completion, man-db, xauth, ...; see `setup_apt` in `distrobox-init`). Installing that list in the Containerfile would make it nearly instant. Changes the build files, so it ships with the next engine image.

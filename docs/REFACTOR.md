@@ -1,6 +1,6 @@
 # Plan: Torquio in Python (v0.6.0)
 
-Status: **proposal, for review**. Once approved, this moves into `BACKLOG.md` ("Defined Work") as the v0.6.0 epic.
+Status: **approved** (2026-10-24). Tracked as the v0.6.0 epic in `BACKLOG.md` ("Defined Work").
 
 ## 1. Goal
 
@@ -16,7 +16,7 @@ a faithful translation).
 
 ## 2. Why Python (summary of the decision)
 
-- Legibility: the maintainers read Python, not Bash.
+- Legibility: Python is the language the maintainers (and most contributors) read most comfortably.
 - Fewer classes of bugs. The v0.5.0 work hit several Bash-specific ones: a helper's non-zero return under
   `set -e` silently aborting the dashboard, a background `distrobox enter` swallowing a prompt's input,
   `pkill -f` matching its own shell, nested quoting in the generated Dorico runner, word splitting on paths
@@ -30,9 +30,13 @@ a faithful translation).
 
 1. **Identical behaviour.** Output text, colours, prompts, defaults, exit codes, files written and their
    locations stay the same. Deviations only as separate, listed bug fixes.
-2. **Standard library only, Python 3.10+.** A `git clone` keeps working with nothing to install. (3.10 is the
-   oldest Python on any distro Torquio targets: Ubuntu 22.04. No `tomllib`, `ExceptionGroup`, `typing.Self`
-   or other 3.11+ features.)
+2. **Standard library only, Python 3.9+.** A `git clone` keeps working with nothing to install. Ubuntu 22.04
+   and its family (Mint 21, Pop!_OS 22.04, Zorin 17, elementary 7) ship 3.10, the oldest of the maintained
+   desktop distros; 3.9 also covers RHEL 9 and its rebuilds (AlmaLinux, Rocky), maintained until 2032. So no
+   `match` statements, no `X | Y` unions evaluated at runtime (fine in annotations with
+   `from __future__ import annotations`), no parenthesised multi-item `with`, `zip(strict=)`,
+   `itertools.pairwise`, dataclass `slots=`/`kw_only=`, and none of 3.11+ (`tomllib`, `ExceptionGroup`,
+   `typing.Self`). CI runs the unit tests on 3.9 to catch slips.
 3. **Staged, never half-broken.** The Bash `torquio` stays the entry point while its functions are moved, one
    group per stage, into Python (the Bash function body becomes a call into Python). Every stage leaves
    Torquio fully working and is merged to develop on its own. The entry point and menu move last.
@@ -129,8 +133,8 @@ Dorico / Activation Manager / Download Assistant (including web logins), folder 
 check, prebuilt tag, license and project detection, mimeapps and Wine-leftover cleanup, config handling,
 registry and PE version parsing, manifest output, update-notice throttling.
 
-**CI:** a small GitHub Actions workflow runs the unit tests (and ShellCheck on the remaining Bash) on every
-push. It doesn't build the engine image and takes seconds.
+**CI:** a small GitHub Actions workflow runs the unit tests on Python 3.9 and the newest 3.x (and ShellCheck on
+the remaining Bash) on every push. It doesn't build the engine image and takes seconds.
 
 ## 8. Stages
 
@@ -160,7 +164,7 @@ released after the last stage; develop stays usable throughout.
 | The update handover breaks for people updating from v0.4.0/v0.5.0 | stage 3 tests a real update from v0.5.0; `--post-update` keeps working forever |
 | Installed launchers can't find the package | stubs with the repo path filled in at install time (as `torquio-sda-handler` does today); tested in stage 6 with a fresh install and an update |
 | Mixed Bash/Python period adds moving parts | Bash only calls into Python through `python3 -m torquio <command>` (one place); each stage merged only when fully tested |
-| Host Python older than 3.10 | checked at startup with a clear message (today nothing checks; Ubuntu 22.04's 3.10 is the oldest Python on the distros Torquio targets) |
+| Host Python older than 3.9 | checked at startup (in the Bash entry point while it exists, then in the Python one, written so it still parses on old Pythons) with a clear message, e.g. "Torquio needs Python 3.9 or newer (yours is 3.6); install a newer python3 package." Affects openSUSE Leap 15 and RHEL 8 (default `python3` is 3.6); today nothing checks |
 
 ## 10. Conventions
 
