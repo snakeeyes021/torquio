@@ -34,7 +34,8 @@ If you've contributed to open-source before, this will feel very familiar.
 Torquio relies on containerizing Windows apps without messing up your host system (making it, hopefully, universally compatible, including on immutable distros like Bazzite and the rest of the Fedora Atomic family). Here are a few practical rules of thumb to keep in mind while you code:
 
 * **Keep it in the box:** Torquio uses Distrobox to keep Wine completely contained. Avoid writing scripts that install Wine packages or Windows dependencies directly onto the user's host OS.
-* **Use dynamic paths:** We have standard, XDG-compliant path variables defined in `scripts/common.sh` (like `TORQUIO_PREFIX_DIR`). Source that file and use those variables so your code works on everyone's machine.
+* **Use dynamic paths:** We have standard, XDG-compliant path variables defined in `scripts/common.sh` (like `TORQUIO_PREFIX_DIR`), and the same locations in Python in `lib/torquio/paths.py`. Use those so your code works on everyone's machine.
+* **Python:** Torquio's Bash is being ported to Python (`docs/REFACTOR.md`). Python code goes in `lib/torquio/`, uses only the standard library and must run on Python 3.9.
 * **Mind the host integration:** We intentionally disabled Wine's automatic desktop integration. This means if you need to add an icon or a `.desktop` file, you'll need to manually craft it in the `desktop_stubs/` directory and ensure the installer script copies it over.
 
 ## Testing Your Changes
@@ -42,6 +43,11 @@ Torquio relies on containerizing Windows apps without messing up your host syste
 Since Torquio interacts heavily with the GUI (icons, file associations, desktop launchers), you'll want to test your changes on a clean slate.
 
 You can run `./scripts/cleanup.sh` to completely wipe your existing Torquio environment, and then run your modified `./install.sh` to see if everything works as expected.
+
+Before that, two quick checks that don't touch your installation:
+
+* `python3 -m unittest` runs the unit tests (GitHub runs them on every push too).
+* `python3 tests/parity/run.py` compares what Torquio shows before and after your change (against `develop` by default) in an isolated scratch environment; see `tests/parity/README.md`.
 
 ## Using AI Assistants
 

@@ -48,7 +48,8 @@ a faithful translation).
 ```
 torquio                          # entry point (Bash during the port; at the end a small Python script)
 lib/torquio/                     # the package (not at the repo root: `torquio` is already a file there)
-    __main__.py                  # `python3 -m torquio <internal command>` used by Bash during the port
+lib/torquio_bridge.py            # runs __main__ for Bash (a script, so the current directory can't shadow the package)
+    __main__.py                  # internal commands Bash calls during the port (torquio_py in common.sh)
     paths.py                     # repo dir, XDG data/cache/config dirs, prefix, container name, overrides
     config.py                    # ~/.config/torquio/config.json (same keys and value types as today)
     ui.py                        # colours, clear, header, prompts (y/N, [Y/n], typed overrides), Ctrl+C
@@ -143,7 +144,7 @@ released after the last stage; develop stays usable throughout.
 
 | # | Stage | Moves to Python | Testing focus |
 |---|---|---|---|
-| 0 | Foundation | `lib/torquio/` skeleton, `paths`, `config` (replaces the Python one-liners in `common.sh`), `ui`, `run`; the three existing Python scripts move into the package (old paths kept as thin wrappers until stage 7); unit-test and parity harness, CI workflow | unit tests; parity of everything (nothing visible changes) |
+| 0 | Foundation | `lib/torquio/` skeleton, `paths`, `config` (replaces the Python one-liners in `common.sh`), `ui`, `run`; the manifest, log export and license checks move into the package (their old paths had only internal callers, so they're removed rather than wrapped; `torquio_graphics.py` stays until stage 6, because the launchers in `~/.local/bin` use a copy of it); Python version check; unit-test and parity harness, CI workflow | unit tests; parity of everything (nothing visible changes) |
 | 1 | Read-only | dashboard (`show_status`), graphics diagnostics, header, help text, manifest | parity (dashboard on installed / not installed / no container) |
 | 2 | Maintenance | Wine Tools menu and actions, GPU (setup, chooser, Vulkan list), ntsync, key commands, folder mappings, run custom exe, Settings, update check | parity of menus; real: GPU chooser, mappings, key command export/import |
 | 3 | Engine and container | `replace_container`, engine update/rebuild, `engine_outdated`, identity, self-update and `--post-update` | unit tests; real: update from v0.5.0 (handover), engine swap and back, NVIDIA conversion, Cantai stays activated |
@@ -163,7 +164,7 @@ released after the last stage; develop stays usable throughout.
 | Background container commands swallow keyboard input meant for a prompt | `run.py` gives non-interactive commands no input (`stdin=DEVNULL`) by default |
 | The update handover breaks for people updating from v0.4.0/v0.5.0 | stage 3 tests a real update from v0.5.0; `--post-update` keeps working forever |
 | Installed launchers can't find the package | stubs with the repo path filled in at install time (as `torquio-sda-handler` does today); tested in stage 6 with a fresh install and an update |
-| Mixed Bash/Python period adds moving parts | Bash only calls into Python through `python3 -m torquio <command>` (one place); each stage merged only when fully tested |
+| Mixed Bash/Python period adds moving parts | Bash only calls into Python through `torquio_py <command>` in `common.sh` (one place); each stage merged only when fully tested |
 | Host Python older than 3.9 | checked at startup (in the Bash entry point while it exists, then in the Python one, written so it still parses on old Pythons) with a clear message, e.g. "Torquio needs Python 3.9 or newer (yours is 3.6); install a newer python3 package." Affects openSUSE Leap 15 and RHEL 8 (default `python3` is 3.6); today nothing checks |
 
 ## 10. Conventions
