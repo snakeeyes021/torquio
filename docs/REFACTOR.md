@@ -178,6 +178,8 @@ Fixed or changed on purpose, each in its own commit (everything else is meant to
   under `$XDG_CONFIG_HOME`).
 - Configure Graphics: the Wayland-only error and the "back up your current desktop scaling settings" lines
   have their intended colours; a folder already mapped to a drive letter no longer shows a stray `033[0m`.
+- Uninstaller: the XWayland restore banners have their intended blue rules (the script never defined the
+  colour).
 - Edge cases where Bash printed its own error (`[: : integer expression expected`, e.g. graphics data without
   `target_xwayland_factor`) now just take the same branch silently.
 - Key command export after mapping a Desktop folder in the same session: Bash had sourced `user-dirs.dirs`

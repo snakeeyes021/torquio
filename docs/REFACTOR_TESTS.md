@@ -86,3 +86,20 @@ old updater and the new code). On a system with v0.5.0 installed and working (a 
       Server finish; Open C: Drive opens the file manager; xev offers to install itself (say no).
 - [ ] *(dev)* The Wine Tools menu looks the same as before.
 - [ ] Fix Icons & Refresh Launchers (main menu 5): finishes; Dorico's menu entry and file associations work.
+
+## Stage 4: uninstall
+
+Destructive: use a VM or a system where you're ready to reinstall (stage 5's tests reinstall anyway).
+
+- [ ] *(dev)* With licenses activated (Steinberg and Cantai): the guard lists them and cancels unless the long
+      sentence is typed; nothing is deleted.
+- [ ] With every license deactivated and a Dorico project saved inside the prefix (e.g. in the prefix's
+      `drive_c/users/<you>/Documents` if it's a real folder there): the project is listed and the uninstall
+      stops unless confirmed.
+- [ ] Full uninstall (`torquio -r`, typing the confirmations): afterwards there's no `torquio-env` container
+      (`distrobox list`), no `~/.local/share/torquio`, `~/.cache/torquio` or `~/.config/torquio`, no Dorico /
+      Activation Manager / Download Assistant menu entries, no Torquio icons, and `.dorico` files no longer open
+      with Dorico. Other Wine programs' menu entries and your other default applications are untouched.
+- [ ] With Automated Mode on before uninstalling: it offers to restore the desktop's XWayland setting (with
+      blue rules around the explanation now), and restores it.
+- [ ] Uninstall from the main menu, cancelled: "Press [Enter] to return to the main menu..." and the menu again.
