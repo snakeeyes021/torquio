@@ -1,4 +1,4 @@
-"""How the Bash scripts call into the torquio package during the port: torquio_py in scripts/common.sh runs
+"""How the Bash wrappers (scripts/install.sh, scripts/cleanup.sh) call into the torquio package: torquio_py in scripts/common.sh runs
 `python3 lib/torquio_bridge.py COMMAND ...`.
 
 A script rather than `python3 -m torquio`, because -m looks in the current directory first, so a stray

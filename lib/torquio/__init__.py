@@ -1,4 +1,5 @@
-"""Torquio's host-side core, being ported from Bash (see docs/REFACTOR.md).
+"""Torquio's host side: the core (this package's modules) and the terminal interface (cli/, launch/). Ported from
+Bash in v0.6.0 (docs/REFACTOR.md).
 
 Standard library only. Keep everything here runnable on Python 3.9: no `match`, no `X | Y` unions outside
 annotations (and only with `from __future__ import annotations`), nothing from 3.10+.
