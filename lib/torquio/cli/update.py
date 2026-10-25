@@ -2,7 +2,6 @@
 Refresh Launchers."""
 import glob
 import os
-import shutil
 
 from .. import container, engine, paths, prefix, run, ui
 from ..ui import BLUE, GREEN, RED, RESET, YELLOW, echo
@@ -107,21 +106,24 @@ def refresh_launchers(pause=True):
         ui.pause("Press [Enter] to return to the main menu...")
 
 
+LAUNCHERS = ("torquio-dorico", "torquio-sam", "torquio-sda-handler")
+
+
 def install_launchers():
     """Copy the launchers to ~/.local/bin, with this copy's path filled in."""
     repo = paths.repo_dir()
     bindir = os.path.join(paths.home(), ".local/bin")
     os.makedirs(bindir, exist_ok=True)
-    for handler in sorted(glob.glob(os.path.join(glob.escape(repo), "scripts/3-runtime_handlers/torquio*"))):
-        name = os.path.basename(handler)
-        target = os.path.join(bindir, name)
-        if name in ("torquio-dorico", "torquio-sam", "torquio-sda-handler"):
-            with open(handler) as f:
-                text = f.read().replace("@TORQUIO_REPO_DIR@", repo)
-            with open(target, "w") as f:
-                f.write(text)
-        else:
-            shutil.copy(handler, target)
+    for name in LAUNCHERS:
+        with open(os.path.join(repo, "scripts/3-runtime_handlers", name)) as f:
+            text = f.read().replace("@TORQUIO_REPO_DIR@", repo)
+        with open(os.path.join(bindir, name), "w") as f:
+            f.write(text)
+    # Older versions copied the monitor query here too; the launchers now use the Torquio folder's own
+    try:
+        os.remove(os.path.join(bindir, "torquio_graphics.py"))
+    except FileNotFoundError:
+        pass
     umask = os.umask(0)
     os.umask(umask)
     for path in glob.glob(os.path.join(glob.escape(bindir), "torquio*")):  # chmod +x (which honours the umask)
