@@ -79,14 +79,17 @@ FAKES = {
     "distrobox": FAKE_DISTROBOX,
     "podman": FAKE_PODMAN,
     "xdg-user-dir": 'echo "$HOME/Downloads"',
-    "gsettings": '[ "$1 $3" = "get xwayland-scaling-factor" ] && [ -n "$FAKE_XWAYLAND_FACTOR" ] && '
-                 '{ printf "%s\\n" "$FAKE_XWAYLAND_FACTOR"; exit 0; }; exit 1',
+    "gsettings": '[ "$1" = list-schemas ] && [ "$FAKE_MUTTER_WAYLAND" = yes ] && { echo org.gnome.mutter.wayland; exit 0; }; '
+                 '[ "$1 $3" = "get xwayland-scaling-factor" ] && [ -n "$FAKE_XWAYLAND_FACTOR" ] && '
+                 '{ printf "%s\\n" "$FAKE_XWAYLAND_FACTOR"; exit 0; }; [ "$1" = set ]',
     "kreadconfig6": 'printf "%s\\n" "$FAKE_KDE_POLICY"',
     "modinfo": '[ "$FAKE_NTSYNC_MODULE" = yes ]',
+    "zenity": '[ -n "$FAKE_PICKED" ] && printf "%s\\n" "$FAKE_PICKED"',
+    "kdialog": '[ -n "$FAKE_PICKED" ] && printf "%s\\n" "$FAKE_PICKED"',
 }
 FAKE_FAILING = ["sudo", "pkexec", "docker", "gsettings", "dconf", "kwriteconfig5", "kwriteconfig6",
                 "kreadconfig5", "kscreen-doctor", "cosmic-randr", "xrandr", "modprobe",
-                "systemctl", "flatpak", "notify-send", "xdg-open", "pkill", "killall"]
+                "systemctl", "flatpak", "notify-send", "xdg-open", "pkill", "killall", "dbus-send"]
 
 MASKS = [
     (re.compile(r"\b\w{3} \w{3} [ \d]\d \d\d:\d\d:\d\d [A-Z]+ \d{4}\b"), "<DATE>"),  # date
@@ -117,6 +120,15 @@ def make_copy(repo, ref, dest, with_working_tree=False):
                 "working tree", cwd=dest)
 
 
+# Every call to a fake except these read-only ones is recorded in ~/.fake-calls, which is compared too: the
+# same commands must reach the container and the desktop settings.
+LOG_CALL = r"""case "$(basename "$0") $1" in
+"distrobox list"|"podman container"|"gsettings get"|"gsettings list-schemas"|kreadconfig*|"modinfo "*|"xdg-user-dir "*) ;;
+*) printf '%s\n' "$(basename "$0") $*" >> "$HOME/.fake-calls" ;;
+esac
+"""
+
+
 def make_fakes(bindir, bodies=None, defaults=True):
     os.makedirs(bindir, exist_ok=True)
     if defaults:
@@ -124,7 +136,7 @@ def make_fakes(bindir, bodies=None, defaults=True):
     for name, body in (bodies or {}).items():
         path = os.path.join(bindir, name)
         with open(path, "w") as f:
-            f.write(f"#!/bin/sh\n{body}\n")
+            f.write(f"#!/bin/sh\n{LOG_CALL}{body}\n")
         os.chmod(path, 0o755)
 
 
@@ -163,17 +175,21 @@ def restore(repo_copy, originals):
         os.chmod(path, mode)
 
 
-def run_in_pty(cmd, env, cwd, stdin_text, timeout=120):
-    """(output with \\r\\n turned into \\n, exit code); -9 if it had to be killed."""
+def run_in_pty(cmd, env, cwd, stdin_text, timeout=120, piped=False):
+    """(output with \\r\\n turned into \\n, exit code); -9 if it had to be killed. With `piped`, input comes
+    from a pipe instead of the terminal (as in scripts; prompts aren't shown then)."""
     master, slave = os.openpty()
     attrs = termios.tcgetattr(slave)
     attrs[3] &= ~(termios.ECHO | termios.ECHONL)
     termios.tcsetattr(slave, termios.TCSANOW, attrs)
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
-    proc = subprocess.Popen(cmd, env=env, cwd=cwd, stdin=slave, stdout=slave, stderr=slave,
-                            start_new_session=True)
+    proc = subprocess.Popen(cmd, env=env, cwd=cwd, stdin=subprocess.PIPE if piped else slave, stdout=slave,
+                            stderr=slave, start_new_session=True)
     os.close(slave)
-    if stdin_text:
+    if piped:
+        proc.stdin.write(stdin_text.encode())
+        proc.stdin.close()
+    elif stdin_text:
         os.write(master, stdin_text.encode())
     out, deadline, killed = bytearray(), time.monotonic() + timeout, False
     while True:
@@ -209,6 +225,10 @@ def snapshot(home, compare_files, replacements):
     names = []
     for root, dirs, files in os.walk(home):
         dirs.sort()
+        for name in sorted(dirs):  # links to folders (folder mappings) are listed with their targets
+            path = os.path.join(root, name)
+            if os.path.islink(path):
+                names.append(mask(f"{os.path.relpath(path, home)} -> {os.readlink(path)}", replacements))
         for name in sorted(files):
             path = os.path.join(root, name)
             names.append(mask(os.path.relpath(path, home), replacements))
@@ -251,11 +271,12 @@ def run_scenario(scenario, repo_copy, workdir):
         cmd = ["unshare", "--map-current-user", "--net", "--", *cmd]
     originals = overlay(repo_copy, scenario.get("repo_files", {}))
     try:
-        output, code = run_in_pty(cmd, env, home, scenario.get("input", ""), scenario.get("timeout", 120))
+        output, code = run_in_pty(cmd, env, home, scenario.get("input", ""), scenario.get("timeout", 120),
+                                  scenario.get("piped", False))
     finally:
         restore(repo_copy, originals)
     replacements = [(repo_copy, "<REPO>"), (home, "<HOME>"), (workdir, "<TMP>")]
-    names, contents = snapshot(home, scenario.get("compare_files", []), replacements)
+    names, contents = snapshot(home, scenario.get("compare_files", []) + [".fake-calls"], replacements)
     return {"output": mask(output, replacements), "exit code": code, "files": names, "contents": contents}
 
 

@@ -183,6 +183,11 @@ Still present: names and folder paths of projects opened in Dorico.
 
 def main(out_dir=None):
     """Write the zip and print its path."""
+    print(write_zip(out_dir))
+
+
+def write_zip(out_dir=None):
+    """Write the zip; returns its path."""
     out_dir = out_dir or run(["xdg-user-dir", "DOWNLOAD"]) or os.path.join(HOME, "Downloads")
     if not os.path.isdir(out_dir):
         out_dir = os.path.join(HOME, "Downloads")
@@ -208,5 +213,5 @@ def main(out_dir=None):
         z.writestr("system-info.txt", redact(info))
         for folder, name, data in logs:
             z.writestr(f"{folder}/{name}", redact(data, folder))
-    print(zip_path)
+    return zip_path
 

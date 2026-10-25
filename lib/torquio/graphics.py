@@ -8,14 +8,15 @@ import os
 import re
 import sys
 
-from . import paths, run
+from . import config, container, paths, prefix, run
 
 GRAPHICS_SCRIPT = "scripts/3-runtime_handlers/torquio_graphics.py"
 
 
-def query():
+def query(show_errors=False):
     """torquio_graphics.py's JSON, as text ("" if it fails)."""
-    return run.capture([sys.executable, os.path.join(paths.repo_dir(), GRAPHICS_SCRIPT)])[1].rstrip("\n")
+    return run.capture([sys.executable, os.path.join(paths.repo_dir(), GRAPHICS_SCRIPT)],
+                       stderr=None if show_errors else run.DEVNULL)[1].rstrip("\n")
 
 
 def field(graphics_json, key, kind):
@@ -54,7 +55,7 @@ def xwayland_scaling_factor():
 
 def kde_xwayland_policy():
     """KScreen's XwaylandClientsScale setting ("" if unset)."""
-    tool = "kreadconfig6" if run.have("kreadconfig6") else "kreadconfig5"
+    tool = kde_tool("read")
     for key in ("XwaylandClientsScale", "XwaylandClientScale"):
         value = run.capture([tool, "--file", "kdeglobals", "--group", "KScreen", "--key", key])[1].rstrip("\n")
         if value:
@@ -62,12 +63,51 @@ def kde_xwayland_policy():
     return ""
 
 
+COSMIC_POLICY = ".config/cosmic/com.system76.CosmicComp/v1/descale_xwayland"
+
+
+def cosmic_policy_file():
+    return os.path.join(paths.home(), COSMIC_POLICY)
+
+
 def cosmic_xwayland_policy():
     try:
-        with open(os.path.join(paths.home(), ".config/cosmic/com.system76.CosmicComp/v1/descale_xwayland")) as f:
+        with open(cosmic_policy_file()) as f:
             return f.read().rstrip("\n")
     except (OSError, UnicodeDecodeError):
         return ""
+
+
+def write_cosmic_policy(value):
+    """echo VALUE > descale_xwayland (None removes the file, which means COSMIC's default)."""
+    os.makedirs(os.path.dirname(cosmic_policy_file()), exist_ok=True)
+    try:
+        if value is None:
+            os.remove(cosmic_policy_file())
+        else:
+            with open(cosmic_policy_file(), "w") as f:
+                f.write(value + "\n")
+    except OSError:
+        pass
+
+
+def kde_tool(kind):
+    """kreadconfig6/kwriteconfig6, or the Plasma 5 tool when there's no 6."""
+    return f"k{kind}config6" if run.have(f"k{kind}config6") else f"k{kind}config5"
+
+
+def set_kde_xwayland_policy(value):
+    tool = kde_tool("write")
+    for key in ("XwaylandClientsScale", "XwaylandClientScale"):
+        run.interactive([tool, "--file", "kdeglobals", "--group", "KScreen", "--key", key, value], stderr=run.DEVNULL)
+    run.interactive(["dbus-send", "--session", "--dest=org.kde.KWin", "/KWin", "org.kde.KWin.reconfigure"],
+                    stderr=run.DEVNULL)
+
+
+def set_gnome_xwayland_factor(value):
+    schemas = run.capture(["gsettings", "list-schemas"], stderr=None)[1]
+    schema = "org.gnome.mutter.wayland" if "org.gnome.mutter.wayland" in schemas else "org.gnome.mutter"
+    run.interactive(["gsettings", "set", schema, "xwayland-scaling-factor", value], stderr=run.DEVNULL)
 
 
 def policies(de, scale, session_type):
@@ -122,3 +162,64 @@ def wine_prefix_dpi():
         return "Unknown"
     match = re.search(r"\[Control Panel\\\\Desktop\][^\[]*?\"LogPixels\"=dword:([0-9a-fA-F]+)", content)
     return str(int(match.group(1), 16)) if match else "96"
+
+
+def unscaled(scale):
+    return scale in ("1", "1.0", "1.00")
+
+
+def apply_settings(say):
+    """apply_graphics_settings: write the Wine DPI (and, in Automated Mode, the desktop's XWayland policy) and
+    restart the Wine server. `say` shows progress messages. Does nothing without a container and prefix."""
+    if not container.exists() or not os.path.isdir(paths.prefix_dir()):
+        return
+    say("Applying graphics settings to Wine prefix...")
+    manage = config.get_text("manage_graphics", "false")
+    if os.environ.get("XDG_SESSION_TYPE", "") == "x11":
+        manage = "false"
+    dpi = config.get_text("manual_dpi", "96")
+    freetype = config.get_text("freetype_interpreter", "40")
+
+    if manage == "true":
+        data = query(show_errors=True)
+        target_dpi = field(data, "target_wine_dpi", "int")
+        target_factor = field(data, "target_xwayland_factor", "int")
+        de = field(data, "de", "string")
+        scale = field(data, "scale", "number")
+        if target_dpi and is_int(target_dpi) and int(target_dpi) > 0:
+            dpi = target_dpi
+        prefix.set_dpi(dpi, freetype)
+
+        if de == "GNOME":
+            current = xwayland_scaling_factor()
+            desired = target_factor
+            if is_int(target_factor) and int(target_factor) > 1 and current in ("0", ""):
+                desired = current
+            if desired == "1" and current in ("0", "") and (unscaled(scale) or not scale):
+                desired = current
+            if desired and current != desired:
+                if not config.get_text("original_scale_factor", ""):
+                    config.set_text("original_scale_factor", current or "0")
+                    say(f"Backed up current GNOME XWayland scaling policy ({current or '0'}).")
+                set_gnome_xwayland_factor(desired)
+        elif de == "KDE":
+            current = kde_xwayland_policy() or "true"
+            if current != "true":
+                if not config.get_text("original_kde_policy", ""):
+                    config.set_text("original_kde_policy", current)
+                    say(f"Backed up current KDE XWayland scaling policy ({current}).")
+                set_kde_xwayland_policy("true")
+        elif de == "COSMIC":
+            current = cosmic_xwayland_policy()
+            desired = current if unscaled(scale) else "fractional"
+            if current != desired:
+                if not config.get_text("original_cosmic_policy", ""):
+                    config.set_text("original_cosmic_policy", current or "none")
+                    say(f"Backed up current COSMIC XWayland scaling policy ({current or 'none'}).")
+                write_cosmic_policy(desired)
+        config.set_text("warn_xwayland_change", "true")
+
+    prefix.set_focus_options()
+    say("Restarting Wine server to load changes...")
+    prefix.restart_wineserver()
+    say("Graphics settings successfully applied.")

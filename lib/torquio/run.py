@@ -11,6 +11,8 @@ import shutil
 import subprocess
 import sys
 
+DEVNULL = subprocess.DEVNULL
+
 
 def interactive(cmd, **kwargs):
     """Run with the terminal inherited; returns the exit code (127 if the program doesn't exist)."""
@@ -22,11 +24,14 @@ def interactive(cmd, **kwargs):
         return 127
 
 
-def capture(cmd, stderr=subprocess.DEVNULL, timeout=None, **kwargs):
-    """Run without input; returns (exit code, stdout as text). A missing program or a timeout gives 127/124
-    and empty output, as the shell would."""
+def capture(cmd, stderr=subprocess.DEVNULL, timeout=None, stdin=subprocess.DEVNULL, **kwargs):
+    """Run without input (unless `stdin` says otherwise); returns (exit code, stdout as text). A missing
+    program or a timeout gives 127/124 and empty output, as the shell would. stderr=None shows errors."""
+    if stderr is None:
+        sys.stdout.flush()
+        sys.stderr.flush()
     try:
-        p = subprocess.run(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=stderr,
+        p = subprocess.run(cmd, stdin=stdin, stdout=subprocess.PIPE, stderr=stderr,
                            text=True, timeout=timeout, **kwargs)
         return p.returncode, p.stdout
     except FileNotFoundError:

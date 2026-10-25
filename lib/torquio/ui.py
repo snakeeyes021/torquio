@@ -2,6 +2,7 @@
 
 Only the interfaces (this module, cli.py, launch/) print or prompt; the rest of the package returns values.
 """
+import os
 import subprocess
 import sys
 
@@ -71,6 +72,28 @@ def clear():
     subprocess.run(["clear"])
 
 
+def _readline(stream):
+    """One line, including its newline ("" at end of input). From the real stdin it's read a byte at a time,
+    as Bash's read does: buffered reading would swallow input meant for whatever runs after Torquio's Python
+    code (the Bash menus, when input comes from a pipe)."""
+    if stream is not sys.stdin:
+        return stream.readline()
+    sys.stdout.flush()
+    fd = sys.stdin.fileno()
+    data = bytearray()
+    while True:
+        try:
+            byte = os.read(fd, 1)
+        except InterruptedError:
+            continue
+        if not byte:
+            break
+        data += byte
+        if byte == b"\n":
+            break
+    return data.decode("utf-8", "surrogateescape")
+
+
 def read(prompt="", raw=False, stream=None):
     """Bash's `read [-r] -p PROMPT VAR`, with one variable and the default IFS. Returns (value, ok).
 
@@ -87,7 +110,7 @@ def read(prompt="", raw=False, stream=None):
     chars = []  # (character, escaped)
     ok = False
     while True:
-        line = stream.readline()
+        line = _readline(stream)
         if not line:
             break
         complete = line.endswith("\n")
@@ -115,3 +138,29 @@ def read(prompt="", raw=False, stream=None):
     while chars and not chars[-1][1] and chars[-1][0] in _IFS_WHITESPACE:
         chars.pop()
     return "".join(c for c, _ in chars), ok
+
+
+def ask(prompt="", strict=True, raw=False):
+    """`read -p PROMPT VAR` as the Bash screens used it; returns the answer.
+
+    At end of input, `strict` (Bash ran with set -e and no `|| true`) stops Torquio with exit code 1, as the
+    Bash version did; otherwise whatever was typed before it is returned.
+    """
+    value, ok = read(prompt, raw)
+    if not ok and strict:
+        raise SystemExit(1)
+    return value
+
+
+def pause(prompt="Press [Enter] to continue...", strict=True):
+    ask(prompt, strict)
+
+
+def yes(answer):
+    """[[ "$answer" =~ ^[Yy]$ ]]"""
+    return answer in ("y", "Y")
+
+
+def no(answer):
+    """[[ "$answer" =~ ^[Nn]$ ]]"""
+    return answer in ("n", "N")

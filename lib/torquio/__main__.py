@@ -46,9 +46,69 @@ def _header():
     header.show()
 
 
-def _graphics_diagnostics(graphics_json, de, supported, w_px, h_px):
+def _configure_graphics():
     from .cli import graphics
-    graphics.show_diagnostics(graphics_json, de, supported, w_px, h_px)
+    graphics.configure()
+
+
+def _apply_graphics_settings():
+    from . import graphics, ui
+    graphics.apply_settings(ui.echo)
+
+
+def _apply_prefix_settings():
+    from . import prefix
+    prefix.apply_settings()
+
+
+def _map_folder(host_folder="", map_type=""):
+    from .cli import folders
+    return folders.map_folder(host_folder, map_type)
+
+
+def _manage_folder_mappings():
+    from .cli import folders
+    folders.manage()
+
+
+def _export_keycommands():
+    from .cli import keycommands
+    keycommands.export()
+
+
+def _import_keycommands():
+    from .cli import keycommands
+    keycommands.import_()
+
+
+def _manage_keycommands():
+    from .cli import keycommands
+    keycommands.manage()
+
+
+def _run_custom_exe(selected=""):
+    from .cli import tools
+    tools.run_custom_exe(selected)
+
+
+def _enable_ntsync():
+    from .cli import tools
+    return tools.enable_ntsync()
+
+
+def _manage_settings():
+    from .cli import tools
+    tools.manage_settings()
+
+
+def _check_for_updates():
+    from .cli import tools
+    tools.check_for_updates()
+
+
+def _pending_updates():
+    from .cli import tools
+    print(tools.pending_updates())
 
 
 def _unknown_argument(arg):
@@ -56,9 +116,9 @@ def _unknown_argument(arg):
     usage.unknown_argument(arg)
 
 
-def _export_logs(out_dir=None):
-    from . import logs
-    logs.main(out_dir)
+def _export_logs():
+    from .cli import tools
+    tools.export_logs()
 
 
 # command: (function, number of required arguments, number of optional ones)
@@ -68,10 +128,22 @@ COMMANDS = {
     "steinberg-licenses": (_steinberg_licenses, 1, 0),
     "plugin-licenses": (_plugin_licenses, 1, 0),
     "manifest": (_manifest, 0, 0),
-    "export-logs": (_export_logs, 0, 1),
+    "export-logs": (_export_logs, 0, 0),
     "status": (_status, 0, 0),
     "header": (_header, 0, 0),
-    "graphics-diagnostics": (_graphics_diagnostics, 5, 0),
+    "configure-graphics": (_configure_graphics, 0, 0),
+    "apply-graphics-settings": (_apply_graphics_settings, 0, 0),
+    "apply-prefix-settings": (_apply_prefix_settings, 0, 0),
+    "map-folder": (_map_folder, 0, 2),
+    "manage-folder-mappings": (_manage_folder_mappings, 0, 0),
+    "export-keycommands": (_export_keycommands, 0, 0),
+    "import-keycommands": (_import_keycommands, 0, 0),
+    "manage-keycommands": (_manage_keycommands, 0, 0),
+    "run-custom-exe": (_run_custom_exe, 0, 1),
+    "enable-ntsync": (_enable_ntsync, 0, 0),
+    "manage-settings": (_manage_settings, 0, 0),
+    "check-for-updates": (_check_for_updates, 0, 0),
+    "pending-updates": (_pending_updates, 0, 0),
     "unknown-argument": (_unknown_argument, 1, 0),
 }
 
@@ -86,9 +158,24 @@ def main(argv=None):
     if not required <= len(args) <= required + optional:
         print(f"torquio_py {argv[0]}: wrong number of arguments", file=sys.stderr)
         return 2
-    function(*args)
-    return 0
+    result = function(*args)
+    return result if isinstance(result, int) else 0
+
+
+def run_main():
+    """main() with Ctrl+C handled like a Bash command: no traceback, and the process ends by SIGINT, so the
+    Bash script that called it stops too (as it did when this was Bash)."""
+    try:
+        code = main()
+    except KeyboardInterrupt:
+        import os
+        import signal
+        sys.stdout.flush()
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
+        os.kill(os.getpid(), signal.SIGINT)
+        code = 130
+    sys.exit(code)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    run_main()
