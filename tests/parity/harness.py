@@ -201,9 +201,13 @@ class Copies:
         self.tmp = tempfile.mkdtemp(prefix="torquio-parity-")
         self.base = os.path.join(self.tmp, "before", "torquio")
         self.new = os.path.join(self.tmp, "after", "torquio")
-        make_copy(self.repo, self.base_ref, self.base)
-        make_copy(self.repo, "HEAD", self.new, with_working_tree=True)
-        make_fakes(os.path.join(self.tmp, "fakebin"))
+        try:
+            make_copy(self.repo, self.base_ref, self.base)
+            make_copy(self.repo, "HEAD", self.new, with_working_tree=True)
+            make_fakes(os.path.join(self.tmp, "fakebin"))
+        except BaseException:
+            shutil.rmtree(self.tmp, ignore_errors=True)
+            raise
         return self
 
     def __exit__(self, *exc):
