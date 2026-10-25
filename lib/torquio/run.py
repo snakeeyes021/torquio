@@ -9,10 +9,13 @@ Pick deliberately per call:
 """
 import shutil
 import subprocess
+import sys
 
 
 def interactive(cmd, **kwargs):
     """Run with the terminal inherited; returns the exit code (127 if the program doesn't exist)."""
+    sys.stdout.flush()
+    sys.stderr.flush()
     try:
         return subprocess.run(cmd, **kwargs).returncode
     except FileNotFoundError:

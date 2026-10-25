@@ -18,6 +18,53 @@ RESET = "\033[0m"
 _IFS_WHITESPACE = " \t\n"
 
 
+_SIMPLE_ESCAPES = {"a": "\a", "b": "\b", "e": "\033", "E": "\033", "f": "\f", "n": "\n", "r": "\r", "t": "\t",
+                   "v": "\v", "\\": "\\"}
+_NUMERIC_ESCAPES = {"0": ("01234567", 3, 8), "x": ("0123456789abcdefABCDEF", 2, 16),
+                    "u": ("0123456789abcdefABCDEF", 4, 16), "U": ("0123456789abcdefABCDEF", 8, 16)}
+
+
+def echo_e(text):
+    """`echo -e TEXT` as Bash prints it (most of Torquio's screens use it, so backslashes in paths and names
+    are interpreted too). Returns the text including the newline, or without it after \\c."""
+    out, i = [], 0
+    while i < len(text):
+        c = text[i]
+        if c != "\\" or i + 1 >= len(text):
+            out.append(c)
+            i += 1
+            continue
+        e = text[i + 1]
+        if e in _SIMPLE_ESCAPES:
+            out.append(_SIMPLE_ESCAPES[e])
+            i += 2
+        elif e == "c":
+            return "".join(out)
+        elif e in _NUMERIC_ESCAPES:
+            digits, most, base = _NUMERIC_ESCAPES[e]
+            j = i + 2
+            while j < len(text) and j - (i + 2) < most and text[j] in digits:
+                j += 1
+            if j == i + 2 and e != "0":
+                out.append("\\" + e)  # \x, \u, \U without digits stay as they are
+            else:
+                value = int(text[i + 2:j] or "0", base)
+                # \\0 and \\x give a byte, \\u and \\U a character (bytes >= 0x80 travel as surrogate escapes)
+                out.append(chr(value) if e in "uU" or value < 0x80 else chr(0xDC00 + (value & 0xFF)))
+            i = j
+        else:
+            out.append("\\" + e)
+            i += 2
+    return "".join(out) + "\n"
+
+
+def echo(text=""):
+    """Print like `echo -e TEXT`."""
+    sys.stdout.flush()
+    sys.stdout.buffer.write(echo_e(text).encode("utf-8", "surrogateescape"))
+    sys.stdout.buffer.flush()
+
+
 def clear():
     """The `clear` command (its output depends on the terminal, so it isn't imitated)."""
     sys.stdout.flush()

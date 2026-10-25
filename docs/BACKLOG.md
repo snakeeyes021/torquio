@@ -14,7 +14,7 @@ This section tracks epics that have been broken down into concrete, actionable s
 Rewrite the host-side Bash in standard-library Python (3.9+) with no user-visible change, as a core library plus a thin CLI that the v0.7.0 GUI can reuse. The full plan (layout, contracts that must never break, parity testing, risks) is in `docs/REFACTOR.md`. Each stage is its own branch, tested for parity and merged to develop on its own; the Bash `torquio` stays the entry point until stage 7.
 
 *   [x] **Stage 0, foundation:** `lib/torquio/` skeleton with `paths`, `config` (replacing the Python one-liners in `common.sh`), `ui` and `run`; the three existing Python scripts moved into the package (old paths kept as wrappers); Python version check; unit-test and parity harness; CI workflow.
-*   [ ] **Stage 1, read-only screens:** dashboard, graphics diagnostics, header, help text, manifest.
+*   [x] **Stage 1, read-only screens:** dashboard, graphics diagnostics, header, help text, manifest.
 *   [ ] **Stage 2, maintenance:** Wine Tools menu and actions, GPU setup and chooser, ntsync, key commands, folder mappings, custom exe, Settings, update check.
 *   [ ] **Stage 3, engine and container:** `replace_container`, engine update/rebuild, `engine_outdated`, machine identity, self-update and `--post-update`.
 *   [ ] **Stage 4, uninstall:** `cleanup.sh`.

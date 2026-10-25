@@ -68,15 +68,16 @@ lib/torquio_bridge.py            # runs __main__ for Bash (a script, so the curr
     updates.py                   # self-update, post-update, update check, settings
     launchers.py                 # host-side icons/launchers/MIME handling (refresh_launchers)
     keycommands.py, folders.py, ntsync.py, settings.py
-    status.py                    # the dashboard
     install.py, uninstall.py     # today's install.sh and cleanup.sh
     launch/                      # today's torquio-dorico, torquio-sam, torquio-sda-handler
-    cli.py                       # flag parsing (exact flags and aliases) and the interactive menus
+    versions.py                  # `sort -V` ordering
+    cli/                         # the terminal interface: one module per screen (status = the dashboard,
+                                 # graphics, header, usage, ...), later the menus and flag parsing
 scripts/templates/run-dorico.sh.in   # the generated Dorico runner as a template file (no heredoc escaping)
 tests/                           # unittest tests and the parity harness (section 7)
 ```
 
-Rule of thumb: modules in `lib/torquio/` other than `ui.py`, `cli.py` and `launch/` don't print or prompt;
+Rule of thumb: modules in `lib/torquio/` other than `ui.py`, `cli/` and `launch/` don't print or prompt;
 they return values and raise exceptions, and the CLI (later also the GUI) decides what to show. Where a
 function needs to ask the user something mid-way (e.g. the license guard), it takes a callback, so the CLI
 asks in the terminal and the GUI in a dialog.
@@ -159,7 +160,7 @@ released after the last stage; develop stays usable throughout.
 |---|---|
 | Interactive programs (winetricks output, `sudo` prompts, distrobox's first-start setup, podman's download progress) don't reach the terminal as before | `run.py` has one helper for interactive commands (inherits the terminal) and one for captured output, chosen deliberately per call; parity and real tests cover each install/update flow |
 | The session log mirror behaves differently | `session_log.py` reproduces today's redirection exactly: stdout and stderr go through a `tee -i` child into the log, so child programs see the same pipe they see today |
-| Ctrl+C prints a Python traceback | one handler in `cli.py`: prints what the Bash version prints (or nothing) and exits with the same code |
+| Ctrl+C prints a Python traceback | one handler in `cli/`: prints what the Bash version prints (or nothing) and exits with the same code |
 | Prompt behaviour at end of input (scripts, pipes) differs | `ui.py` prompt helpers mirror `read -p` (empty answer on end of input, defaults applied the same way); covered by the parity harness's scripted input |
 | Background container commands swallow keyboard input meant for a prompt | `run.py` gives non-interactive commands no input (`stdin=DEVNULL`) by default |
 | The update handover breaks for people updating from v0.4.0/v0.5.0 | stage 3 tests a real update from v0.5.0; `--post-update` keeps working forever |

@@ -42,5 +42,21 @@ class ReadMatchesBash(unittest.TestCase):
         self.assertEqual(stderr.getvalue(), "")
 
 
+ECHO_INPUTS = [
+    "plain", "a\\nb", "\\0101", "\\101", "\\x41\\x4", "\\u00e9", "\\U0001F600", "x\\cy", "\\e[0m", "\\E", "\\q",
+    "trail\\", "\\\\", "\\08", "\\0", "\\x", "\\u", "\\a\\b\\f\\r\\t\\v", "\\0351", "\\xe9z", "\\0777",
+    "\033[38;5;125mreal escape\033[0m", "C:\\users\\new", "/home/me/Dorico Projects", "café \\t tab",
+]
+
+
+@unittest.skipUnless(shutil.which("bash"), "needs bash")
+class EchoMatchesBash(unittest.TestCase):
+    def test_echo_e(self):
+        for text in ECHO_INPUTS:
+            with self.subTest(text=text):
+                expected = subprocess.run(["bash", "-c", 'echo -e "$1"', "bash", text], capture_output=True).stdout
+                self.assertEqual(ui.echo_e(text).encode("utf-8", "surrogateescape"), expected)
+
+
 if __name__ == "__main__":
     unittest.main()

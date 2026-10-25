@@ -26,13 +26,66 @@ import fcntl
 import time
 import zipfile
 
+# The fake container is driven by FAKE_* variables a scenario sets (scenarios.py describes them); without
+# FAKE_CONTAINER there is none. The repo copy is found through TORQUIO_INSTALLERS_DIR (common.sh exports it).
+FAKE_DISTROBOX = r"""
+repo="${TORQUIO_INSTALLERS_DIR%/installers}"
+case "$1" in
+list)
+    [ -n "$FAKE_CONTAINER" ] || exit 0
+    echo "ID           | NAME                 | STATUS             | IMAGE"
+    echo "0123456789ab | $FAKE_CONTAINER          | ${FAKE_STATUS-Up 2 hours}         | x"
+    exit 0 ;;
+enter)
+    [ -n "$FAKE_CONTAINER" ] || exit 1
+    case "$*" in
+    *machine-id*)
+        if [ "$FAKE_MACHINE_ID" = derived ]; then
+            printf 'torquio:%s' "$(cat /etc/machine-id)" | sha256sum | cut -c1-32
+        else
+            printf '%s\n' "$FAKE_MACHINE_ID"
+        fi ;;
+    *build-info*)
+        if [ "$FAKE_BUILD_INFO" = matching ]; then
+            echo "zhiyi_commit=$(sed -n 's/^TARGET_COMMIT="\(.*\)"$/\1/p' "$repo/scripts/1-build/build_wine.sh")"
+            for p in "$repo"/scripts/1-build/patches/*.patch; do
+                echo "patch=$(sha256sum "$p" | cut -c1-12) $(basename "$p" .patch)"
+            done
+            echo "torquio_commit=0123abc"
+        else
+            printf '%b' "$FAKE_BUILD_INFO"
+        fi ;;
+    *vulkaninfo*) printf '%b' "$FAKE_PROBE" ;;
+    esac
+    exit 0 ;;
+esac
+exit 1
+"""
+FAKE_PODMAN = r"""
+repo="${TORQUIO_INSTALLERS_DIR%/installers}"
+if [ "$1 $2" = "container inspect" ] && [ -n "$FAKE_CONTAINER" ]; then
+    if [ "$FAKE_IMAGE" = current ]; then
+        echo "ghcr.io/snakeeyes021/torquio-env:build-$(git -C "$repo" rev-parse HEAD:scripts/1-build | cut -c1-12)"
+    else
+        printf '%s\n' "$FAKE_IMAGE"
+    fi
+    exit 0
+fi
+exit 125
+"""
+
 FAKES = {
     # program: shell body (prints nothing and fails unless given here)
-    "distrobox": 'case "$1" in list) exit 0 ;; esac; exit 1',
+    "distrobox": FAKE_DISTROBOX,
+    "podman": FAKE_PODMAN,
     "xdg-user-dir": 'echo "$HOME/Downloads"',
+    "gsettings": '[ "$1 $3" = "get xwayland-scaling-factor" ] && [ -n "$FAKE_XWAYLAND_FACTOR" ] && '
+                 '{ printf "%s\\n" "$FAKE_XWAYLAND_FACTOR"; exit 0; }; exit 1',
+    "kreadconfig6": 'printf "%s\\n" "$FAKE_KDE_POLICY"',
+    "modinfo": '[ "$FAKE_NTSYNC_MODULE" = yes ]',
 }
-FAKE_FAILING = ["sudo", "pkexec", "podman", "docker", "gsettings", "dconf", "kwriteconfig5", "kwriteconfig6",
-                "kreadconfig5", "kreadconfig6", "kscreen-doctor", "cosmic-randr", "xrandr", "modprobe",
+FAKE_FAILING = ["sudo", "pkexec", "docker", "gsettings", "dconf", "kwriteconfig5", "kwriteconfig6",
+                "kreadconfig5", "kscreen-doctor", "cosmic-randr", "xrandr", "modprobe",
                 "systemctl", "flatpak", "notify-send", "xdg-open", "pkill", "killall"]
 
 MASKS = [
@@ -64,17 +117,18 @@ def make_copy(repo, ref, dest, with_working_tree=False):
                 "working tree", cwd=dest)
 
 
-def make_fakes(bindir):
+def make_fakes(bindir, bodies=None, defaults=True):
     os.makedirs(bindir, exist_ok=True)
-    bodies = dict(FAKES, **{name: "exit 1" for name in FAKE_FAILING if name not in FAKES})
-    for name, body in bodies.items():
+    if defaults:
+        bodies = dict(FAKES, **{name: "exit 1" for name in FAKE_FAILING if name not in FAKES})
+    for name, body in (bodies or {}).items():
         path = os.path.join(bindir, name)
         with open(path, "w") as f:
             f.write(f"#!/bin/sh\n{body}\n")
         os.chmod(path, 0o755)
 
 
-def environment(home, bindir):
+def environment(home, bindir, extra=None):
     env = {
         "HOME": home, "USER": os.environ.get("USER", "user"), "LOGNAME": os.environ.get("LOGNAME", "user"),
         "PATH": bindir + ":" + os.environ.get("PATH", "/usr/bin:/bin"),
@@ -82,7 +136,31 @@ def environment(home, bindir):
         "XDG_RUNTIME_DIR": os.path.join(home, ".run"),
         "XDG_SESSION_TYPE": "wayland", "XDG_CURRENT_DESKTOP": "GNOME",
     }
+    for key, value in (extra or {}).items():
+        if value is None:
+            env.pop(key, None)
+        else:
+            env[key] = value
     return env
+
+
+def overlay(repo_copy, files):
+    """Replace files in the repo copy for one scenario; returns what to put back."""
+    originals = {}
+    for rel, text in files.items():
+        path = os.path.join(repo_copy, rel)
+        with open(path, "rb") as f:
+            originals[path] = (f.read(), os.stat(path).st_mode)
+        with open(path, "w") as f:
+            f.write(text)
+    return originals
+
+
+def restore(repo_copy, originals):
+    for path, (data, mode) in originals.items():
+        with open(path, "wb") as f:
+            f.write(data)
+        os.chmod(path, mode)
 
 
 def run_in_pty(cmd, env, cwd, stdin_text, timeout=120):
@@ -157,16 +235,25 @@ def run_scenario(scenario, repo_copy, workdir):
     shutil.rmtree(home, ignore_errors=True)
     os.makedirs(os.path.join(home, ".run"), mode=0o700)
     for rel, text in scenario.get("files", {}).items():
+        if text is None:  # lets a scenario leave out one file of a shared set
+            continue
         path = os.path.join(home, rel)
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w") as f:
             f.write(text)
     bindir = os.path.join(workdir, "fakebin")
-    env = environment(home, bindir)
+    scenario_bin = os.path.join(workdir, "scenario-bin")  # the scenario's own fakes, ahead of the defaults
+    shutil.rmtree(scenario_bin, ignore_errors=True)
+    make_fakes(scenario_bin, scenario.get("fakes", {}), defaults=False)
+    env = environment(home, scenario_bin + ":" + bindir, scenario.get("env"))
     cmd = [os.path.join(repo_copy, "torquio"), *scenario.get("args", [])]
     if shutil.which("unshare"):
         cmd = ["unshare", "--map-current-user", "--net", "--", *cmd]
-    output, code = run_in_pty(cmd, env, home, scenario.get("input", ""), scenario.get("timeout", 120))
+    originals = overlay(repo_copy, scenario.get("repo_files", {}))
+    try:
+        output, code = run_in_pty(cmd, env, home, scenario.get("input", ""), scenario.get("timeout", 120))
+    finally:
+        restore(repo_copy, originals)
     replacements = [(repo_copy, "<REPO>"), (home, "<HOME>"), (workdir, "<TMP>")]
     names, contents = snapshot(home, scenario.get("compare_files", []), replacements)
     return {"output": mask(output, replacements), "exit code": code, "files": names, "contents": contents}

@@ -36,6 +36,26 @@ def _manifest():
     manifest.main()
 
 
+def _status():
+    from .cli import status
+    status.show()
+
+
+def _header():
+    from .cli import header
+    header.show()
+
+
+def _graphics_diagnostics(graphics_json, de, supported, w_px, h_px):
+    from .cli import graphics
+    graphics.show_diagnostics(graphics_json, de, supported, w_px, h_px)
+
+
+def _unknown_argument(arg):
+    from .cli import usage
+    usage.unknown_argument(arg)
+
+
 def _export_logs(out_dir=None):
     from . import logs
     logs.main(out_dir)
@@ -49,6 +69,10 @@ COMMANDS = {
     "plugin-licenses": (_plugin_licenses, 1, 0),
     "manifest": (_manifest, 0, 0),
     "export-logs": (_export_logs, 0, 1),
+    "status": (_status, 0, 0),
+    "header": (_header, 0, 0),
+    "graphics-diagnostics": (_graphics_diagnostics, 5, 0),
+    "unknown-argument": (_unknown_argument, 1, 0),
 }
 
 
