@@ -73,6 +73,9 @@ enter)
         fi ;;
     *vulkaninfo*) printf '%b' "$FAKE_PROBE" ;;
     *"test -x"*) exit "${FAKE_NEW_WINE_RC:-0}" ;;
+    *"wine reg query"*) printf '%b' "$FAKE_REG_QUERY" ;;
+    *"ps auxww"*) printf '%b' "$FAKE_PS" ;;
+    *run-dorico.sh|*run-sam.sh|*run-sda.sh) exit "${FAKE_RUNNER_RC:-0}" ;;
     *libGLX_nvidia*) [ "$FAKE_CONTAINER_NVIDIA" = yes ] ;;
     *"command -v xev"*) [ "$FAKE_XEV" = yes ] ;;
     *"build_wine.sh --rebuild"*) echo "(fake) building Wine"; exit "${FAKE_BUILD_RC:-0}" ;;
@@ -117,7 +120,10 @@ FAKES = {
 }
 FAKE_FAILING = ["sudo", "pkexec", "docker", "gsettings", "dconf", "kwriteconfig5", "kwriteconfig6",
                 "kreadconfig5", "kscreen-doctor", "cosmic-randr", "xrandr", "modprobe",
-                "systemctl", "flatpak", "notify-send", "xdg-open", "pkill", "killall", "dbus-send"]
+                "systemctl", "flatpak", "notify-send", "xdg-open", "pkill", "killall", "dbus-send",
+                # terminals (the Activation Manager launcher can open Torquio in one)
+                "xdg-terminal-exec", "gnome-terminal", "ptyxis", "tilix", "konsole", "xfce4-terminal", "alacritty",
+                "kitty", "xterm"]
 
 MASKS = [
     (re.compile(r"\b\w{3} \w{3} [ \d]\d \d\d:\d\d:\d\d [A-Z]+ \d{4}\b"), "<DATE>"),  # date
@@ -258,6 +264,10 @@ def run_in_pty(cmd, env, cwd, stdin_text, timeout=120, piped=False):
             break  # something still holds the terminal (e.g. a background process); stop waiting
     if slave_open:
         os.close(slave)
+    try:  # background jobs still running (e.g. the Download Assistant watcher) mustn't outlive the scenario
+        os.killpg(proc.pid, signal.SIGKILL)
+    except OSError:
+        pass
     os.close(master)
     code = proc.wait()
     return out.decode("utf-8", "replace").replace("\r\n", "\n"), (-9 if killed else code)
@@ -318,7 +328,7 @@ def run_scenario(scenario, repo_copy, workdir):
     shutil.rmtree(scenario_bin, ignore_errors=True)
     make_fakes(scenario_bin, scenario.get("fakes", {}), defaults=False)
     env = environment(home, scenario_bin + ":" + bindir, scenario.get("env"))
-    cmd = [os.path.join(repo_copy, "torquio"), *scenario.get("args", [])]
+    cmd = [os.path.join(repo_copy, scenario.get("command", "torquio")), *scenario.get("args", [])]
     if shutil.which("unshare"):
         cmd = ["unshare", "--map-current-user", "--net", "--", *cmd]
     originals = overlay(repo_copy, scenario.get("repo_files", {}))
@@ -333,6 +343,10 @@ def run_scenario(scenario, repo_copy, workdir):
         restore(repo_copy, originals)
     replacements = [(repo_copy, "<REPO>"), (home, "<HOME>"), (workdir, "<TMP>")]
     names, contents = snapshot(home, scenario.get("compare_files", []) + [".fake-calls"], replacements)
+    calls = contents[".fake-calls"]
+    if calls is not None:  # background work (e.g. a watcher, a dialog) makes some calls' order or count timing-dependent
+        lines = [l for l in calls.splitlines() if not any(i in l for i in scenario.get("ignore_calls", []))]
+        contents[".fake-calls"] = "\n".join(sorted(lines) if scenario.get("unordered_calls") else lines)
     return {"output": mask(output, replacements), "exit code": code, "files": names, "contents": contents}
 
 

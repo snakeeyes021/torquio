@@ -31,6 +31,4 @@ jobs:
       - name: ShellCheck (errors only for now; the Bash is being ported to Python)
         run: |
           shellcheck --version
-          shellcheck -S error torquio scripts/*.sh scripts/1-build/*.sh scripts/2-install/*.sh \
-            scripts/3-runtime_handlers/torquio-dorico scripts/3-runtime_handlers/torquio-sam \
-            scripts/3-runtime_handlers/torquio-sda-handler
+          shellcheck -S error torquio scripts/*.sh scripts/1-build/*.sh scripts/2-install/*.sh scripts/templates/*.sh.in

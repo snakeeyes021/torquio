@@ -108,14 +108,14 @@ def refresh_launchers(pause=True):
 
 
 def install_launchers():
-    """Copy the launchers to ~/.local/bin (torquio-sda-handler gets this copy's path filled in)."""
+    """Copy the launchers to ~/.local/bin, with this copy's path filled in."""
     repo = paths.repo_dir()
     bindir = os.path.join(paths.home(), ".local/bin")
     os.makedirs(bindir, exist_ok=True)
     for handler in sorted(glob.glob(os.path.join(glob.escape(repo), "scripts/3-runtime_handlers/torquio*"))):
         name = os.path.basename(handler)
         target = os.path.join(bindir, name)
-        if name == "torquio-sda-handler":
+        if name in ("torquio-dorico", "torquio-sam", "torquio-sda-handler"):
             with open(handler) as f:
                 text = f.read().replace("@TORQUIO_REPO_DIR@", repo)
             with open(target, "w") as f:

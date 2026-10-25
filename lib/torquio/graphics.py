@@ -15,8 +15,14 @@ GRAPHICS_SCRIPT = "scripts/3-runtime_handlers/torquio_graphics.py"
 
 def query(show_errors=False):
     """torquio_graphics.py's JSON, as text ("" if it fails)."""
-    return run.capture([sys.executable, os.path.join(paths.repo_dir(), GRAPHICS_SCRIPT)],
-                       stderr=None if show_errors else run.DEVNULL)[1].rstrip("\n")
+    return query_status(show_errors)[1]
+
+
+def query_status(show_errors=False):
+    """(exit code, JSON text) of torquio_graphics.py."""
+    code, out = run.capture([sys.executable, os.path.join(paths.repo_dir(), GRAPHICS_SCRIPT)],
+                            stderr=None if show_errors else run.DEVNULL)
+    return code, out.rstrip("\n")
 
 
 def field(graphics_json, key, kind):

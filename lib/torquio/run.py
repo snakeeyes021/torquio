@@ -49,6 +49,15 @@ def succeeds(cmd, timeout=None, **kwargs):
         return False
 
 
+def spawn(cmd):
+    """Start a program in the background (cmd &, with no input and errors hidden)."""
+    sys.stdout.flush()
+    try:
+        subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError:
+        pass
+
+
 def have(program):
     """`command -v program` for programs on PATH."""
     return shutil.which(program) is not None

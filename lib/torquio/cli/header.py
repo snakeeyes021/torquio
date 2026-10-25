@@ -16,17 +16,35 @@ LOGO = [
 ]
 
 
+def clock_offset():
+    """(server time, local time, difference in seconds) against Google's clock, or None when the server sent
+    no date. Raises when it can't be checked (e.g. offline)."""
+    req = urllib.request.Request('https://www.google.com', method='HEAD')
+    with urllib.request.urlopen(req, timeout=3) as response:
+        srv_date_str = response.headers.get('Date')
+    if not srv_date_str:
+        return None
+    srv_dt = email.utils.parsedate_to_datetime(srv_date_str)
+    local_dt = datetime.datetime.now(datetime.timezone.utc)
+    return srv_dt, local_dt, abs((srv_dt - local_dt).total_seconds())
+
+
+def clock_offset_ok():
+    """False only when the clock is known to be off by more than 3 minutes."""
+    try:
+        offset = clock_offset()
+    except Exception:
+        return True
+    return offset is None or offset[2] <= 180
+
+
 def check_clock():
     """Warn when the system clock is off by more than 3 minutes (the Steinberg Activation Manager fails then),
     or when it can't be checked."""
     try:
-        req = urllib.request.Request('https://www.google.com', method='HEAD')
-        with urllib.request.urlopen(req, timeout=3) as response:
-            srv_date_str = response.headers.get('Date')
-        if srv_date_str:
-            srv_dt = email.utils.parsedate_to_datetime(srv_date_str)
-            local_dt = datetime.datetime.now(datetime.timezone.utc)
-            diff = abs((srv_dt - local_dt).total_seconds())
+        offset = clock_offset()
+        if offset:
+            srv_dt, local_dt, diff = offset
             if diff > 180:
                 print('')
                 print('\033[38;5;179mSystem Clock Status:\033[0m')

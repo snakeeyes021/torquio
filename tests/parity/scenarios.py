@@ -10,6 +10,9 @@
     fakes          {program: sh script body} replacing a program for this scenario
     repo_files     {path in the repo: contents} swapped in for this scenario (both copies)
     piped          True: input comes from a pipe, not the terminal (catches input read ahead and lost)
+    command        what to run instead of ./torquio (path in the repo, e.g. a launcher)
+    ignore_calls   substrings of recorded calls to leave out (calls made by background work at its own pace)
+    unordered_calls  True: compare the recorded calls in sorted order (background work interleaves)
     git_setup      shell commands run in both repo copies first (e.g. an upstream branch with updates);
                    undone afterwards
 
@@ -33,6 +36,9 @@ The fake container (harness.py) is set up by environment variables:
                           exit codes of image download, snapshot, container creation, the new container's
                           Wine check and the engine build (default 0)
     FAKE_XEV              "yes": xev is installed in the container
+    FAKE_REG_QUERY        `wine reg query` output in the container (printf %b)
+    FAKE_PS               `ps auxww` output in the container (printf %b)
+    FAKE_RUNNER_RC        exit code of the launchers' runner scripts (default 0)
 A container machine ID written by the scenario (fix identity, re-created container) is kept in
 ~/.fake-machine-id and read back from there.
 
@@ -133,6 +139,15 @@ OPTIONAL_INSTALLERS = {"Downloads/NotePerformer-Installer-5.1.2.exe": "",
                        "Downloads/Cantai-Windows-3.1.1-Installer-x64.exe.zip": ""}
 CANTAI_FAILS = {"scripts/2-install/install_cantai.sh": "#!/bin/bash\necho '(stub) Cantai installer'\nexit 1\n"}
 PARTIAL = {f"{PREFIX}/dosdevices/.keep": "", f"{PREFIX}/user.reg": USER_REG}
+DORICO = "scripts/3-runtime_handlers/torquio-dorico"
+SAM = "scripts/3-runtime_handlers/torquio-sam"
+SDA = "scripts/3-runtime_handlers/torquio-sda-handler"
+RUNNERS = [".local/share/torquio/run-dorico.sh", ".local/share/torquio/run-sam.sh", ".local/share/torquio/run-sda.sh",
+           ".local/share/torquio/launch_path.txt", ".local/share/torquio/sam_url.txt", ".local/share/torquio/sda_url.txt"]
+CRASH = {f"{PREFIX}/drive_c/winedbg_crash_1234.log": "Unhandled exception: page fault on read access\nBacktrace:\n"}
+REG_96 = "\\nHKEY_CURRENT_USER\\\\Control Panel\\\\Desktop\\n    LogPixels    REG_DWORD    0x60\\n"
+REG_120 = REG_96.replace("0x60", "0x78")
+DORICO_RUNNING = "user 1 0.0 0.0 C:\\\\Program Files\\\\Steinberg\\\\Dorico6\\\\Dorico6.exe\\n"
 GNOME_125 = graphics("GNOME", supported=True, connector="eDP-1", width=2560, height=1600, scale=1.25, physical_dpi=189,
                      ideal_xwayland_policy="Framebuffer Upscale (xwayland-scaling-factor=1)", target_wine_dpi=120,
                      target_xwayland_factor=1, rec_formula="Formula: 96 x 1.25 scale")
@@ -430,4 +445,69 @@ SCENARIOS = [
      "compare_files": [CONFIG]},
     {"name": "install-eof", "args": ["--install"], "input": "n\n\x04", "files": dict(INSTALLERS)},
     {"name": "install-from-menu-cancel", "input": "1\n5\n\n12\n", "files": dict(INSTALLED_FULL), "env": CONTAINER},
+
+    # Launchers (stage 6)
+    {"name": "dorico-manual", "command": DORICO, "files": {**INSTALLED, **CRASH, **config(freetype_interpreter=35)},
+     "compare_files": RUNNERS, "env": CONTAINER},
+    {"name": "dorico-open-file", "command": DORICO, "args": ["/home/me/Scores/My Song.dorico"],
+     "files": {**INSTALLED, **config(ai_gpu="NVIDIA RTX 4060")}, "compare_files": RUNNERS, "env": CONTAINER},
+    {"name": "dorico-runner-fails", "command": DORICO, "files": {**INSTALLED, **CRASH}, "compare_files": RUNNERS,
+     "env": {**CONTAINER, "FAKE_RUNNER_RC": "3"}},
+    {"name": "dorico-managed-gnome-declined", "command": DORICO, "repo_files": GNOME_125,
+     "files": {**INSTALLED, **config(manage_graphics=True)}, "compare_files": [CONFIG] + RUNNERS,
+     "env": {**CONTAINER, "FAKE_XWAYLAND_FACTOR": "uint32 0", "FAKE_REG_QUERY": REG_96}},
+    {"name": "dorico-managed-gnome-apply", "command": DORICO, "repo_files": GNOME_125,
+     "files": {**INSTALLED, **config(manage_graphics=True, warn_xwayland_change=True)}, "compare_files": [CONFIG] + RUNNERS,
+     "env": {**CONTAINER, "FAKE_XWAYLAND_FACTOR": "uint32 0", "FAKE_REG_QUERY": REG_96, "FAKE_MUTTER_WAYLAND": "yes"}},
+    {"name": "dorico-managed-dpi-only", "command": DORICO, "repo_files": GNOME_125,
+     "files": {**INSTALLED, **config(manage_graphics=True)}, "compare_files": [CONFIG] + RUNNERS,
+     "env": {**CONTAINER, "FAKE_XWAYLAND_FACTOR": "uint32 1", "FAKE_REG_QUERY": REG_96}},
+    {"name": "dorico-managed-nothing-to-do", "command": DORICO, "repo_files": GNOME_125,
+     "files": {**INSTALLED, **config(manage_graphics=True)}, "compare_files": [CONFIG] + RUNNERS,
+     "env": {**CONTAINER, "FAKE_XWAYLAND_FACTOR": "uint32 1", "FAKE_REG_QUERY": REG_120}},
+    {"name": "dorico-managed-running-restart-yes", "command": DORICO, "repo_files": GNOME_125,
+     "files": {**INSTALLED, **config(manage_graphics=True, warn_xwayland_change=True)}, "compare_files": [CONFIG] + RUNNERS,
+     "env": {**CONTAINER, "FAKE_XWAYLAND_FACTOR": "uint32 1", "FAKE_REG_QUERY": REG_96, "FAKE_PS": DORICO_RUNNING,
+             "FAKE_PICKED": "yes"}},
+    {"name": "dorico-managed-running-file-open", "command": DORICO, "args": ["/tmp/a.dorico"], "repo_files": GNOME_125,
+     "files": {**INSTALLED, **config(manage_graphics=True)}, "compare_files": [CONFIG] + RUNNERS,
+     "env": {**CONTAINER, "FAKE_XWAYLAND_FACTOR": "uint32 0", "FAKE_REG_QUERY": REG_96, "FAKE_PS": DORICO_RUNNING}},
+    {"name": "dorico-managed-kde", "command": DORICO, "repo_files": KDE_2X,
+     "files": {**INSTALLED, **config(manage_graphics=True, warn_xwayland_change=True)}, "compare_files": [CONFIG] + RUNNERS,
+     "env": {**CONTAINER, "XDG_CURRENT_DESKTOP": "KDE", "FAKE_KDE_POLICY": "false", "FAKE_REG_QUERY": REG_96}},
+    {"name": "dorico-managed-cosmic", "command": DORICO, "repo_files": COSMIC_15,
+     "files": {**INSTALLED, **config(manage_graphics=True, warn_xwayland_change=True)},
+     "compare_files": [CONFIG, COSMIC_FILE] + RUNNERS,
+     "env": {**CONTAINER, "XDG_CURRENT_DESKTOP": "COSMIC", "FAKE_REG_QUERY": ""}},
+    {"name": "dorico-managed-unsupported", "command": DORICO, "repo_files": graphics("SWAY", supported=False),
+     "files": {**INSTALLED, **config(manage_graphics=True)}, "compare_files": RUNNERS, "env": CONTAINER},
+    {"name": "dorico-managed-x11", "command": DORICO, "repo_files": GNOME_125,
+     "files": {**INSTALLED, **config(manage_graphics=True)}, "compare_files": RUNNERS,
+     "env": {**CONTAINER, "XDG_SESSION_TYPE": "x11"}},
+    {"name": "sam-plain", "command": SAM, "files": dict(INSTALLED), "compare_files": RUNNERS, "env": CONTAINER},
+    {"name": "sam-sign-in-link", "command": SAM, "args": ["net-steinberg-sam://login?code=abc"], "files": dict(INSTALLED),
+     "compare_files": RUNNERS, "env": CONTAINER},
+    {"name": "sam-clock-warning-gnome", "command": SAM, "files": dict(INSTALLED), "compare_files": RUNNERS,
+     "env": {**CONTAINER, "TORQUIO_TEST_CLOCK_DESYNC": "true", "FAKE_PICKED": "x"}, "unordered_calls": True},
+    {"name": "sam-clock-warning-terminal", "command": SAM, "files": dict(INSTALLED), "compare_files": RUNNERS,
+     "env": {**CONTAINER, "TORQUIO_TEST_CLOCK_DESYNC": "true", "TORQUIO_FORCE_TERMINAL": "true"},
+     "unordered_calls": True},
+    {"name": "sam-managed-gnome", "command": SAM, "repo_files": GNOME_125,
+     "files": {**INSTALLED, **config(manage_graphics=True, warn_xwayland_change=True)}, "compare_files": [CONFIG] + RUNNERS,
+     "env": {**CONTAINER, "FAKE_XWAYLAND_FACTOR": "uint32 0", "FAKE_REG_QUERY": REG_96}},
+    {"name": "sda-sign-in-link", "command": SDA, "args": ["net-steinberg-sda://login?code=abc"],
+     "files": {**INSTALLED, "Desktop/Dorico 6.lnk": ""}, "compare_files": RUNNERS, "env": CONTAINER},
+    {"name": "sda-plain-watcher", "command": SDA, "files": {**INSTALLED, "Desktop/HALion Sonic.lnk": ""},
+     "compare_files": RUNNERS, "env": CONTAINER, "ignore_calls": ["ps auxww"]},
+    {"name": "sda-managed", "command": SDA, "repo_files": GNOME_125,
+     "files": {**INSTALLED, **config(manage_graphics=True, warn_xwayland_change=True)}, "compare_files": [CONFIG] + RUNNERS,
+     "env": {**CONTAINER, "FAKE_XWAYLAND_FACTOR": "uint32 0", "FAKE_REG_QUERY": REG_96}, "ignore_calls": ["ps auxww"]},
+    {"name": "dorico-managed-kde-no-kreadconfig", "command": DORICO, "repo_files": KDE_2X,
+     "files": {**INSTALLED, **config(manage_graphics=True, warn_xwayland_change=True)}, "compare_files": RUNNERS,
+     "env": {**CONTAINER, "XDG_CURRENT_DESKTOP": "KDE", "FAKE_REG_QUERY": REG_96},
+     "fakes": {"kreadconfig6": "exit 1"}},
+    {"name": "dorico-managed-cosmic-policy-set", "command": DORICO, "repo_files": COSMIC_15,
+     "files": {**INSTALLED, **config(manage_graphics=True), COSMIC_FILE: "true\n"},
+     "compare_files": [CONFIG, COSMIC_FILE] + RUNNERS,
+     "env": {**CONTAINER, "XDG_CURRENT_DESKTOP": "COSMIC", "FAKE_REG_QUERY": REG_96}},
 ]

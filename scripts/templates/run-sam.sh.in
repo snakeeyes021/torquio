@@ -1,0 +1,43 @@
+#!/bin/bash
+export DBUS_SYSTEM_BUS_ADDRESS="unix:path=/run/host/run/dbus/system_bus_socket"
+export WINEPREFIX="@TORQUIO_PREFIX_DIR@"
+export WINEDLLOVERRIDES="winemenubuilder.exe=d;wineconsole.exe=d"
+export PATH="@WINE_CUSTOM_BIN@:$PATH"
+export FREETYPE_PROPERTIES="truetype:interpreter-version=@FREETYPE_INTERP@"
+
+URL_FILE="$HOME/.local/share/torquio/sam_url.txt"
+URL=""
+if [ -f "$URL_FILE" ]; then
+    URL=$(cat "$URL_FILE")
+    rm -f "$URL_FILE"
+fi
+
+PRIMARY_SAM="$WINEPREFIX/drive_c/Program Files/Steinberg/Activation Manager/SteinbergActivationManager.exe"
+SAM_EXE=""
+if [ -f "$PRIMARY_SAM" ]; then
+    SAM_EXE="$PRIMARY_SAM"
+else
+    SAM_EXE=$(find "$WINEPREFIX/drive_c/Program Files" "$WINEPREFIX/drive_c/Program Files (x86)" -type f -iname "*activation*manager*.exe" 2>/dev/null | head -n 1)
+fi
+
+if [ -z "$SAM_EXE" ]; then
+    MSG="Steinberg Activation Manager could not be located in your Wine prefix.\n\nPlease open the Steinberg Download Assistant (SDA) to install it."
+    if command -v zenity >/dev/null 2>&1; then
+        zenity --error --text="$MSG" --title="Torquio Launch Error" --width=400 2>/dev/null
+    elif command -v kdialog >/dev/null 2>&1; then
+        kdialog --error "$MSG" --title "Torquio Launch Error" 2>/dev/null
+    else
+        echo -e "\033[1;31mError: $MSG\033[0m"
+    fi
+    exit 1
+fi
+
+SAM_DIR=$(dirname "$SAM_EXE")
+SAM_NAME=$(basename "$SAM_EXE")
+
+cd "$SAM_DIR"
+if [ -n "$URL" ]; then
+    wine "$SAM_NAME" --redirect "$URL"
+else
+    wine "$SAM_NAME"
+fi

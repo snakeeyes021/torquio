@@ -1,0 +1,19 @@
+#!/bin/bash
+export DBUS_SYSTEM_BUS_ADDRESS="unix:path=/run/host/run/dbus/system_bus_socket"
+export WINEPREFIX="@TORQUIO_PREFIX_DIR@"
+export WINEDLLOVERRIDES="winemenubuilder.exe=d;wineconsole.exe=d"
+export PATH="@WINE_CUSTOM_BIN@:$PATH"
+export FREETYPE_PROPERTIES="truetype:interpreter-version=@FREETYPE_INTERP@"
+
+URL_FILE="$HOME/.local/share/torquio/sda_url.txt"
+URL=""
+if [ -f "$URL_FILE" ]; then
+    URL=$(cat "$URL_FILE")
+    rm -f "$URL_FILE"
+fi
+
+if [ -n "$URL" ]; then
+    wine 'C:\Program Files (x86)\Steinberg\Download Assistant\Steinberg Download Assistant.exe' "$URL"
+else
+    wine 'C:\Program Files (x86)\Steinberg\Download Assistant\Steinberg Download Assistant.exe'
+fi
