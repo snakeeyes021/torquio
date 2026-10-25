@@ -56,3 +56,33 @@ elsewhere (another desktop, a VM) is still useful.
       already active).
 - [ ] *(dev)* Settings, Configure Graphics, Folder Mappings and Key Commands menus look the same as before.
 - [ ] Ctrl+C at any prompt in those menus ends Torquio quietly (no Python traceback).
+
+## Stage 3: engine, container, updates
+
+The most important test of the release: **updating from v0.5.0 to the new version** (the handover between the
+old updater and the new code). On a system with v0.5.0 installed and working (a VM is fine):
+
+1. In the Torquio folder: `git fetch origin && git checkout -B test-update v0.5.0-alpha && git branch -u origin/develop`
+   (a branch at v0.5.0 that follows develop, so "Update Torquio" offers the new version).
+2. `torquio`, choose Update Torquio, install. Expected: the list of changes, "Torquio updated.", then the new
+   copy takes over (launchers and icons refreshed, GPU access checked), and "Press [Enter] to return to the
+   main menu..." leads to the menu of the new version.
+3. Launch Dorico; Cantai (if activated) is still activated.
+4. Afterwards `git checkout main` (or `develop`) to leave the test branch.
+
+- [ ] Update from v0.5.0 as above (menu), and once more with `torquio -u` from the command line.
+- [ ] Update Torquio when it's already up to date: "Torquio is up to date."
+- [ ] Wine Tools > Update / Rebuild Wine Engine with the engine up to date: offers compiling anyway; say no.
+- [ ] Wine Tools > Update / Rebuild Wine Engine with an older prebuilt engine (e.g. right after step 2 above if
+      the engine changed since v0.5.0): downloads it, replaces the container, Dorico still starts, Cantai still
+      activated.
+- [ ] `torquio --rebuild-wine` (20-40 minutes; only if you have the time): completes, Dorico starts.
+- [ ] On a computer with an NVIDIA GPU whose container predates NVIDIA support: `torquio --setup-gpu` offers
+      to set up NVIDIA access and re-creates the container; the dashboard then shows "NVIDIA Access: Enabled".
+- [ ] Wine Tools > GPU for AI Plug-ins: lists your GPUs; choose one, then Automatic, then Off, then Automatic;
+      the dashboard's Setting line follows.
+- [ ] *(dev)* `torquio --fix-identity` with a stable identity: "already stable; nothing to do."
+- [ ] Wine Tools > winecfg, regedit, control, explorer, cmd each open; Reboot Wine Prefix and Shutdown Wine
+      Server finish; Open C: Drive opens the file manager; xev offers to install itself (say no).
+- [ ] *(dev)* The Wine Tools menu looks the same as before.
+- [ ] Fix Icons & Refresh Launchers (main menu 5): finishes; Dorico's menu entry and file associations work.

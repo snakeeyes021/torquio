@@ -16,7 +16,7 @@ Rewrite the host-side Bash in standard-library Python (3.9+) with no user-visibl
 *   [x] **Stage 0, foundation:** `lib/torquio/` skeleton with `paths`, `config` (replacing the Python one-liners in `common.sh`), `ui` and `run`; the three existing Python scripts moved into the package (old paths kept as wrappers); Python version check; unit-test and parity harness; CI workflow.
 *   [x] **Stage 1, read-only screens:** dashboard, graphics diagnostics, header, help text, manifest.
 *   [x] **Stage 2, maintenance:** Configure Graphics, ntsync, key commands, folder mappings, custom exe, prefix settings, Settings, update check, log export screen.
-*   [ ] **Stage 3, engine and container:** `replace_container`, engine update/rebuild, `engine_outdated`, machine identity, GPU setup and chooser, the Wine Tools menu, self-update and `--post-update`.
+*   [x] **Stage 3, engine and container:** `replace_container`, engine update/rebuild, `engine_outdated`, machine identity, GPU setup and chooser, the Wine Tools menu, self-update and `--post-update`.
 *   [ ] **Stage 4, uninstall:** `cleanup.sh`.
 *   [ ] **Stage 5, install:** `install.sh` and the host-side `install_*.sh` helpers, launcher and icon installation.
 *   [ ] **Stage 6, launchers:** `torquio-dorico`, `torquio-sam`, `torquio-sda-handler`, graphics automation; the Dorico runner as a template file.
