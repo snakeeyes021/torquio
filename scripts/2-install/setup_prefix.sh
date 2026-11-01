@@ -12,6 +12,10 @@ export PATH="$WINE_CUSTOM_BIN:$PATH"
 # Suppress Wine Mono, Gecko installer prompts, and prevent winemenubuilder pollution
 export WINEDLLOVERRIDES="${WINEDLLOVERRIDES};mscoree=d;mshtml=d"
 
+# Winetricks prefers aria2c when it's installed, but SourceForge answers aria2c with 403 (allfonts' eufonts
+# download then falls back to a Wayback page that isn't the file); curl downloads it fine
+export WINETRICKS_DOWNLOADER=curl
+
 if [ ! -f "$WINEPREFIX/.torquio_core_installed" ]; then
     echo "Initializing Wine prefix at $WINEPREFIX..."
     wineboot -u
