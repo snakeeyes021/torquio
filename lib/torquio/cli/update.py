@@ -3,7 +3,7 @@ Refresh Launchers."""
 import glob
 import os
 
-from .. import container, engine, paths, prefix, run, ui
+from .. import container, engine, paths, prefix, run, ui, uninstall
 from ..ui import BLUE, GREEN, RED, RESET, YELLOW, echo
 from . import engine as engine_cli
 
@@ -93,7 +93,11 @@ def refresh_launchers(pause=True):
     echo()
     run.check(run.interactive(["distrobox", "enter", paths.container_name(), "--", "bash", "-c",
                                f'cd "{repo}" && ./scripts/2-install/extract_icons.sh']), True)
+    # Wine's own launchers and file types for the prefix duplicate Torquio's (e.g. a second Dorico in Open With)
+    uninstall.remove_menu_builder_leftovers()
     run.interactive(["update-desktop-database", os.path.join(paths.home(), ".local/share/applications/")],
+                    stdout=run.DEVNULL, stderr=run.DEVNULL)
+    run.interactive(["update-mime-database", os.path.join(paths.home(), ".local/share/mime/")],
                     stdout=run.DEVNULL, stderr=run.DEVNULL)
     print("Refreshing Wine prefix registry settings & debugger...")
     run.check(run.interactive(["distrobox", "enter", paths.container_name(), "--", "bash", "-c",

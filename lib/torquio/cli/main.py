@@ -2,7 +2,7 @@
 import os
 import sys
 
-from .. import config, container, paths, prefix, run, session_log, ui
+from .. import config, container, paths, prefix, run, session_log, ui, uninstall
 from ..ui import RESET, WINE, YELLOW, echo
 from . import usage
 
@@ -174,7 +174,10 @@ def run_command(args):
         code = run.interactive(["distrobox", "enter", paths.container_name(), "--", "bash", "-c",
                                 f'cd "{paths.repo_dir()}" && ./scripts/2-install/extract_icons.sh'])
         run.check(code, True)
+        uninstall.remove_menu_builder_leftovers()
         run.interactive(["update-desktop-database", os.path.join(paths.home(), ".local/share/applications/")],
+                        stdout=run.DEVNULL, stderr=run.DEVNULL)
+        run.interactive(["update-mime-database", os.path.join(paths.home(), ".local/share/mime/")],
                         stdout=run.DEVNULL, stderr=run.DEVNULL)
         return 0
     if flag in ("-g", "--graphics"):

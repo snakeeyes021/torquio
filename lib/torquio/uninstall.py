@@ -102,9 +102,26 @@ def remove_integrations():
         _rm(os.path.join(apps, name))
     for path in glob.glob(os.path.join(glob.escape(apps), "wine-protocol-net-steinberg-*.desktop")):
         _rm(path)
-    needles = torquio_dir_patterns()
+    remove_menu_builder_leftovers()
 
-    # Leftovers of Wine's menu builder (Torquio disables it, but older versions and some setup steps didn't):
+    for name in ICONS:
+        _rm(os.path.join(home, ".local/share/icons/hicolor/256x256/apps", name))
+    for name in MIME_PACKAGES:
+        _rm(os.path.join(home, ".local/share/mime/packages", name))
+    # Generated from Wine's .dorico file type; update-mime-database leaves it behind once its package is gone
+    _rm_rf(os.path.join(home, ".local/share/mime/dorico"))
+    # Default-application entries pointing at Torquio's launchers
+    for path in (os.path.join(home, ".config/mimeapps.list"), os.path.join(apps, "mimeapps.list")):
+        if os.path.isfile(path):
+            remove_default_apps(path)
+
+
+def remove_menu_builder_leftovers():
+    """What Wine's menu builder created for Torquio's prefix (Torquio disables it, but older versions and
+    some setup steps didn't): launchers, file types, menu entries and folders. Also run by Fix Icons."""
+    home = paths.home()
+    apps = os.path.join(home, ".local/share/applications")
+    needles = torquio_dir_patterns()
     # 1. launchers pointing into Torquio's data or cache directory, with the file types they registered
     candidates = []
     try:
@@ -152,17 +169,6 @@ def remove_integrations():
         needle = [f"<Directory>{os.path.basename(directory)}</Directory>"]
         if not any(_mentions(m, needle) for m in menus):
             _rm(directory)
-
-    for name in ICONS:
-        _rm(os.path.join(home, ".local/share/icons/hicolor/256x256/apps", name))
-    for name in MIME_PACKAGES:
-        _rm(os.path.join(home, ".local/share/mime/packages", name))
-    # Generated from Wine's .dorico file type; update-mime-database leaves it behind once its package is gone
-    _rm_rf(os.path.join(home, ".local/share/mime/dorico"))
-    # Default-application entries pointing at Torquio's launchers
-    for path in (os.path.join(home, ".config/mimeapps.list"), os.path.join(apps, "mimeapps.list")):
-        if os.path.isfile(path):
-            remove_default_apps(path)
 
 
 def remove_default_apps(path):

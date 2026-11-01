@@ -60,3 +60,28 @@ class UninstallMatchesBash(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MenuBuilderLeftovers(unittest.TestCase):
+    def test_removes_only_torquio_prefix_entries(self):
+        with tempfile.TemporaryDirectory() as home:
+            apps = os.path.join(home, ".local/share/applications")
+            mime = os.path.join(home, ".local/share/mime/packages")
+            os.makedirs(os.path.join(apps, "wine/Programs"))
+            os.makedirs(mime)
+            ours = f'Exec=env "WINEPREFIX={home}/.local/share/torquio/prefix" wine start %f\n'
+            files = {
+                f"{apps}/wine-extension-dorico.desktop": ours, f"{mime}/x-wine-extension-dorico.xml": "",
+                f"{apps}/wine-protocol-https.desktop": ours, f"{apps}/wine/Programs/Dorico.desktop": ours,
+                f"{apps}/wine-extension-txt.desktop": 'Exec=env "WINEPREFIX=/home/x/.wine" wine start %f\n',
+                f"{mime}/x-wine-extension-txt.xml": "", f"{apps}/wine/Programs/Other.desktop": "Exec=wine other.exe\n",
+                f"{apps}/Dorico.desktop": "Exec=torquio-dorico %F\n",
+            }
+            for path, text in files.items():
+                with open(path, "w") as f:
+                    f.write(text)
+            with mock.patch.dict(os.environ, {"HOME": home, "XDG_DATA_HOME": ""}):
+                uninstall.remove_menu_builder_leftovers()
+            left = {p for p in files if os.path.exists(p)}
+            self.assertEqual(left, {f"{apps}/wine-extension-txt.desktop", f"{mime}/x-wine-extension-txt.xml",
+                                    f"{apps}/wine/Programs/Other.desktop", f"{apps}/Dorico.desktop"})
