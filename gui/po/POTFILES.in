@@ -1,0 +1,8 @@
+# List of source files containing translatable strings.
+# Please keep this file sorted alphabetically.
+data/tech.redfoxlabs.Torquio.desktop.in
+data/tech.redfoxlabs.Torquio.gschema.xml
+data/tech.redfoxlabs.Torquio.metainfo.xml.in
+src/main.py
+src/window.py
+src/window.ui

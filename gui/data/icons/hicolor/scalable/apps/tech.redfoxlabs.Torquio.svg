@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Placeholder until Torquio has its own icon -->
+  <rect x="8" y="12" width="112" height="108" rx="20" fill="#7a2e1f"/>
+  <rect x="8" y="8" width="112" height="104" rx="20" fill="#c0503a"/>
+  <path d="M34 34h60v14H71v46H57V48H34z" fill="#fff"/>
+</svg>

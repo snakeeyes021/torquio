@@ -1,0 +1,3 @@
+[D-BUS Service]
+Name=tech.redfoxlabs.Torquio
+Exec=@bindir@/torquio-gui --gapplication-service

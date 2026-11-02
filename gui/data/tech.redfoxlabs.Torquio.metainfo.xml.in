@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>tech.redfoxlabs.Torquio</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+
+  <name>Torquio</name>
+  <summary>Run Steinberg Dorico on Linux</summary>
+  <description>
+    <p>
+      Torquio installs and runs Steinberg's Dorico, with its Activation Manager, Download Assistant and
+      playback plug-ins such as NotePerformer and Cantai, in a Wine environment tuned for it. It takes care of
+      display scaling, file associations, sign-in links and updates.
+    </p>
+    <p>
+      Dorico and Steinberg's other software aren't included: you download them with your own Steinberg
+      account.
+    </p>
+  </description>
+
+  <developer id="tech.redfoxlabs">
+    <name>Matthew Samson (Red Fox Labs)</name>
+  </developer>
+
+  <url type="homepage">https://github.com/snakeeyes021/torquio</url>
+  <url type="vcs-browser">https://github.com/snakeeyes021/torquio</url>
+  <url type="bugtracker">https://github.com/snakeeyes021/torquio/issues</url>
+
+  <translation type="gettext">torquio-gui</translation>
+  <launchable type="desktop-id">tech.redfoxlabs.Torquio.desktop</launchable>
+  <content_rating type="oars-1.1" />
+
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+
+  <releases>
+    <release version="0.1.0" date="2026-11-02">
+      <description translate="no">
+        <p>Scaffold: an overview of the Torquio installation on this computer, and starting Dorico.</p>
+      </description>
+    </release>
+  </releases>
+</component>

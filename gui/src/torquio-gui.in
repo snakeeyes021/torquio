@@ -1,0 +1,29 @@
+#!@PYTHON@
+"""Torquio's GUI (installed by Meson with the paths below filled in)."""
+import gettext
+import locale
+import os
+import signal
+import sys
+
+VERSION = '@VERSION@'
+APPLICATION_ID = '@APPLICATION_ID@'
+pkgdatadir = '@pkgdatadir@'
+localedir = '@localedir@'
+
+sys.path.insert(1, pkgdatadir)
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+locale.bindtextdomain('torquio-gui', localedir)
+locale.textdomain('torquio-gui')
+gettext.bindtextdomain('torquio-gui', localedir)
+gettext.textdomain('torquio-gui')
+
+if __name__ == '__main__':
+    import gi
+
+    from gi.repository import Gio
+    resource = Gio.Resource.load(os.path.join(pkgdatadir, 'torquio-gui.gresource'))
+    resource._register()
+
+    from torquio_gui import main
+    sys.exit(main.main(VERSION, APPLICATION_ID))

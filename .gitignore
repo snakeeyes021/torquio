@@ -30,3 +30,6 @@ installers/
 __pycache__/
 *.py[cod]
 *$py.class
+# GUI builds (flatpak-builder)
+.flatpak-builder/
+gui/build-dir/
