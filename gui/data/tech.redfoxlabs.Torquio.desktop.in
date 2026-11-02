@@ -5,7 +5,7 @@ Exec=torquio-gui
 Icon=tech.redfoxlabs.Torquio
 Terminal=false
 Type=Application
-Categories=AudioVideo;Audio;Music;Utility;
+Categories=AudioVideo;Audio;Music;
 # Translators: Search terms to find this application. Do NOT translate or localize the semicolons!
 Keywords=Dorico;Steinberg;Wine;Notation;Score;
 StartupNotify=true
