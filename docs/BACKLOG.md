@@ -9,7 +9,7 @@ This section tracks epics that have been broken down into concrete, actionable s
     *   [x] **v0.5.0:** Plug-in window icons, version manifest generation and the prebuilt container image (released 2026-10-24).
     *   [x] **v0.6.0:** Refactor in Python (epic below; released 2026-11-02).
     *   [ ] **v0.6.5:** Fixes for what the v0.6.0 testing found (epic below), released once the maintainer's host checks pass (the lost-unsaved-work fix shouldn't wait for the GUI).
-    *   [ ] **v0.7.0:** The Flatpak GUI app on Flathub (design in `docs/GUI.md` on `feat/gui-scaffold`; built from its own worktree, `~/dev/torquio-gui`), plus the fixes that land after v0.6.5.
+    *   [ ] **v0.7.0:** The Flatpak GUI app on Flathub (design in `docs/GUI.md` on `feat/gui-scaffold`; built in GNOME Builder from the repository, on that branch), plus the fixes that land after v0.6.5.
 
 ### Epic: v0.6.5 fixes (from the v0.6.0 testing)
 Found while testing v0.6.0 (VMs and the maintainer's machine) or already in this backlog, ranked by how much they affect users. All but the last were in v0.5.0 too. What isn't done by the v0.6.5 release moves to v0.7.0. Each fix is its own topic branch into `develop`; anything that needs real hardware or licenses goes on one checklist for the maintainer.
