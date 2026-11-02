@@ -1,7 +1,6 @@
 # Design: Torquio's GUI
 
-Status: **design and scaffold** (`gui/`, on `feat/gui-scaffold`). Whether it ships in v0.7.0 or the release
-after is still to be decided.
+Status: **design and scaffold** (`gui/`, on `feat/gui-scaffold`), for v0.7.0 (the GUI release).
 
 ## Goal
 
