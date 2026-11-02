@@ -1,6 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-  <!-- Placeholder until Torquio has its own icon -->
-  <rect x="8" y="12" width="112" height="108" rx="20" fill="#7a2e1f"/>
-  <rect x="8" y="8" width="112" height="104" rx="20" fill="#c0503a"/>
-  <path d="M34 34h60v14H71v46H57V48H34z" fill="#fff"/>
+  <defs>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ef7446"/>
+      <stop offset="1" stop-color="#d04b2c"/>
+    </linearGradient>
+    <linearGradient id="ink" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fffaf4"/>
+      <stop offset="1" stop-color="#f6e7d8"/>
+    </linearGradient>
+  </defs>
+  <!-- the tile, with its lower edge for depth -->
+  <rect x="12" y="18" width="104" height="98" rx="22" fill="#8e2f1b"/>
+  <rect x="12" y="12" width="104" height="98" rx="22" fill="url(#face)"/>
+  <!-- a staff -->
+  <g stroke="#fff" stroke-opacity="0.16" stroke-width="2">
+    <path d="M24 42h80M24 52h80M24 62h80M24 72h80M24 82h80"/>
+  </g>
+  <!-- a T whose stem is a note's -->
+  <g fill="url(#ink)">
+    <rect x="34" y="28" width="60" height="13" rx="4"/>
+    <rect x="58" y="28" width="12" height="56" rx="2"/>
+    <ellipse cx="55" cy="86" rx="16" ry="11.5" transform="rotate(-22 55 86)"/>
+  </g>
 </svg>

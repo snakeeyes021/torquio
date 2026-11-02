@@ -1,3 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
-  <path d="M3 3h10v2.5H9.25V14h-2.5V5.5H3z" fill="#2e3436"/>
+  <g fill="#2e3436">
+    <rect x="2.5" y="1.5" width="11" height="2.5" rx="0.75"/>
+    <rect x="7" y="1.5" width="2.2" height="10"/>
+    <ellipse cx="6.6" cy="12" rx="3" ry="2.2" transform="rotate(-22 6.6 12)"/>
+  </g>
 </svg>

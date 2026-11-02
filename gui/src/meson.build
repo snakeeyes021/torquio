@@ -31,7 +31,23 @@ sources = [
   '__init__.py',
   'host.py',
   'main.py',
+  'preferences.py',
+  'task.py',
+  'widgets.py',
   'window.py',
 ]
 
 install_data(sources, install_dir: moduledir)
+
+views = [
+  'views/__init__.py',
+  'views/display.py',
+  'views/folders.py',
+  'views/keycommands.py',
+  'views/maintenance.py',
+  'views/overview.py',
+  'views/plugins.py',
+  'views/setup.py',
+]
+
+install_data(views, install_dir: moduledir / 'views')

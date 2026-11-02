@@ -1,0 +1,20 @@
+/* A few quiet touches on top of Adwaita: the hero icon gets some air and a soft shadow, the task log reads
+   like a log, and finished steps pick up the accent's calmer cousin. */
+
+.hero-icon {
+  -gtk-icon-shadow: 0 2px 6px alpha(black, 0.18);
+  margin-bottom: 12px;
+}
+
+statuspage.hero > scrolledwindow > viewport > box > image {
+  -gtk-icon-shadow: 0 2px 6px alpha(black, 0.18);
+}
+
+.task-log {
+  font-size: 0.9em;
+  background: transparent;
+}
+
+statuspage.compact {
+  padding: 12px 0;
+}

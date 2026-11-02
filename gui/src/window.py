@@ -1,119 +1,213 @@
-"""The main window: an overview of the Torquio installation on this computer (`torquio api status`), with
-buttons to start Dorico and Steinberg's tools. More pages follow docs/GUI.md."""
-import threading
+"""The main window: the setup assistant until Torquio is installed, then a sidebar of pages."""
 from gettext import gettext as _
 
 from gi.repository import Adw, Gio, GLib, Gtk
 
 from . import host
-
-ENGINE_SOURCES = {"prebuilt": _("Prebuilt"), "compiled": _("Compiled on this computer")}
-NTSYNC = {"active": _("Active"), "dormant": _("Supported, not enabled"), "unavailable": _("Not supported by this kernel")}
-
-
-def in_background(work, done):
-    """Run work() in a thread (host commands take a while), then done(result, error) on the main loop."""
-    def thread():
-        try:
-            result, error = work(), None
-        except Exception as e:  # shown to the user, not raised
-            result, error = None, e
-        GLib.idle_add(lambda: done(result, error) and False)
-    threading.Thread(target=thread, daemon=True).start()
+from .task import TaskDialog
+from .views.display import Display
+from .views.folders import Folders
+from .views.keycommands import KeyCommands
+from .views.maintenance import Maintenance
+from .views.overview import Overview
+from .views.plugins import Plugins
+from .views.setup import Setup
+from .widgets import confirm, error
 
 
 @Gtk.Template(resource_path='/tech/redfoxlabs/Torquio/window.ui')
 class TorquioWindow(Adw.ApplicationWindow):
     __gtype_name__ = 'TorquioWindow'
 
+    toast_overlay = Gtk.Template.Child()
     stack = Gtk.Template.Child()
     message_page = Gtk.Template.Child()
+    setup_bin = Gtk.Template.Child()
+    split = Gtk.Template.Child()
+    sidebar = Gtk.Template.Child()
+    content_page = Gtk.Template.Child()
+    pages = Gtk.Template.Child()
     update_banner = Gtk.Template.Child()
-    environment_group = Gtk.Template.Child()
-    settings_group = Gtk.Template.Child()
     refresh_button = Gtk.Template.Child()
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._rows = []
-        refresh = Gio.SimpleAction.new("refresh", None)
-        refresh.connect("activate", lambda *_: self.refresh())
-        self.add_action(refresh)
-        launch = Gio.SimpleAction.new("launch", GLib.VariantType.new("s"))
-        launch.connect("activate", self.on_launch)
-        self.add_action(launch)
+        self.status, self.version = {}, {}
+        self.setup = None
+        for name, callback, param in (("refresh", lambda *_: self.refresh(), None),
+                                      ("launch", self._launch, GLib.VariantType.new("s")),
+                                      ("update", lambda *_: self._show_update(), None)):
+            action = Gio.SimpleAction.new(name, param)
+            action.connect("activate", callback)
+            self.add_action(action)
+
+        self.views = [Overview(self), Display(self), Folders(self), KeyCommands(self), Plugins(self),
+                      Maintenance(self)]
+        for view in self.views:
+            self.pages.add_named(view.widget, view.name)
+            row = Gtk.ListBoxRow()
+            box = Gtk.Box(spacing=12, margin_top=3, margin_bottom=3)
+            box.append(Gtk.Image(icon_name=view.icon))
+            box.append(Gtk.Label(label=view.title, xalign=0, hexpand=True))
+            row.set_child(box)
+            row._view = view
+            self.sidebar.append(row)
+        self.sidebar.connect("row-activated", self._select)
+        self.sidebar.select_row(self.sidebar.get_row_at_index(0))
         self.refresh()
 
-    def refresh(self):
-        self.stack.set_visible_child_name("loading")
-        self.refresh_button.set_sensitive(False)
-        in_background(lambda: (host.check_version(), host.api("status")), self.show_status)
+    # ---- navigation ---------------------------------------------------------------------------------------
 
-    def show_message(self, title, description):
+    def _select(self, listbox, row):
+        self.pages.set_visible_child_name(row._view.name)
+        self.content_page.set_title(row._view.title)
+        self.split.set_show_content(True)
+
+    def show_page(self, name):
+        for i, view in enumerate(self.views):
+            if view.name == name:
+                row = self.sidebar.get_row_at_index(i)
+                self.sidebar.select_row(row)
+                self._select(self.sidebar, row)
+
+    # ---- state ----------------------------------------------------------------------------------------------
+
+    def refresh(self):
+        if self.stack.get_visible_child_name() != "main":
+            self.stack.set_visible_child_name("loading")
+        self.refresh_button.set_sensitive(False)
+        host.in_background(lambda: (host.check_version(), host.api("status")), self._show_status)
+
+    def _message(self, title, description, icon="dialog-warning-symbolic"):
         self.message_page.set_title(title)
         self.message_page.set_description(description)
+        self.message_page.set_icon_name(icon)
         self.stack.set_visible_child_name("message")
 
-    def show_status(self, result, error):
+    def _show_status(self, result, err):
         self.refresh_button.set_sensitive(True)
-        if isinstance(error, host.NotInstalled):
-            self.show_message(_("Torquio Isn't Installed"),
-                              _("Torquio wasn't found on this computer. Setting it up from here is coming; for now, "
-                                "install it as described at github.com/snakeeyes021/torquio."))
+        if isinstance(err, host.NotInstalled):
+            self._show_setup(torquio_missing=True)
             return
-        if isinstance(error, host.TooOld):
-            self.show_message(_("Torquio Needs Updating"),
-                              _("The Torquio on this computer is too old for this app. Update it with "
-                                "<tt>torquio -u</tt> in a terminal, then refresh."))
+        if isinstance(err, host.TooOld):
+            self._message(_("Torquio Needs Updating"),
+                          _("The Torquio on this computer is older than this app. Update it with "
+                            "<tt>torquio -u</tt> in a terminal, then try again."), "software-update-available-symbolic")
             return
-        if error is not None:
-            self.show_message(_("Couldn't Check Torquio"), GLib.markup_escape_text(str(error)))
+        if err is not None:
+            self._message(_("Couldn't Reach Torquio"), GLib.markup_escape_text(str(err)))
             return
-        version, status = result
-        if not status.get("installed"):
-            self.show_message(_("Torquio Isn't Set Up Yet"),
-                              _("Torquio is on this computer, but its environment isn't installed. Run "
-                                "<tt>torquio -i</tt> in a terminal; the setup assistant is coming."))
+        self.version, self.status = result
+        if not self.status.get("installed"):
+            self._show_setup()
             return
-        self.fill_overview(version, status)
-        self.update_banner.set_revealed(status.get("updates_pending", 0) > 0)
-        self.stack.set_visible_child_name("overview")
+        self.setup = None
+        self.update_banner.set_revealed(self.status.get("updates_pending", 0) > 0)
+        for view in self.views:
+            view.refresh(self.status)
+        self.stack.set_visible_child_name("main")
 
-    def _row(self, group, title, subtitle):
-        row = Adw.ActionRow(title=title, subtitle=GLib.markup_escape_text(subtitle or "—"))
-        row.add_css_class("property")
-        group.add(row)
-        self._rows.append((group, row))
+    def _show_setup(self, torquio_missing=False):
+        if self.setup is None:
+            self.setup = Setup(self, torquio_missing)
+            self.setup_bin.set_child(self.setup)
+        self.stack.set_visible_child_name("setup")
 
-    def fill_overview(self, version, status):
-        for group, row in self._rows:
-            group.remove(row)
-        self._rows = []
-        engine = status["engine"]
-        engine_text = ENGINE_SOURCES.get(engine["source"], engine["source"])
-        if engine["update_available"]:
-            engine_text += " · " + _("update available")
-        self._row(self.environment_group, _("Torquio"), version.get("torquio", ""))
-        self._row(self.environment_group, _("Container"),
-                  f'{status["container"]["name"]} ({status["container"]["status"]})')
-        self._row(self.environment_group, _("Wine Engine"), engine_text)
-        self._row(self.environment_group, _("Wine Prefix"), status["prefix"]["path"])
-        self._row(self.environment_group, _("Kernel Fast Sync"), NTSYNC.get(status["ntsync"], status["ntsync"]))
-        settings = status["settings"]
-        self._row(self.settings_group, _("Display Scaling"),
-                  _("Managed by Torquio") if settings["manage_graphics"] else _("Manual"))
-        self._row(self.settings_group, _("GPU for AI Plug-ins"),
-                  {"auto": _("Automatic"), "off": _("Off (CPU)")}.get(settings["ai_gpu"], settings["ai_gpu"]))
-        self._row(self.settings_group, _("Font Smoothing"), f'FreeType v{settings["freetype_interpreter"]}')
+    # ---- shared actions ---------------------------------------------------------------------------------------
 
-    def on_launch(self, action, parameter):
+    def toast(self, text, timeout=3):
+        self.toast_overlay.add_toast(Adw.Toast(title=GLib.markup_escape_text(text), timeout=timeout))
+
+    def show_error(self, heading, err):
+        error(self, heading, err)
+
+    def _launch(self, action, parameter):
         name = parameter.get_string()
+        labels = {"torquio-dorico": _("Starting Dorico…"), "torquio-sam": _("Starting the Activation Manager…"),
+                  "torquio-sda-handler": _("Starting the Download Assistant…")}
         try:
             host.spawn([host.launcher(name)])
+            self.toast(labels.get(name, _("Starting…")))
         except OSError as e:
-            self.add_toast_message(str(e))
+            self.show_error(_("Couldn't Start It"), e)
 
-    def add_toast_message(self, text):
-        dialog = Adw.AlertDialog(heading=_("Couldn't Start It"), body=text)
-        dialog.add_response("close", _("_Close"))
+    def run_task(self, title, heading, done_heading, name, *args, on_done=None):
+        def finished(code, result):
+            self.refresh()
+            if on_done:
+                on_done(code, result)
+        TaskDialog(self, title, heading, done_heading, name, *args, on_done=finished).present(self)
+
+    def apply_setting(self, key, value, on_done=None, on_cancel=None, quiet_success=None):
+        """Change a setting; graphics settings restart Wine, so ask first when Dorico is open."""
+        restarts_wine = key in ("manage_graphics", "manual_dpi", "match_physical_dpi", "freetype_interpreter")
+
+        def apply():
+            def done(data, err):
+                if err:
+                    self.show_error(_("Couldn't Change the Setting"), err)
+                    if on_cancel:
+                        on_cancel()
+                    return
+                self.toast(quiet_success or _("Applied"))
+                self.refresh()
+                if on_done:
+                    on_done()
+            host.in_background(lambda: host.api("settings", "set", key, value), done)
+
+        if not restarts_wine:
+            apply()
+            return
+
+        def check(data, err):
+            if data and data.get("running"):
+                dialog = confirm(self, _("Restart Wine?"),
+                                 _("Applying this restarts Wine, which closes Dorico and Steinberg's programs. Save "
+                                   "your work first."), _("_Restart Wine"), apply, destructive=True)
+                dialog.connect("response", lambda d, r: on_cancel() if r != "ok" and on_cancel else None)
+            else:
+                apply()
+        host.in_background(lambda: host.api("running"), check)
+
+    def enable_ntsync(self, on_done=None):
+        def done(code):
+            if code == 0:
+                self.toast(_("Kernel fast sync is on"))
+                self.refresh()
+            else:
+                self.toast(_("Kernel fast sync wasn't enabled"))
+            if on_done:
+                on_done(code == 0)
+        host.Task("ntsync", on_done=done).start()
+
+    def _show_update(self):
+        dialog = Adw.AlertDialog(heading=_("Update Torquio"), body=_("Checking what's new…"))
+        dialog.add_response("cancel", _("_Later"))
+        dialog.add_response("update", _("_Update"))
+        dialog.set_response_appearance("update", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_response_enabled("update", False)
+        dialog.set_close_response("cancel")
+
+        def listed(data, err):
+            if err:
+                dialog.set_body(str(err))
+                return
+            if data["local_changes"]:
+                dialog.set_body(_("Torquio's files were changed on this computer, so it can't update itself. "
+                                  "Run torquio -u in a terminal to see what changed."))
+                return
+            commits = data["commits"]
+            if not commits:
+                dialog.set_body(_("Torquio is up to date."))
+                self.update_banner.set_revealed(False)
+                return
+            shown = "\n".join("• " + c for c in commits[:12])
+            more = len(commits) - 12
+            dialog.set_body(_("{} changes, including:").format(len(commits)) + "\n\n" + shown +
+                            (("\n" + _("…and {} more").format(more)) if more > 0 else ""))
+            dialog.set_response_enabled("update", True)
+        dialog.connect("response", lambda d, r: self.run_task(
+            _("Update Torquio"), _("Updating Torquio…"), _("Torquio is up to date"), "update") if r == "update"
+            else None)
         dialog.present(self)
+        host.in_background(lambda: host.api("updates", "check", timeout=60), listed)
