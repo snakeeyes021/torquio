@@ -3,19 +3,24 @@ import os
 import re
 import subprocess
 
-from .. import config, graphics, paths, prefix, run
+from .. import config, dialogs, graphics, paths, prefix, run
 
 APPS_RUNNING = re.compile(r"Dorico.*\.exe|Download.*Assistant.*\.exe|Activation.*Manager.*\.exe|aria2c", re.I)
 XSET = ("xset r rate 500 30 && for keycode in {10..21} 23 {24..35} 36 {38..49} 51 {52..61} 65; do "
         "xset -r $keycode; done")
 CHANGE_TITLE = "Torquio Graphics Change"
 CHANGE_TEXT = ("Torquio detected a display scaling change. To apply this change, the active WINE session needs to be "
-               "restarted.\\n\\nWould you like Torquio to close active applications and apply the new scaling now?")
+               "restarted.\n\nWould you like Torquio to close active applications and apply the new scaling now?")
+# Where nobody can be asked, Wine isn't restarted (that would close Dorico and lose unsaved work)
+CHANGE_LATER = ("Your display scaling changed. Torquio will apply it the next time you start Dorico, the Activation "
+                "Manager or the Download Assistant with none of them running.")
 POLICY_TITLE = "Torquio Graphics Management"
 POLICY_TEXT = ("You've configured Torquio to automatically handle graphics/scaling changes. Torquio is about to adjust "
-               "your global XWayland scaling policy for optimal Dorico performance.\\n\\nReminder: This is a persistent "
+               "your global XWayland scaling policy for optimal Dorico performance.\n\nReminder: This is a persistent "
                "system setting change and may affect the scaling of other running XWayland applications. Your current "
-               "settings will be backed up first so they can be easily restored later.\\n\\nProceed with applying this change?")
+               "settings will be backed up first so they can be easily restored later.\n\nProceed with applying this change?")
+POLICY_DONE = ("Torquio adjusted your desktop's XWayland scaling setting for Dorico, as you set it to manage scaling. "
+               "Your previous setting is backed up; Configure Graphics & Scaling can restore it.")
 
 
 class Declined(Exception):
@@ -38,17 +43,6 @@ def apps_running():
     out = run.capture(["distrobox", "enter", paths.container_name(), "--", "bash", "-c", "ps auxww"], stdin=None,
                       stderr=None)[1]
     return any(APPS_RUNNING.search(line) and "grep" not in line for line in out.splitlines())
-
-
-def question(text, title, width=None):
-    """A yes/no dialog (zenity, else kdialog); None when neither is installed."""
-    if run.have("zenity"):
-        cmd = ["zenity", "--question", f"--title={title}", f"--text={text}"] + ([f"--width={width}"] if width else [])
-        return run.interactive(cmd, stderr=run.DEVNULL if width else None) == 0
-    if run.have("kdialog"):
-        return run.interactive(["kdialog", "--yesno", text, "--title", title],
-                               stderr=run.DEVNULL if width else None) == 0
-    return None
 
 
 def manage_graphics(restartable):
@@ -94,16 +88,21 @@ def manage_graphics(restartable):
     apply = True
     if apps_running():
         if restartable:
-            answer = question(CHANGE_TEXT, CHANGE_TITLE, width=400)
-            apply = True if answer is None else answer
+            answer = dialogs.question(CHANGE_TEXT, CHANGE_TITLE, width=400)
+            if answer is None:
+                dialogs.notify(CHANGE_TITLE, CHANGE_LATER)
+            apply = bool(answer)
         else:
             apply = False
     if not apply:
         return
     if host_change:
         if warn_dismissed != "true":
-            if question(POLICY_TEXT, POLICY_TITLE) is False:
+            answer = dialogs.question(POLICY_TEXT, POLICY_TITLE)
+            if answer is False:
                 raise Declined()
+            if answer is None:
+                dialogs.notify(POLICY_TITLE, POLICY_DONE)
             config.set_text("warn_xwayland_change", "true")
         if de == "GNOME":
             if not config.get_text("original_scale_factor", ""):
@@ -165,6 +164,20 @@ def runner_text(template, values):
 
 def run_in_container(runner):
     return run.interactive(["distrobox", "enter", paths.container_name(), "--", runner])
+
+
+# A runner's exit code when its program isn't installed in the prefix; the container has no dialog tools, so the
+# launcher says so
+NOT_FOUND = 3
+
+
+def run_program(runner, missing):
+    """Run a launcher's runner; when its program isn't installed, show `missing` (and stop with exit code 1)."""
+    code = run_in_container(runner)
+    if code == NOT_FOUND:
+        dialogs.message("error", missing, "Torquio Launch Error")
+        code = 1
+    run.check(code, True)
 
 
 def report_crashes():
