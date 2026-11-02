@@ -7,7 +7,7 @@ This section tracks epics that have been broken down into concrete, actionable s
 
 *   [ ] **Release plan:**
     *   [x] **v0.5.0:** Plug-in window icons, version manifest generation and the prebuilt container image (released 2026-10-24).
-    *   [ ] **v0.6.0:** Refactor in Python (epic below).
+    *   [x] **v0.6.0:** Refactor in Python (epic below; released 2026-11-02).
     *   [ ] **v0.7.0:** Flatpak GUI app on Flathub.
 
 ### Epic: Torquio in Python (v0.6.0)

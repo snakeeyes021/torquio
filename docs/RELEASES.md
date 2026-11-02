@@ -4,6 +4,53 @@ This document tracks known-good, tested "snapshots" of the entire system. It ser
 
 ---
 
+## **Release v0.6.0-alpha (Torquio in Python)**
+**Date:** 2026-11-02
+**Status:** Alpha / Milestone
+
+**Description:** Torquio's host-side Bash is rewritten in standard-library Python (3.9 or newer, no other dependencies), organised as a core library with a thin command-line interface on top, which the planned GUI will reuse. Commands, flags, menus, wording and files stay the same, and existing installs update with Update Torquio as before. Testing the port turned up a few older problems, fixed here: a second Dorico in "Open With", fonts failing to install where `aria2c` is present, and KDE Plasma 6's scale not being read. Verified in a Fedora Workstation 44 VM (GNOME): a real update of a working v0.5.0 install (from the menu and with `torquio -u`), the uninstaller, and a from-scratch install (the wizard and `torquio -i -y`); the dashboard in a Fedora 44 KDE Plasma VM; and on RedFoxOS, a Bazzite-based Fedora Atomic image (Intel Iris Xe + NVIDIA RTX 3080 Ti Laptop): Fix Icons & Refresh Launchers, the GPU chooser, re-creating the container with Cantai staying activated, Cantai playback, and opening `.dorico` files from the file manager.
+
+**Key Improvements:**
+*   **Torquio in Python:** `torquio` is now a small Python entry point over the `lib/torquio` package (menus, installer, updater, uninstaller, engine and container management, Wine Tools, launchers). The launchers in `~/.local/bin` are short Python files that run your Torquio folder's code, so keep the folder where you installed it (as `~/.local/bin/torquio` always needed); `torquio_graphics.py` is no longer copied there. Unit tests, a parity harness that compared each stage with the Bash version, and a CI workflow come with it. The plan and the list of deliberate differences are in `docs/REFACTOR.md`.
+*   **Python Version Check:** On a Python older than 3.9 (e.g. openSUSE Leap 15 and RHEL 8, whose default `python3` is 3.6), `torquio` says which version it needs.
+*   **Launchers in Automated Mode:** Dorico, the Activation Manager and the Download Assistant now start on desktops the scaling automation doesn't cover, on COSMIC before its XWayland setting exists, and on KDE when `kreadconfig` fails; the Bash launchers stopped silently there.
+*   **One Dorico in "Open With":** Wine's menu builder turned the prefix's file types and protocols (`.dorico`, `.vstsound`, Steinberg sign-in links, `http`) into launchers and file types on the host, duplicating Torquio's. It was only disabled for processes started with Torquio's `WINEDLLOVERRIDES`, which some winetricks packages replace; it's now disabled in the prefix itself, and Update Torquio and Fix Icons & Refresh Launchers remove what it created.
+*   **Reliable Font Install:** Winetricks prefers `aria2c` when it's installed, and SourceForge answers `aria2c` with 403, so `allfonts` failed on such systems; winetricks now downloads with `curl`.
+*   **KDE Plasma 6 Scaling:** Newer `kscreen-doctor` colours its output even into a pipe, which hid the scale and monitor from Torquio, and reports the scaled size as Geometry; Torquio now reads the scale and the monitor's real resolution.
+*   **Smaller Fixes:** Log export reads the settings file Torquio actually writes; Configure Graphics and the uninstaller's banners show their intended colours (and no stray `033[0m`); key command export always uses `$XDG_DOWNLOAD_DIR` or `~/Downloads`.
+
+**Build Environment Artifacts:**
+*   **Custom Wine Source (`zhiyi/wine`):** Commit `883970826c62286c3da998072a5f49813d333a31` (`wine-11.5-191-g883970826c6`)
+*   **Torquio Wine Patches:** `0001-dcomp-dxgi-composition-swapchain`, `0002-dcomp-virtual-surface`, `0003-dcomp-d2d1-device-context-support`, `0004-dxgi-vblank-and-frame-latency-dcomp-presented-buffer`, `0005-dcomp-layered-popups-transparent-corners-no-black-flash`, `0006-ole32-revokedragdrop-other-process-windows`, `0007-dcomp-dwmapi-windows11-rounded-popup-corners`, `0008-winex11-hide-layered-windows-until-drawn`, `0009-dcomp-cross-process-targets-compose-on-change`, `0010-kernelbase-answer-wmic-uuid-query-without-a-process`, `0011-dxcore-report-d3d12-ml-adapters-for-native-d3d12`
+*   **Container Image:** `ghcr.io/snakeeyes021/torquio-env:build-f568ffd9a7fc`
+*   **Container:** `Ubuntu 24.04.5 LTS`, Mesa `25.2.8-0ubuntu0.24.04.4`
+*   **vkd3d-proton:** `3.0.1`
+*   **WebView2 Runtime:** `156.0.4314.42` (fetched at install time)
+*   **Winetricks Version:** `20240105`
+*   **Wine-ICU MSI Version:** `72.1`
+
+**Verified Application Versions:**
+*   **Steinberg Download Assistant:** `1.40.1`
+*   **Steinberg Activation Manager:** `1.10.0.1489`
+*   **Steinberg MediaBay:** `1.3.80.59`
+*   **Steinberg Dorico 6:** `6.2.30.6245`
+*   **Cantai (3rd Party):** `3.1.1`
+*   **NotePerformer (3rd Party):** `5.1.2`
+
+**Known Issues:**
+*   Without `zenity` or `kdialog` (e.g. on a stock Fedora Workstation), the launchers' questions get no dialog and are answered yes (e.g. Wine restarts without asking after a display scale change), as in earlier versions.
+*   The warning about an out-of-sync system clock opens behind the Activation Manager.
+*   After `torquio --rebuild-wine`, the dashboard still says the engine is prebuilt.
+*   SDA attempts to update MediaBay automatically and fails (Error 231: `preinstall.ps1: not trusted`); MediaBay stays at the version from the provided installer.
+*   The Activation Manager asks you to sign in every time it opens (its License Engine discards the stored sign-in on start); licenses stay activated.
+*   Cantai's editor shows white for a few seconds when first opened (WebView2 start-up); score edits made while Cantai's renderer is starting aren't rendered until the next edit; its renderer stays running for ~2 minutes after Dorico quits.
+*   GPU rendering for Cantai is verified on Intel Iris Xe (Mesa) and NVIDIA (proprietary 615); other GPUs/drivers are untested. It can be turned off in Wine Tools > GPU for AI Plug-ins.
+*   A new container's first start takes about a minute longer (distrobox installs its base packages).
+*   32-bit programs that crash use Wine's default crash handling rather than Torquio's (only the 64-bit debugger setting points at it); Dorico and its audio engine are 64-bit.
+*   ntsync requires a host kernel 6.14+ with `CONFIG_NTSYNC`. On older kernels Wine falls back to the wineserver path.
+
+---
+
 ## **Release v0.5.0-alpha (Prebuilt Wine Engine, Version Manifest & Plug-in Icons)**
 **Date:** 2026-10-24
 **Status:** Alpha / Milestone

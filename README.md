@@ -16,6 +16,7 @@ Before running the installer, ensure your host system has the following installe
     - Optional addition: **Distroshelf** (a graphical frontend for managing Distrobox containers, available via Flathub)
 2.  **Docker** or **Podman**
     - If you don't know which one to get, go with Podman. It's in the major repos and is therefore easier to install, and for most people they're functionally identical (the only people for whom the differences are material are people who already know which one they need).  
+3.  **Python 3.9 or newer** (`python3`; already installed on almost every current distro)
 
 On traditional (non-immutable) distros, these generally aren't installed by default, so just install them from your distro's package manager. For example:
 
