@@ -130,10 +130,10 @@ Destructive: use a VM or a system where you're ready to reinstall (stage 5's tes
       commands in v0.6.0's)*
 - [x] With Cantai's installer in ~/Downloads: Cantai is installed and its playback template appears in Dorico.
       *(VM)*
-- [ ] Re-running the installer on a complete install: each option of the "existing installation" menu (Configure
+- [x] Re-running the installer on a complete install: each option of the "existing installation" menu (Configure
       Settings Only; Re-run Windows Software Installers; Recreate Distrobox Container Only — Cantai stays
-      activated; Fresh Reinstallation — goes through the uninstaller's guards; Cancel). *(VM: every option works;
-      Cantai wasn't activated there, so "Cantai stays activated" is left for the host.)*
+      activated; Fresh Reinstallation — goes through the uninstaller's guards; Cancel). *(VM: every option works.
+      Host: after Recreate Distrobox Container Only, Cantai is still activated and plays)*
 - [x] `torquio -i -y` (automatic install with default settings). *(VM: fresh, 25 minutes, only the sudo prompt
       for NTsync)*
 - [x] Without the mandatory installers: the error names the missing ones and nothing is changed. *(VM; NTsync and
@@ -159,7 +159,8 @@ After updating (or Fix Icons & Refresh Launchers), `~/.local/bin/torquio-dorico`
       installing Dorico its icon appears in the menu. *(VM)*
 - [x] Set the system clock off by an hour and open the Activation Manager: a warning dialog appears (set the
       clock back afterwards). *(VM; the warning opens behind the Activation Manager)*
-- [ ] With Cantai installed: start Dorico, play a Cantai part; rendering works (GPU if available).
+- [x] With Cantai installed: start Dorico, play a Cantai part; rendering works (GPU if available). *(Host, on
+      the NVIDIA GPU)*
 - [x] Logs: each launch writes `~/.local/share/torquio/logs/torquio_dorico_*.log` (or `_sam_`, `_sda_`) with the
       same content as before. *(VM)*
 
