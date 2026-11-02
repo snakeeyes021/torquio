@@ -1,4 +1,5 @@
 """The main window: the setup assistant until Torquio is installed, then a sidebar of pages."""
+import os
 from gettext import gettext as _
 
 from gi.repository import Adw, Gio, GLib, Gtk
@@ -98,7 +99,8 @@ class TorquioWindow(Adw.ApplicationWindow):
             self._message(_("Couldn't Reach Torquio"), GLib.markup_escape_text(str(err)))
             return
         self.version, self.status = result
-        if not self.status.get("installed"):
+        # TORQUIO_GUI_SETUP=1 shows the setup assistant on an installed system (for working on it)
+        if not self.status.get("installed") or os.environ.get("TORQUIO_GUI_SETUP") == "1":
             self._show_setup()
             return
         self.setup = None
@@ -116,7 +118,7 @@ class TorquioWindow(Adw.ApplicationWindow):
     # ---- shared actions ---------------------------------------------------------------------------------------
 
     def toast(self, text, timeout=3):
-        self.toast_overlay.add_toast(Adw.Toast(title=GLib.markup_escape_text(text), timeout=timeout))
+        self.toast_overlay.add_toast(Adw.Toast(title=text, timeout=timeout, use_markup=False))
 
     def show_error(self, heading, err):
         error(self, heading, err)

@@ -50,12 +50,12 @@ class Folders(Page):
             self.window.show_error(_("Couldn't List the Folders"), error)
             return
         for d in data["drives"]:
-            row = add(self.drives, Adw.ActionRow(title=d["letter"], subtitle=d["target"]))
+            row = add(self.drives, Adw.ActionRow(title=d["letter"], subtitle=d["target"], use_markup=False))
             row.add_prefix(Gtk.Image(icon_name="drive-harddisk-symbolic"))
             row.add_suffix(icon_button("user-trash-symbolic", lambda d=d: self._remove("drive", d["letter"], d),
                                        _("Remove")))
         for s in data["shortcuts"]:
-            row = add(self.shortcuts, Adw.ActionRow(title=s["name"], subtitle=s["target"]))
+            row = add(self.shortcuts, Adw.ActionRow(title=s["name"], subtitle=s["target"], use_markup=False))
             row.add_prefix(Gtk.Image(icon_name="folder-symbolic"))
             row.add_suffix(icon_button("user-trash-symbolic", lambda s=s: self._remove("desktop", s["path"], s),
                                        _("Remove")))
@@ -95,6 +95,7 @@ class Folders(Page):
             # Easy to undo: put it back as it was
             toast = Adw.Toast(title=_("Removed {}").format(entry.get("letter") or entry.get("name")),
                               button_label=_("_Undo"))
+            toast.set_use_markup(False)
             toast.connect("button-clicked", lambda *_: self._map(entry["target"], kind, quiet=True))
             self.window.toast_overlay.add_toast(toast)
         host.in_background(lambda: host.api("folders", "unmap", kind, value), done)

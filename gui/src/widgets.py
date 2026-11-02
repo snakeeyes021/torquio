@@ -13,7 +13,8 @@ class StatusRow(Adw.ActionRow):
     """A row whose subtitle says how something is, with a small state icon at the end."""
 
     def __init__(self, title, icon_name=None, **kwargs):
-        super().__init__(title=title, **kwargs)
+        # Plain text: titles and values (paths, folder names) may contain "&" or "<"
+        super().__init__(title=title, use_markup=False, **kwargs)
         if icon_name:
             self.add_prefix(Gtk.Image(icon_name=icon_name))
         self.state_icon = Gtk.Image(visible=False)
@@ -21,7 +22,7 @@ class StatusRow(Adw.ActionRow):
         self.add_css_class("property")
 
     def set_state(self, text, state="off"):
-        self.set_subtitle(GLib.markup_escape_text(text or "—"))
+        self.set_subtitle(text or "—")
         icon, css = STATE_ICONS.get(state, ("", ""))
         for c in ("success", "warning", "error"):
             self.state_icon.remove_css_class(c)
@@ -46,12 +47,14 @@ def icon_button(icon, callback, tooltip):
     return button
 
 
-def nav_row(title, subtitle, icon, callback):
-    """A row that does something when activated (with the chevron Adwaita uses for that)."""
-    row = Adw.ActionRow(title=title, subtitle=subtitle or "", activatable=True)
+def nav_row(title, subtitle, icon, callback, opens=None):
+    """A row that does something when activated. `opens`: "window" (another program's: the external-link icon),
+    "page" (a page of ours: the chevron), or None (an action right here)."""
+    row = Adw.ActionRow(title=title, subtitle=subtitle or "", activatable=True, use_markup=False)
     if icon:
         row.add_prefix(Gtk.Image(icon_name=icon))
-    row.add_suffix(Gtk.Image(icon_name="go-next-symbolic"))
+    if opens:
+        row.add_suffix(Gtk.Image(icon_name="adw-external-link-symbolic" if opens == "window" else "go-next-symbolic"))
     row.connect("activated", lambda *_: callback())
     return row
 

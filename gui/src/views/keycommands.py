@@ -48,7 +48,7 @@ class KeyCommands(Page):
                              "ok" if files else "off")
         self.export.set_sensitive(bool(files))
         for path in data["backups"]:
-            row = add(self.backups, Adw.ActionRow(title=os.path.basename(path), subtitle=_("In Downloads")))
+            row = add(self.backups, Adw.ActionRow(title=os.path.basename(path), subtitle=_("In Downloads"), use_markup=False))
             row.add_prefix(Gtk.Image(icon_name="x-office-document-symbolic"))
             row.add_suffix(suffix_button(_("Import"), lambda p=path: self._import(p)))
         add(self.backups, self.choose)
@@ -60,6 +60,7 @@ class KeyCommands(Page):
                 return
             toast = Adw.Toast(title=_("Saved {}").format(os.path.basename(data["exported"])),
                               button_label=_("_Show"))
+            toast.set_use_markup(False)
             toast.connect("button-clicked", lambda *_: host.show_in_files(data["exported"]))
             self.window.toast_overlay.add_toast(toast)
             self.refresh(None)

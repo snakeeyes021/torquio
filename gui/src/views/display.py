@@ -1,7 +1,7 @@
 """Display & Scaling: Automated or Manual Mode, Wine's DPI, font smoothing, and what Torquio sees."""
 from gettext import gettext as _
 
-from gi.repository import Adw, Gtk
+from gi.repository import Adw, GLib, Gtk
 
 from .. import host
 from ..widgets import StatusRow, add, clear, suffix_button
@@ -30,16 +30,15 @@ class Display(Page):
         self.dpi = Adw.SpinRow.new_with_range(48, 480, 1)
         self.dpi.set_title(_("Wine DPI"))
         self.dpi.set_subtitle(_("96 is 100 %, 120 is 125 %, 144 is 150 %, 192 is 200 %"))
-        self.dpi_apply = suffix_button(_("Apply"), self._apply_dpi, "suggested-action")
-        self.dpi_apply.set_visible(False)
-        self.dpi.add_suffix(self.dpi_apply)
+        self.dpi.get_adjustment().set_page_increment(24)
+        self._dpi_timer = 0
         self.dpi.connect("notify::value", self._dpi_changed)
         for row in (self.manage, self.match, self.dpi):
             scaling.add(row)
         self.widget.add(scaling)
 
         self.restore_group = Adw.PreferencesGroup()
-        self.restore_row = Adw.ActionRow(title=_("Your Desktop's XWayland Setting Was Changed"))
+        self.restore_row = Adw.ActionRow(title=_("Your Desktop's XWayland Setting Was Changed"), use_markup=False)
         self.restore_row.add_prefix(Gtk.Image(icon_name="edit-undo-symbolic"))
         self.restore_row.add_suffix(suffix_button(_("Restore"), self._restore))
         self.restore_group.add(self.restore_row)
@@ -63,7 +62,6 @@ class Display(Page):
         self.match.set_visible(s["manage_graphics"])
         self.dpi.set_visible(not s["manage_graphics"])
         self.dpi.set_value(int(s["manual_dpi"]) if s["manual_dpi"].isdigit() else 96)
-        self.dpi_apply.set_visible(False)
         self.font.set_selected(next((i for i, f in enumerate(FONTS) if f[0] == s["freetype_interpreter"]), 0))
         self.font.set_subtitle(FONTS[self.font.get_selected()][2])
         x11 = status["session_type"] == "x11"
@@ -154,12 +152,20 @@ class Display(Page):
             self.window.apply_setting(key, "true" if row.get_active() else "false", on_cancel=self._revert)
 
     def _dpi_changed(self, *args):
-        if not self._updating:
-            current = self.window.status["settings"]["manual_dpi"]
-            self.dpi_apply.set_visible(str(int(self.dpi.get_value())) != current)
+        """Applied a moment after the last change (applying restarts Wine, so not on every step)."""
+        if self._updating:
+            return
+        if self._dpi_timer:
+            GLib.source_remove(self._dpi_timer)
+        self._dpi_timer = GLib.timeout_add(1000, self._apply_dpi)
 
     def _apply_dpi(self):
-        self.window.apply_setting("manual_dpi", str(int(self.dpi.get_value())), on_cancel=self._revert)
+        self._dpi_timer = 0
+        value = str(int(self.dpi.get_value()))
+        if value != self.window.status["settings"]["manual_dpi"]:
+            self.window.apply_setting("manual_dpi", value, on_cancel=self._revert,
+                                      quiet_success=_("Wine DPI set to {}").format(value))
+        return False
 
     def _font_changed(self, *args):
         if self._updating:

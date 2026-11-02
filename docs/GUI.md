@@ -1,6 +1,6 @@
 # Design: Torquio's GUI
 
-Status: **design and scaffold** (`gui/`, on `feat/gui-scaffold`), for v0.7.0 (the GUI release).
+Status: **first full version** (`gui/`, on `feat/gui`), for v0.7.0 (the GUI release).
 
 ## Goal
 
@@ -65,14 +65,18 @@ install and keep running than `flatpak-spawn`, for no gain over a command-line i
     confirmation, as in the terminal.
 - **Task view:** phases and a scrolling log for long tasks; closing it doesn't stop the task.
 
-## API, in the order the screens need it
+## API
 
-1. `version`, `status` (in the scaffold).
-2. `settings get|set`, `launch dorico|sam|sda`.
-3. `folders list|map|unmap`, `keycommands import|export`, `gpu list|set`.
-4. `update check|apply`, `engine update|rebuild`, `fix-icons`, `ntsync enable`, `logs export`.
-5. `install` (all wizard answers as options, JSON events), `uninstall` (`guards` reports licenses and
-   projects; the actual uninstall takes the confirmation).
+`torquio api VERB` (`lib/torquio/api.py`), JSON only:
+
+- Data: `version`, `status`, `running` (is Dorico or a Steinberg program open), `settings [set KEY VALUE]`
+  (validated; graphics settings are applied at once, which restarts Wine), `display [restore]`,
+  `folders [map PATH drive|desktop | unmap ...]`, `keycommands [export | import PATH]`, `gpus`, `prereqs`,
+  `updates [check]`, `guards` (activated licenses and projects in the prefix, for the uninstall dialog).
+- Tasks, `task NAME ARGS...`: `install OPTIONS_JSON`, `update`, `fix-icons`, `engine-update`,
+  `engine-rebuild`, `setup-gpu`, `ntsync` (pkexec), `logs`, `wine PROGRAM`, `uninstall RESTORE`. A task runs in a
+  child process with empty input and a session log; its output becomes `log` events, its steps `phase` events
+  (the CLI's step headings, renamed for people), and it ends with `done` and the exit code.
 
 ## Flathub
 
@@ -80,21 +84,35 @@ Permissions: `--talk-name=org.freedesktop.Flatpak` (essential, explained in the 
 X11 fallback, `--share=ipc`, `--device=dri`. No network or filesystem access is needed in the sandbox: the
 host does the downloading and the file work. Nothing from Steinberg is bundled.
 
-## Scaffold (this branch)
+## What's in this version
 
-- `gui/`: the template's structure, renamed (`tech.redfoxlabs.Torquio`, module `torquio_gui`), with a
-  window showing the Overview from `torquio api status` and buttons to start Dorico and Steinberg's tools, and
-  `host.py`, the `flatpak-spawn --host` bridge.
-- At the repository's root, only for the GUI: `meson.build` (which builds `gui/`) and the Flatpak manifest
-  `tech.redfoxlabs.Torquio.json`. The manifest builds the checkout itself (`"type": "dir", "path": "."`), so a
-  build always matches the checked-out branch, never a pinned commit or an installed copy.
-- `lib/torquio/api.py`: `torquio api version` and `torquio api status` (also on `develop`, so the GUI can
-  talk to a Torquio on `develop`).
+- **Setup assistant** (until Torquio is installed): welcome; when there's no Torquio on the computer at all, it
+  downloads it from GitHub (to `~/.local/share/torquio-app`); what's needed (Distrobox, Podman or Docker, the
+  installers, with links to their download pages and a file chooser for ones saved elsewhere); a few choices
+  (scaling, font smoothing, kernel fast sync, a folder for scores, key commands found in Downloads); the install
+  with its steps; done.
+- **Overview:** Start Dorico (or Get Dorico, until it's installed), the Activation Manager and the Download
+  Assistant; the Wine engine (with Update when there's a newer one), the container, kernel fast sync (Enable),
+  playback plug-ins.
+- **Display & Scaling:** Automated or Manual Mode (with the explanation, and the offer to restore the desktop's
+  XWayland setting when switching off), Wine DPI (applied a moment after the last change), physical DPI, font
+  smoothing, and what Torquio sees of the display.
+- **Folders:** drives and Desktop shortcuts, added through the folder portal (its host path from the Documents
+  portal), removed with an Undo toast.
+- **Key Commands:** export to Downloads (with Show), import from Downloads or a chosen file.
+- **AI Plug-ins:** the GPU AI plug-ins render on, NVIDIA access (Set Up), engine support, vkd3d-proton, Cantai.
+- **Maintenance:** Wine's tools, running a Windows program, drive C:, restarting or closing Wine (asking first when
+  Dorico is open), Fix Icons & Launchers, the Wine engine (Update, Rebuild), kernel fast sync, Export Logs, and
+  Uninstall (the license and project checks, restoring the scaling setting, a typed confirmation).
+- **Everywhere:** an update banner with what's new and Update; toasts rather than dialogs for finished actions;
+  progress dialogs for long tasks (closing one lets the task carry on); Preferences (update checks, which copy of
+  Torquio it talks to); keyboard shortcuts (Ctrl+Return starts Dorico, Ctrl+R refreshes); About with credits.
+- For working on the setup assistant on an installed system: `TORQUIO_GUI_SETUP=1`.
 
 ## Building and running it in GNOME Builder
 
 1. In GNOME Builder, open the repository (`~/dev/torquio`).
-2. Check out the GUI's branch (`feat/gui-scaffold`), in Builder or with `git checkout`.
+2. Check out the GUI's branch (`feat/gui`), in Builder or with `git checkout`.
 3. Press **Run** (or Build). Builder uses `tech.redfoxlabs.Torquio.json` (GNOME 50 SDK), builds the working
    tree and runs the app in its sandbox, where it talks to the Torquio on the host (`~/.local/bin/torquio`).
 

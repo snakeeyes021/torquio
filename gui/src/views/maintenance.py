@@ -22,15 +22,16 @@ class Maintenance(Page):
         super().__init__(window)
         tools = Adw.PreferencesGroup(title=_("Wine Tools"))
         for name, title, subtitle, icon in WINE_TOOLS:
-            tools.add(nav_row(title, subtitle, icon, lambda n=name, t=title: self._wine(n, t)))
+            tools.add(nav_row(title, subtitle, icon, lambda n=name, t=title: self._wine(n, t), opens="window"))
         tools.add(nav_row(_("Run a Windows Program…"), _("An installer (.exe or .msi) or a program"),
-                          "application-x-executable-symbolic", self._run_exe))
+                          "application-x-executable-symbolic", self._run_exe, opens="window"))
         tools.add(nav_row(_("Open Drive C:"), _("The Wine prefix in your file manager"), "drive-harddisk-symbolic",
-                          lambda: host.open_folder(os.path.join(self.window.status["prefix"]["path"], "drive_c"))))
+                          lambda: host.open_folder(os.path.join(self.window.status["prefix"]["path"], "drive_c")),
+                          opens="window"))
         self.widget.add(tools)
 
         wine = Adw.PreferencesGroup(title=_("Wine"))
-        wine.add(nav_row(_("Restart Wine"), _("Restarts Wine's Windows session (wineboot)"), "system-reboot-symbolic",
+        wine.add(nav_row(_("Restart Wine"), _("Restarts Wine's Windows session (wineboot)"), "view-refresh-symbolic",
                          lambda: self._stop_wine("reboot")))
         wine.add(nav_row(_("Close All Wine Programs"), _("Dorico, the Activation Manager and the Download Assistant "
                                                          "too"), "system-shutdown-symbolic",
@@ -39,7 +40,7 @@ class Maintenance(Page):
 
         repair = Adw.PreferencesGroup(title=_("Repair"))
         repair.add(nav_row(_("Fix Icons & Launchers"), _("Menu entries, file types and launchers"),
-                           "view-refresh-symbolic", lambda: window.run_task(
+                           "emblem-system-symbolic", lambda: window.run_task(
                                _("Fix Icons & Launchers"), _("Refreshing icons and launchers…"),
                                _("Icons and launchers are refreshed"), "fix-icons")))
         self.engine = StatusRow(_("Wine Engine"), "applications-system-symbolic")
@@ -112,6 +113,7 @@ class Maintenance(Page):
         def done(code, result):
             if code == 0 and result and result.get("path"):
                 toast = Adw.Toast(title=_("Logs saved to Downloads"), button_label=_("_Show"), timeout=8)
+                toast.set_use_markup(False)
                 toast.connect("button-clicked", lambda *_: host.show_in_files(result["path"]))
                 self.window.toast_overlay.add_toast(toast)
         self.window.run_task(_("Export Logs"), _("Collecting logs…"),

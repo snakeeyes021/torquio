@@ -23,8 +23,8 @@ def open_uri(window, uri):
     Gtk.UriLauncher.new(uri).launch(window, None, None)
 
 
-def page(title, child, tag):
-    header = Adw.HeaderBar()
+def page(title, child, tag, show_title=True):
+    header = Adw.HeaderBar(show_title=show_title)
     toolbar = Adw.ToolbarView(content=child)
     toolbar.add_top_bar(header)
     return Adw.NavigationPage(title=title, child=toolbar, tag=tag)
@@ -68,7 +68,7 @@ class Setup(Adw.Bin):
         self.get_started = pill(_("_Get Started"), lambda: self._get_torquio() if torquio_missing
                                 else self.nav.push(self._requirements()))
         status.set_child(footer(self.get_started))
-        return page(_("Welcome"), status, "welcome")
+        return page(_("Welcome"), status, "welcome", show_title=False)
 
     def _get_torquio(self):
         """No Torquio on this computer yet: download it from GitHub (on the host, with git)."""
@@ -246,6 +246,6 @@ class Setup(Adw.Bin):
                                               "Dorico. Then start it from here or from your app menu."))
         status.add_css_class("hero")
         status.set_child(footer(pill(_("_Continue"), self.window.refresh)))
-        done = page(_("Done"), status, "done")
+        done = page(_("Done"), status, "done", show_title=False)
         done.set_can_pop(False)
         self.nav.push(done)

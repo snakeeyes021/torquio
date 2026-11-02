@@ -28,6 +28,23 @@ PHASE = "::torquio-phase::"
 RESULT = "::torquio-result::"
 ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\x07]*\x07")
 INSTALLER_PHASE = re.compile(r"^(Phase \d+: .*|=== (.*) ===)$")
+# The CLI's step headings as the GUI shows them (None: not a step worth showing)
+PHASE_NAMES = [("Installation Manifest", None), ("Creating Distrobox container", "Setting up the container"),
+               ("Wine Engine", "Getting the Wine engine"),
+               ("Initializing Wine Prefix", "Preparing Windows: fonts, .NET and runtimes (the longest step)"),
+               ("Installing Steinberg Components", "Installing Steinberg's components and your plug-ins"),
+               ("Performing Host Integration", "Adding Dorico to your desktop"),
+               ("Refreshing Launchers & Icons", None), ("Rebuilding Wine Engine", "Compiling the Wine engine"),
+               ("Update Torquio", None), ("GPU Access for AI Plug-ins", "Setting up GPU access"),
+               ("Export Logs", None)]
+
+
+def phase_name(heading):
+    heading = heading.rstrip(". ")
+    for prefix, name in PHASE_NAMES:
+        if heading.startswith(prefix):
+            return name
+    return heading
 SETTINGS = {  # setting: (default, kind)
     "manage_graphics": ("false", "bool"),
     "manual_dpi": ("96", "int"),
@@ -106,7 +123,7 @@ def _installed_apps():
         "dorico": found("Program Files/Steinberg/Dorico*/Dorico*.exe"),
         "activation_manager": found("Program Files/Steinberg/Activation Manager/SteinbergActivationManager.exe"),
         "download_assistant": found("Program Files (x86)/Steinberg/Download Assistant/*.exe"),
-        "noteperformer": found("Program Files/Wallander Instruments/NotePerformer*", "Program Files/NotePerformer*"),
+        "noteperformer": found("Program Files/Common Files/VST3/NotePerformer*.vst3"),
         "cantai": found("users/*/AppData/Local/Cantai/Cantai.exe"),
     }
 
@@ -397,8 +414,25 @@ def task_update():
 
 
 def task_fix_icons():
-    from .cli.update import refresh_launchers
-    refresh_launchers(pause=False)
+    """Fix Icons & Refresh Launchers, step by step (what refresh_launchers does)."""
+    from . import uninstall
+    from .cli.update import install_launchers
+    repo, home = paths.repo_dir(), paths.home()
+    in_container = lambda script: run.interactive(["distrobox", "enter", paths.container_name(), "--", "bash", "-c",
+                                                   f'cd "{repo}" && {script}'])
+    phase("Icons and menu entries")
+    if in_container("./scripts/2-install/extract_icons.sh") != 0:
+        return 1
+    uninstall.remove_menu_builder_leftovers()
+    run.interactive(["update-desktop-database", os.path.join(home, ".local/share/applications/")],
+                    stdout=run.DEVNULL, stderr=run.DEVNULL)
+    run.interactive(["update-mime-database", os.path.join(home, ".local/share/mime/")],
+                    stdout=run.DEVNULL, stderr=run.DEVNULL)
+    phase("Wine prefix settings")
+    if in_container("./scripts/2-install/setup_prefix.sh") != 0:
+        return 1
+    phase("Launchers")
+    install_launchers()
     return 0
 
 
@@ -536,7 +570,9 @@ def run_task(name, args):
         elif line.strip():
             m = INSTALLER_PHASE.match(line.strip())
             if m and "Log Started" not in line:
-                _emit("phase", text=m.group(1).split(": ", 1)[-1] if m.group(1).startswith("Phase") else m.group(2))
+                name = phase_name(m.group(1).split(": ", 1)[-1] if m.group(1).startswith("Phase") else m.group(2))
+                if name:
+                    _emit("phase", text=name)
             _emit("log", text=line)
     code = child.wait()
     _emit("done", code=code)
