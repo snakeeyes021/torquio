@@ -25,10 +25,18 @@ index d9da19b..443fe6c 100644
          /* Use the given handle, make sure not to close this one ourselves */
          hFile = hFileIn;
 diff --git a/dlls/wintrust/crypt.c b/dlls/wintrust/crypt.c
-index ad6f264..c8390ce 100644
+index ad6f264..5e4a081 100644
 --- a/dlls/wintrust/crypt.c
 +++ b/dlls/wintrust/crypt.c
-@@ -33,6 +33,7 @@
+@@ -26,6 +26,7 @@
+ #include <stdio.h>
+ #include "windef.h"
+ #include "winbase.h"
++#include "winnls.h"
+ #include "wintrust.h"
+ #include "winver.h"
+ #include "mscat.h"
+@@ -33,6 +34,7 @@
  #include "imagehlp.h"
  #include "winternl.h"
  
@@ -36,7 +44,7 @@ index ad6f264..c8390ce 100644
  #include "wine/debug.h"
  
  WINE_DEFAULT_DEBUG_CHANNEL(wintrust);
-@@ -1611,6 +1612,138 @@ static BOOL WINTRUST_GetSignedMsgFromCatFile(SIP_SUBJECTINFO *pSubjectInfo,
+@@ -1611,6 +1613,138 @@ static BOOL WINTRUST_GetSignedMsgFromCatFile(SIP_SUBJECTINFO *pSubjectInfo,
      return ret;
  }
  
@@ -175,7 +183,7 @@ index ad6f264..c8390ce 100644
  /* GUIDs used by CryptSIPGetSignedDataMsg and CryptSIPPutSignedDataMsg */
  static const GUID unknown = { 0xC689AAB8, 0x8E78, 0x11D0, { 0x8C,0x47,
      0x00,0xC0,0x4F,0xC2,0x95,0xEE } };
-@@ -1645,6 +1778,9 @@ BOOL WINAPI CryptSIPGetSignedDataMsg(SIP_SUBJECTINFO* pSubjectInfo, DWORD* pdwEn
+@@ -1645,6 +1779,9 @@ BOOL WINAPI CryptSIPGetSignedDataMsg(SIP_SUBJECTINFO* pSubjectInfo, DWORD* pdwEn
      else if (!memcmp(pSubjectInfo->pgSubjectType, &catGUID, sizeof(catGUID)))
          ret = WINTRUST_GetSignedMsgFromCatFile(pSubjectInfo, pdwEncodingType,
           dwIndex, pcbSignedDataMsg, pbSignedDataMsg);
