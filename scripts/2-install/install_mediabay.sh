@@ -9,10 +9,23 @@ export WINE="$WINE_CUSTOM_BIN/wine"
 export WINESERVER="$WINE_CUSTOM_BIN/wineserver"
 export PATH="$WINE_CUSTOM_BIN:$PATH"
 
-echo "Looking for MediaBay installers..."
-# Search locations for the zip
-SEARCH_DIRS=("$TORQUIO_INSTALLERS_DIR" "$HOME/Downloads" "$(pwd)")
-mapfile -t ZIPS < <(find "${SEARCH_DIRS[@]}" -maxdepth 1 -type f -name "MediaBay_Installer_win64*.zip" 2>/dev/null)
+INTERACTIVE=""
+ZIPS=()
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --interactive) INTERACTIVE=1 ;;
+        # A specific installer, e.g. the update the Download Assistant downloaded but couldn't install
+        --zip) ZIPS=("$2"); shift ;;
+    esac
+    shift
+done
+
+if [ ${#ZIPS[@]} -eq 0 ]; then
+    echo "Looking for MediaBay installers..."
+    # Search locations for the zip
+    SEARCH_DIRS=("$TORQUIO_INSTALLERS_DIR" "$HOME/Downloads" "$(pwd)")
+    mapfile -t ZIPS < <(find "${SEARCH_DIRS[@]}" -maxdepth 1 -type f -name "MediaBay_Installer_win64*.zip" 2>/dev/null)
+fi
 
 if [ ${#ZIPS[@]} -eq 0 ]; then
     echo "Error: MediaBay installer zip not found in search locations."
@@ -42,7 +55,7 @@ BEST_FOLDER=$(find "$TORQUIO_DATA_DIR/MediaBay_extracted" -name "Setup.exe" -pri
 if [ -n "$BEST_FOLDER" ]; then
     SETUP_EXE="$BEST_FOLDER/Setup.exe"
     echo "Selected versioned folder: $(basename "$BEST_FOLDER")"
-    if [[ "$1" == "--interactive" ]]; then
+    if [ -n "$INTERACTIVE" ]; then
         echo "Running interactively: wine $SETUP_EXE"
         wine "$SETUP_EXE" || true
     else
