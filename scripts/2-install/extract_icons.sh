@@ -124,6 +124,9 @@ extract_icon() {
         rm -f "$HOME/.local/share/applications/wine-protocol-net-steinberg-"*.desktop
         rm -f "$HOME/.local/share/applications/wine-extension-vstsound.desktop"
         rm -f "$HOME/.local/share/applications/wine-extension-slm.desktop"
+        # Their file types too (the menu builder cleanup finds those through the launchers, gone by then)
+        rm -f "$HOME/.local/share/mime/packages/x-wine-extension-vstsound.xml"
+        rm -f "$HOME/.local/share/mime/packages/x-wine-extension-slm.xml"
 
         echo "Registering desktop launcher: $desktop_name..."
         sed "s|\$HOME|$HOME|g" "$SCRIPT_DIR/../../desktop_stubs/$desktop_name" > "$HOME/.local/share/applications/$desktop_name"
