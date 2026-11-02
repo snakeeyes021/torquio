@@ -10,11 +10,11 @@ same core (`lib/torquio`), so behaviour can't drift apart.
 
 ## Where it lives
 
-In this repository, in `gui/`: a Meson project made from the GNOME Builder template (Python, GTK 4,
-libadwaita, GNOME 50 runtime), with its Flatpak manifest `gui/tech.redfoxlabs.Torquio.json`. The app ID is
-`tech.redfoxlabs.Torquio`, matching Pianola and Thirties. Keeping it in the same repository means one version
-and one release for the core and both interfaces; a change to the core and the screen that uses it land
-together.
+In this repository, in `gui/`: made from the GNOME Builder template (Python, GTK 4, libadwaita, GNOME 50
+runtime), built by a `meson.build` and the Flatpak manifest `tech.redfoxlabs.Torquio.json` at the repository's
+root. The app ID is `tech.redfoxlabs.Torquio`, matching Pianola and Thirties. Keeping it in the same repository
+means one version and one release for the core and both interfaces; a change to the core and the screen that
+uses it land together.
 
 ## How a sandboxed app drives Torquio
 
