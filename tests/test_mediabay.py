@@ -28,7 +28,7 @@ class FailedUpdate(unittest.TestCase):
             with mock.patch.object(mediabay.paths, "prefix_dir", return_value=prefix), \
                     mock.patch.object(mediabay, "installed_version", return_value=installed):
                 found = mediabay.failed_update()
-            return found and found[2]
+            return found and found[1]
 
     def test_newer_failed_download(self):
         self.assertEqual(self.find("1.3.80", ("a", "1.4.10")), "1.4.10")
