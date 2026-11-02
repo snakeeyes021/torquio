@@ -12,6 +12,16 @@ export PATH="$WINE_CUSTOM_BIN:$PATH"
 # Suppress Wine Mono, Gecko installer prompts, and prevent winemenubuilder pollution
 export WINEDLLOVERRIDES="${WINEDLLOVERRIDES};mscoree=d;mshtml=d"
 
+# Winetricks prefers aria2c when it's installed, but SourceForge answers aria2c with 403 (allfonts' eufonts
+# download then falls back to a Wayback page that isn't the file); curl downloads it fine
+export WINETRICKS_DOWNLOADER=curl
+
+# Wine's menu builder turns the prefix's file types and protocols (.dorico, Steinberg sign-in links, http) into
+# host launchers that duplicate Torquio's. WINEDLLOVERRIDES only covers processes started with it (winetricks
+# replaces it for some packages); disabling it in the prefix covers every process. Before winetricks, so its
+# packages don't leave launchers behind (`wine reg` creates the prefix if it doesn't exist yet).
+wine reg add "HKCU\\Software\\Wine\\DllOverrides" /v winemenubuilder.exe /t REG_SZ /d "" /f
+
 if [ ! -f "$WINEPREFIX/.torquio_core_installed" ]; then
     echo "Initializing Wine prefix at $WINEPREFIX..."
     wineboot -u
@@ -118,6 +128,7 @@ if [ ! -f /opt/wine-custom/bin/torquio-winedbg.exe ] && command -v x86_64-w64-mi
 fi
 
 echo "Configuring Keyboard Focus Loss Mitigation & Accessibility Registry Overrides..."
+
 # FocusOnClick forces window focus acquisition upon mouse click, preventing focus loss in modals
 wine reg add "HKCU\\Software\\Wine\\X11 Driver" /v FocusOnClick /t REG_SZ /d Y /f
 wine reg add "HKCU\\Software\\Wine\\X11 Driver" /v UseTakeFocus /t REG_SZ /d N /f

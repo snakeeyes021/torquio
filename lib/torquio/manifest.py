@@ -1,11 +1,10 @@
-#!/usr/bin/env python3
 """Version manifest: what this installation's Wine engine was built from and which Windows software is installed.
 
 Prints the "Build Environment Artifacts" and "Verified Application Versions" sections of a docs/RELEASES.md
 entry as Markdown. Problems that make the manifest unreliable for a release (e.g. a Wine engine built from
 other patches than this copy of Torquio has) are printed to stderr as warnings.
 
-Usage: version_manifest.py
+Usage: torquio --manifest
 """
 import glob
 import hashlib
@@ -16,11 +15,13 @@ import struct
 import subprocess
 import sys
 
-HOME = os.path.expanduser("~")
-DATA_DIR = os.environ.get("TORQUIO_DATA_DIR") or os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.join(HOME, ".local/share"), "torquio")
-PREFIX = os.environ.get("TORQUIO_PREFIX_DIR") or os.path.join(DATA_DIR, "prefix")
-CONTAINER = os.environ.get("TORQUIO_CONTAINER_NAME") or "torquio-env"
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from . import paths
+
+HOME = paths.home()
+DATA_DIR = paths.data_dir()
+PREFIX = paths.prefix_dir()
+CONTAINER = paths.container_name()
+REPO = paths.repo_dir()
 
 # Programs are listed under their Windows "Programs and Features" names, except Cantai, whose installer
 # registers as its renderer but installs the plug-in too
@@ -234,7 +235,7 @@ def manifest():
              "*   **Torquio Wine Patches:** " + (", ".join(f"`{name}`" for _, name in patches) or "none")]
     image = container_image()
     if image:
-        prebuilt = image.startswith(os.environ.get("TORQUIO_IMAGE_REPO") or "ghcr.io/snakeeyes021/torquio-env") and ":" in image
+        prebuilt = image.startswith(paths.image_repo()) and ":" in image
         lines.append(f"*   **Container Image:** `{image}`" if prebuilt else "*   **Container Image:** compiled locally")
         tree = subprocess.run(["git", "-C", REPO, "rev-parse", "HEAD:scripts/1-build"], capture_output=True, text=True).stdout.strip()
         if prebuilt and tree and not image.endswith(f":build-{tree[:12]}"):
@@ -244,7 +245,7 @@ def manifest():
         lines.append(f"*   **Container:** `{c['os']}`" + (f", Mesa `{c['mesa']}`" if c.get("mesa") else ""))
     vkd3d = versions_in(os.path.join(DATA_DIR, "vkd3d-proton"))
     if vkd3d:
-        lines.append(f"*   **vkd3d-proton:** " + ", ".join(f"`{v}`" for v in vkd3d))
+        lines.append("*   **vkd3d-proton:** " + ", ".join(f"`{v}`" for v in vkd3d))
         want = pinned("2-install/install_vkd3d_proton.sh", "VKD3D_PROTON_VERSION")
         if want and want not in vkd3d:
             warnings.append(f"vkd3d-proton {want} (this copy's pinned version) isn't installed; re-run the Cantai installer to provision it.")
@@ -284,6 +285,3 @@ def main():
     for w in warnings:
         print(f"Warning: {w}", file=sys.stderr)
 
-
-if __name__ == "__main__":
-    main()
