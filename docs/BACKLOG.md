@@ -8,10 +8,11 @@ This section tracks epics that have been broken down into concrete, actionable s
 *   [ ] **Release plan:**
     *   [x] **v0.5.0:** Plug-in window icons, version manifest generation and the prebuilt container image (released 2026-10-24).
     *   [x] **v0.6.0:** Refactor in Python (epic below; released 2026-11-02).
-    *   [ ] **v0.7.0:** Fixes for what the v0.6.0 testing found (epic below). The Flatpak GUI app (design in `docs/GUI.md` on `feat/gui-scaffold`) goes in v0.7.0 or the release after (to be decided).
+    *   [ ] **v0.6.5:** Fixes for what the v0.6.0 testing found (epic below), released once the maintainer's host checks pass (the lost-unsaved-work fix shouldn't wait for the GUI).
+    *   [ ] **v0.7.0:** The Flatpak GUI app on Flathub (design in `docs/GUI.md` on `feat/gui-scaffold`; built from its own worktree, `~/dev/torquio-gui`), plus the fixes that land after v0.6.5.
 
-### Epic: v0.7.0 fixes (from the v0.6.0 testing)
-Found while testing v0.6.0 (VMs and the maintainer's machine) or already in this backlog, ranked by how much they affect users. All but the last were in v0.5.0 too. Each fix is its own topic branch into `develop`; anything that needs real hardware or licenses goes on one checklist for the maintainer.
+### Epic: v0.6.5 fixes (from the v0.6.0 testing)
+Found while testing v0.6.0 (VMs and the maintainer's machine) or already in this backlog, ranked by how much they affect users. All but the last were in v0.5.0 too. What isn't done by the v0.6.5 release moves to v0.7.0. Each fix is its own topic branch into `develop`; anything that needs real hardware or licenses goes on one checklist for the maintainer.
 
 *   [x] **1. Launcher questions without zenity or kdialog are answered yes:** Stock Fedora Workstation has neither, and the launchers then skip every dialog: with Dorico open and the display scale changed, starting Dorico (or the Activation Manager) again restarts Wine without asking, which closes Dorico and loses unsaved work (seen in testing); the one-time XWayland policy warning, the clock warning and launch errors never appear. Fixed: questions and warnings fall back to GTK (`lib/torquio/gtk_dialog.py`, through PyGObject, which GNOME desktops have), then to a desktop notification; where nobody can be asked, Wine isn't restarted and a notification says the change applies on the next start. The runners' "could not be located" errors are shown by the launcher (the container has no dialog tools, so they never appeared). Verified on stock Fedora Workstation 44 (no zenity or kdialog): Yes, No, no way to ask, the clock warning and the launch error.
 *   [ ] **2. Cantai: edits made while its renderer starts are dropped:** see "Cantai" below. Playback is silently missing the change until the next edit. Needs Cantai (maintainer's machine).
