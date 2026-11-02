@@ -31,7 +31,14 @@ def main(argv):
     if len(argv) != 4 or argv[1] not in ("question", "warning", "error"):
         print(__doc__, file=sys.stderr)
         return UNAVAILABLE
-    kind, title, text = argv[1:]
+    try:
+        return show(*argv[1:])
+    except Exception as e:  # e.g. no display: an uncaught exception's exit code (1) would read as "No"
+        print(f"gtk_dialog: {e}", file=sys.stderr)
+        return UNAVAILABLE
+
+
+def show(kind, title, text):
     Gtk = load_gtk()
     if Gtk is None:
         return UNAVAILABLE
@@ -43,7 +50,8 @@ def main(argv):
     accepted = (Gtk.ResponseType.YES, Gtk.ResponseType.OK)
 
     if Gtk.get_major_version() >= 4:
-        if not Gtk.init_check():
+        # PyGObject already tried to initialise GTK 4 on import; init_check() can be true even when that failed
+        if not Gtk.init_check() or not Gtk.is_initialized():
             return UNAVAILABLE
         from gi.repository import GLib
         loop = GLib.MainLoop()
@@ -56,7 +64,7 @@ def main(argv):
             loop.quit()
 
         dialog.connect("response", on_response)
-        dialog.set_title(title)
+        # (no window title: GTK 4 shows it above the text, which already starts with it)
         dialog.present()
         loop.run()
         return result[0]
