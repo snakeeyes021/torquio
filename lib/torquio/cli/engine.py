@@ -34,7 +34,7 @@ def replace_container(image="", strict=True):
     current = container.image()
     new = f"{name}-new"
     snapshot = ""
-    if not image and engine.is_prebuilt(current):
+    if not image and engine.from_image(current):  # (a recompiled engine is kept by snapshotting the container)
         image = current
     machine_id = identity.container_machine_id()
     print("Stopping Wine and the container...")
@@ -100,7 +100,11 @@ def rebuild_wine(strict=True):
                      "wineserver -w 2>/dev/null || true"), strict)
     prefix.apply_settings()
     print("Running build_wine.sh inside container...")
-    run.check(_enter("bash", "-c", f'cd "{paths.repo_dir()}" && ./scripts/1-build/build_wine.sh --rebuild'), strict)
+    code = run.check(_enter("bash", "-c", f'cd "{paths.repo_dir()}" && ./scripts/1-build/build_wine.sh --rebuild'),
+                     strict)
+    if code == 0 and engine.is_prebuilt(container.image()):
+        # So the dashboard (and engine updates) know this isn't the image's engine any more
+        _quiet(["distrobox", "enter", paths.container_name(), "--", "sudo", "touch", engine.COMPILED_MARKER])
     print()
     echo(f"{WINE}Wine rebuild complete!{RESET}")
     return 0
@@ -177,6 +181,8 @@ def manage_ai_gpu(strict=True):
         choice = ui.ask("Select an option (1-4): ", strict=False)
         if choice == "1":
             config.set_text("ai_gpu", "auto")
+        elif choice == "2" and not gpus:
+            print("No GPU was found, so AI plug-ins use the CPU.")
         elif choice == "2":
             for i, g in enumerate(gpus, 1):
                 echo(f"  {WINE}{i}){RESET} {g.split('|', 1)[-1]}")
