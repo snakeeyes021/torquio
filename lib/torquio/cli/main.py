@@ -146,6 +146,11 @@ def environment():
 
 
 def main(argv):
+    if argv[1:2] == ["api"]:
+        # For the GUI: JSON only, so no session log (its header would go to stdout)
+        from .. import api
+        environment()
+        return api.main(argv[2:])
     session_log.start("main", "Main", argv[0])
     environment()
     args = argv[1:]
