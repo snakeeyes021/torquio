@@ -302,21 +302,8 @@ def main(args=()):
             echo(f"{RED}Error: Neither docker nor podman was found.{RESET}")
             print("Please install one of them to use with distrobox.")
             return 1
-        ntsync_offer(auto_accept)
 
-    current = {"manage": config.get_text("manage_graphics", "false"), "manual_dpi": config.get_text("manual_dpi", "96"),
-               "match_phys": config.get_text("match_physical_dpi", "false"),
-               "freetype": config.get_text("freetype_interpreter", "40")}
-    settings = dict(current, map_path="", map_type="drive", import_path="")
-    if auto_accept:
-        settings.update(manage="false", manual_dpi="96", match_phys="false", freetype="40")
-    else:
-        wizard(settings)
-    config.set_text("manage_graphics", settings["manage"])
-    config.set_text("manual_dpi", settings["manual_dpi"])
-    config.set_text("match_physical_dpi", settings["match_phys"])
-    config.set_text("freetype_interpreter", settings["freetype"])
-
+    # Before anything is changed (NTsync, the settings file), so a missing installer leaves the system as it was
     installers = {}
     if install_software:
         print("Validating installers...")
@@ -335,6 +322,22 @@ def main(args=()):
             echo(f"{RED}Error: Mandatory installers were not found.{RESET}")
             print(f"Please place them in {paths.installers_dir()} or ~/Downloads and run this script again.")
             return 1
+
+    if create_container:
+        ntsync_offer(auto_accept)
+
+    current = {"manage": config.get_text("manage_graphics", "false"), "manual_dpi": config.get_text("manual_dpi", "96"),
+               "match_phys": config.get_text("match_physical_dpi", "false"),
+               "freetype": config.get_text("freetype_interpreter", "40")}
+    # -y keeps the current settings (on a new install they're the defaults: Manual Mode, 96 DPI, FreeType v40);
+    # resetting them turned Automated Mode off without restoring the XWayland setting it had changed
+    settings = dict(current, map_path="", map_type="drive", import_path="")
+    if not auto_accept:
+        wizard(settings)
+    config.set_text("manage_graphics", settings["manage"])
+    config.set_text("manual_dpi", settings["manual_dpi"])
+    config.set_text("match_physical_dpi", settings["match_phys"])
+    config.set_text("freetype_interpreter", settings["freetype"])
 
     banner()
     echo(f"{BLUE}=== Installation Manifest ==={RESET}")
