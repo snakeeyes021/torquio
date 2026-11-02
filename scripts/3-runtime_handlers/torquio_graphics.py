@@ -159,10 +159,11 @@ def query_gnome():
     }
 
 def query_kde():
-    out = run_cmd("kscreen-doctor -o")
+    # Newer kscreen-doctor colours its output even into a pipe ("Scale: \x1b[0;0m1.25"), which hides the values
+    out = re.sub(r"\x1b\[[0-9;]*m", "", run_cmd("kscreen-doctor -o"))
     if not out:
         return None
-    
+
     # Parse priority 1 or fall back to the first available output block
     blocks = [b for b in out.split("Output: ")[1:] if b.strip()]
     if not blocks:
@@ -184,6 +185,7 @@ def query_kde():
     scale = 1.0
     w_px = 0
     h_px = 0
+    w_mode = h_mode = 0
     
     for line in lines:
         if "Scale:" in line:
@@ -196,17 +198,17 @@ def query_kde():
                 w_px = int(geom_match.group(1))
                 h_px = int(geom_match.group(2))
         
-        # Check all lines for the current mode marker '*'
+        # The current mode (marked '*') is in physical pixels; Geometry is the scaled size on Plasma 6, so it's
+        # only a fallback
         if "*" in line and "x" in line:
-            res_match = re.search(r'(\d+)x(\d+)', line)
+            res_match = re.search(r'(\d+)x(\d+)@[\d.]+\*', line) or re.search(r'(\d+)x(\d+)', line)
             if res_match:
-                w_px_mode = int(res_match.group(1))
-                h_px_mode = int(res_match.group(2))
-                # Only use modes resolution if Geometry didn't successfully set it
-                if w_px == 0:
-                    w_px = w_px_mode
-                    h_px = h_px_mode
+                w_mode = int(res_match.group(1))
+                h_mode = int(res_match.group(2))
                     
+    if w_mode:
+        w_px, h_px = w_mode, h_mode
+
     if w_px == 0:
         for line in lines:
             if "x" in line:

@@ -45,3 +45,34 @@ class FieldsMatchGrep(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def _graphics_script():
+    import importlib.util
+    import os
+    path = os.path.join(os.path.dirname(__file__), "..", "scripts/3-runtime_handlers/torquio_graphics.py")
+    spec = importlib.util.spec_from_file_location("torquio_graphics", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+# kscreen-doctor -o from Plasma 6 (Fedora 44): coloured even into a pipe, Geometry is the scaled size, and the
+# current mode isn't the first one listed
+KSCREEN = ("\x1b[01;32mOutput: \x1b[0;0m1 Virtual-1 84ab7432\n\t\x1b[01;32menabled\x1b[0;0m\n"
+           "\t\x1b[01;32mpriority 1\x1b[0;0m\n"
+           "\t\x1b[01;34mModes: \x1b[0;0m 1:1280x800@74.99!  2:\x1b[01;32m1920x1080@60.00*\x1b[0;0m  3:640x480@60.00\n"
+           "\x1b[01;33m\tGeometry: \x1b[0;0m0,0 1536x864\n\x1b[01;33m\tScale: \x1b[0;0m1.25\n")
+
+
+class KdeQuery(unittest.TestCase):
+    def test_coloured_kscreen_doctor(self):
+        from unittest import mock
+        script = _graphics_script()
+        with mock.patch.object(script, "run_cmd", return_value=KSCREEN), \
+                mock.patch.object(script, "get_edid_dpi", return_value=96), \
+                mock.patch.object(script, "should_match_physical_dpi", return_value=False):
+            data = script.query_kde()
+        self.assertEqual((data["connector"], data["width"], data["height"], data["scale"]),
+                         ("Virtual-1", 1920, 1080, 1.25))
+        self.assertEqual(data["target_wine_dpi"], 120)
