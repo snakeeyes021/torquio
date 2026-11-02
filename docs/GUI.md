@@ -84,30 +84,25 @@ host does the downloading and the file work. Nothing from Steinberg is bundled.
 
 - `gui/`: the template's structure, renamed (`tech.redfoxlabs.Torquio`, module `torquio_gui`), with a
   window showing the Overview from `torquio api status` and buttons to start Dorico and Steinberg's tools, and
-  `host.py`, the `flatpak-spawn --host` bridge. It's a project of its own (its own `meson.build` and manifest),
-  and the manifest builds the folder itself (`"type": "dir", "path": "."`), so a build is always of the
-  checked-out code, never a pinned commit.
+  `host.py`, the `flatpak-spawn --host` bridge.
+- At the repository's root, only for the GUI: `meson.build` (which builds `gui/`) and the Flatpak manifest
+  `tech.redfoxlabs.Torquio.json`. The manifest builds the checkout itself (`"type": "dir", "path": "."`), so a
+  build always matches the checked-out branch, never a pinned commit or an installed copy.
 - `lib/torquio/api.py`: `torquio api version` and `torquio api status` (also on `develop`, so the GUI can
   talk to a Torquio on `develop`).
 
 ## Building and running it in GNOME Builder
 
-Your Torquio runs from your main checkout (`~/dev/torquio`, on `develop`), so switching that checkout's branch
-would change your live launchers. Work on the GUI in its own worktree instead:
+1. In GNOME Builder, open the repository (`~/dev/torquio`).
+2. Check out the GUI's branch (`feat/gui-scaffold`), in Builder or with `git checkout`.
+3. Press **Run** (or Build). Builder uses `tech.redfoxlabs.Torquio.json` (GNOME 50 SDK), builds the working
+   tree and runs the app in its sandbox, where it talks to the Torquio on the host (`~/.local/bin/torquio`).
 
-    git -C ~/dev/torquio worktree add ~/dev/torquio-gui feat/gui-scaffold
+Your Torquio runs from this same checkout, so checking out a branch also changes what your launchers
+(`torquio`, Dorico's, the Activation Manager's, the Download Assistant's) run until you switch back. Builder
+doesn't install the app.
 
-(already set up). Then:
+From a terminal instead (also without installing), in the repository:
 
-1. In GNOME Builder, **Open Project** (or *Select a Folder*) and choose **`~/dev/torquio-gui/gui`**, the GUI's
-   folder, not the repository's root.
-2. Builder picks up `tech.redfoxlabs.Torquio.json` as the build configuration (check the configuration in the
-   header bar's build menu if it offers others) and downloads nothing more if the GNOME 50 SDK is installed.
-3. Press **Run** (or Build, then Run). Builder builds the working tree and runs the app in its sandbox, where it
-   talks to the Torquio on the host (`~/.local/bin/torquio`, your main checkout).
-
-Builder doesn't install the app. From a terminal instead (also without installing):
-
-    cd ~/dev/torquio-gui/gui
     flatpak run org.flatpak.Builder --force-clean build-dir tech.redfoxlabs.Torquio.json
     flatpak build --talk-name=org.freedesktop.Flatpak --share=ipc --socket=wayland --socket=fallback-x11 --device=dri build-dir torquio-gui

@@ -32,9 +32,11 @@
                     "type": "dir",
                     "path": ".",
                     "skip": [
+                        ".git",
+                        "_build",
                         "build-dir",
                         ".flatpak-builder",
-                        "_build"
+                        "installers"
                     ]
                 }
             ]

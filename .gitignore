@@ -32,6 +32,5 @@ __pycache__/
 *$py.class
 # GUI builds (flatpak-builder)
 .flatpak-builder/
-gui/build-dir/
-gui/.flatpak-builder/
-gui/_build/
+_build/
+build-dir/
