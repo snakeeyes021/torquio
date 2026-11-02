@@ -5,7 +5,7 @@ import os
 import re
 import time
 
-from .. import config, paths, run, uninstall
+from .. import config, mediabay, paths, run, uninstall
 from . import common
 
 SDA_RUNNING = re.compile(r"Steinberg Download Assistant\.exe|STEI~B2R\.EXE|aria2c\.exe", re.I)
@@ -141,4 +141,8 @@ def launch(url=""):
     common.report_crashes()
     # Sweep after exiting to catch any shortcuts written right at the end
     uninstall.remove_windows_shortcuts()
+    # The MediaBay update it downloaded but couldn't install (not while Dorico or another Steinberg program is
+    # open; they use MediaBay)
+    if not url and not common.apps_running():
+        mediabay.install_failed_update()
     return 0
