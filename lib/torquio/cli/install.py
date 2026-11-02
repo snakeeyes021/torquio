@@ -10,6 +10,7 @@ import time
 from .. import config, container, engine, folders, graphics, identity, paths, prefix, run, uninstall, ui, versions
 from ..ui import BLUE, GRAY, GREEN, RED, RESET, WINE, YELLOW, echo
 from . import keycommands
+from ..launch.common import apps_running
 from .update import install_launchers
 
 CANCELLED = 10
@@ -364,6 +365,17 @@ def main(args=()):
     if not auto_accept and ui.no(ui.ask("Proceed with the wizard installation tasks? [Y/n]: ")):
         echo(f"{RED}Installation cancelled.{RESET}")
         return CANCELLED
+    # Steinberg's installers stop at a "still running" warning (and Wine's prefix setup would change it under
+    # them) while Dorico or a Steinberg program is open
+    if (setup_prefix or install_software) and container.exists() and apps_running():
+        echo(f"{YELLOW}Dorico or another Steinberg program is open. It has to be closed to continue.{RESET}")
+        if auto_accept:
+            print("Close it (save your work first), then run the installer again.")
+            return 1
+        if ui.no(ui.ask("Save your work in it, then close it now? [Y/n]: ")):
+            echo(f"{RED}Installation cancelled.{RESET}")
+            return CANCELLED
+        prefix.restart_wineserver()
 
     name = paths.container_name()
     if create_container:
