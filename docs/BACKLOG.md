@@ -8,7 +8,24 @@ This section tracks epics that have been broken down into concrete, actionable s
 *   [ ] **Release plan:**
     *   [x] **v0.5.0:** Plug-in window icons, version manifest generation and the prebuilt container image (released 2026-10-24).
     *   [x] **v0.6.0:** Refactor in Python (epic below; released 2026-11-02).
-    *   [ ] **v0.7.0:** Flatpak GUI app on Flathub.
+    *   [ ] **v0.7.0:** Fixes for what the v0.6.0 testing found (epic below). The Flatpak GUI app (design in `docs/GUI.md`) goes in v0.7.0 or the release after (to be decided).
+
+### Epic: v0.7.0 fixes (from the v0.6.0 testing)
+Found while testing v0.6.0 (VMs and the maintainer's machine) or already in this backlog, ranked by how much they affect users. All but the last were in v0.5.0 too. Each fix is its own topic branch into `develop`; anything that needs real hardware or licenses goes on one checklist for the maintainer.
+
+*   [ ] **1. Launcher questions without zenity or kdialog are answered yes:** Stock Fedora Workstation has neither, and the launchers then skip every dialog: with Dorico open and the display scale changed, starting Dorico (or the Activation Manager) again restarts Wine without asking, which closes Dorico and loses unsaved work (seen in testing); the one-time XWayland policy warning, the clock warning and launch errors never appear. Fix: never restart Wine without an answer (apply the change on the next start instead, as when opening a file), show the questions with GTK through PyGObject when it's installed (it is on GNOME desktops), and fall back to a desktop notification for warnings.
+*   [ ] **2. Cantai: edits made while its renderer starts are dropped:** see "Cantai" below. Playback is silently missing the change until the next edit. Needs Cantai (maintainer's machine).
+*   [ ] **3. The Download Assistant fails to update MediaBay every time it starts:** "Failed to update ... Steinberg MediaBay" (error 231, `preinstall.ps1: not trusted`) on every start. See "Automate MediaBay Update" below; besides a public download URL, look at why Setup.exe's signature check of `preinstall.ps1` fails under Wine (Wine has no PowerShell signature provider) and whether the SDA can be stopped from retrying.
+*   [ ] **4. The clock warning opens behind the Activation Manager:** so a user whose activation fails because the clock is off doesn't see why. Show it before starting the Activation Manager and wait for it to be closed.
+*   [ ] **5. The Activation Manager asks you to sign in every time it opens:** see "the SAM always signs the user out" below. Licenses stay activated.
+*   [ ] **6. `torquio -i -y` on an existing install resets the settings to defaults:** Automated Mode is turned off without restoring the XWayland setting it changed. `-y` should keep the existing settings (they're the wizard's defaults when re-running it interactively).
+*   [ ] **7. The installer checks for missing installers too late:** it enables NTsync (with a sudo prompt) and writes `config.json` before reporting that installers are missing. Check first.
+*   [ ] **8. The uninstaller leaves Wine's icons behind:** Wine's menu builder put icons for the prefix's programs in `~/.local/share/icons/hicolor/*/apps/` (`9A05_Dorico6.0.png`, `64A2_SteinbergActivationManager.0.png`, ...; about 60 sizes and programs). Torquio's prefix no longer creates them; remove the ones named after Steinberg's and Torquio-installed programs on uninstall and Fix Icons (names are a hash of the Windows path plus the program's name, so programs every prefix has, such as `msiexec`, can't be told apart from another prefix's and stay unless no launcher uses them).
+*   [ ] **9. "Choose a GPU" with no GPU found asks `GPU (1-0):`.** Say that no GPU was found instead.
+*   [ ] **10. After `torquio --rebuild-wine`, the dashboard still says the engine is prebuilt:** the label comes from the container's image name; use the engine's build record instead.
+*   [ ] **11. HALion Sonic editor exception dump:** see below. Nothing visible to users.
+*   [ ] **12. Combined NotePerformer + Cantai playback template:** see "Cantai" below. Needs the maintainer's template file.
+*   *Notes:* Re-creating the container gives it the computer's current hostname, so after a rename Wine's computer name changes too (`REDFOX` to `REDMAX` in testing); Cantai and Dorico stayed activated. A Dorico started from outside the desktop session (`systemd-run`, then `gio open`) ran without ever showing its window, and starting Dorico again then silently did nothing because it was already running; not seen when started from the desktop.
 
 ### Epic: Torquio in Python (v0.6.0)
 Rewrite the host-side Bash in standard-library Python (3.9+) with no user-visible change, as a core library plus a thin CLI that the v0.7.0 GUI can reuse. The full plan (layout, contracts that must never break, parity testing, risks) is in `docs/REFACTOR.md`. Each stage is its own branch, tested for parity and merged to develop on its own; the Bash `torquio` stays the entry point until stage 7.
