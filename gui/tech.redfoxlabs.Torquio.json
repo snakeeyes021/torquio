@@ -27,16 +27,14 @@
             "name": "torquio-gui",
             "builddir": true,
             "buildsystem": "meson",
-            "subdir": "gui",
             "sources": [
                 {
                     "type": "dir",
-                    "path": "..",
+                    "path": ".",
                     "skip": [
-                        ".git",
+                        "build-dir",
                         ".flatpak-builder",
-                        "gui/build-dir",
-                        "gui/.flatpak-builder"
+                        "_build"
                     ]
                 }
             ]

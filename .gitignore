@@ -33,3 +33,5 @@ __pycache__/
 # GUI builds (flatpak-builder)
 .flatpak-builder/
 gui/build-dir/
+gui/.flatpak-builder/
+gui/_build/
