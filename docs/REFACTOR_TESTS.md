@@ -89,9 +89,11 @@ old updater and the new code). On a system with v0.5.0 installed and working (a 
       minutes; Dorico starts)*
 - [ ] On a computer with an NVIDIA GPU whose container predates NVIDIA support: `torquio --setup-gpu` offers
       to set up NVIDIA access and re-creates the container; the dashboard then shows "NVIDIA Access: Enabled".
-- [ ] Wine Tools > GPU for AI Plug-ins: lists your GPUs; choose one, then Automatic, then Off, then Automatic; the
-      dashboard's Setting line follows. *(VM: Off and Automatic switch and the dashboard follows; the VM has no
-      GPU, so choosing one is left for the host.)*
+      *(Host: the container already had NVIDIA access, so it only re-registered the driver and the dashboard
+      shows "Enabled"; the offer itself isn't checked.)*
+- [x] Wine Tools > GPU for AI Plug-ins: lists your GPUs; choose one, then Automatic, then Off, then Automatic; the
+      dashboard's Setting line follows. *(Host: Intel and NVIDIA listed; choosing Intel, Off and Automatic each
+      show on the dashboard)*
 - [x] *(dev)* `torquio --fix-identity` with a stable identity: "already stable; nothing to do." *(VM)*
 - [x] Wine Tools > winecfg, regedit, control, explorer, cmd each open; Reboot Wine Prefix and Shutdown Wine
       Server finish; Open C: Drive opens the file manager; xev offers to install itself (say no). *(VM)*
@@ -142,8 +144,9 @@ Destructive: use a VM or a system where you're ready to reinstall (stage 5's tes
 After updating (or Fix Icons & Refresh Launchers), `~/.local/bin/torquio-dorico`, `torquio-sam` and
 `torquio-sda-handler` are short Python files that name your Torquio folder.
 
-- [ ] Start Dorico from the application menu; it opens as before. Open a `.dorico` file from the file manager;
-      Dorico opens it. *(VM: from the menu yes; opening a `.dorico` file from the file manager not checked yet.)*
+- [x] Start Dorico from the application menu; it opens as before. Open a `.dorico` file from the file manager;
+      Dorico opens it. *(VM: from the menu. Host: `gio open` on a `.dorico` file starts Dorico with it; Dorico is
+      the only application registered for `.dorico`)*
 - [x] Automated Mode on: change the display scale (e.g. 100% → 125%), start Dorico; the first time it asks to
       change the XWayland setting; Dorico's UI size follows. With Dorico already running and the scale changed,
       starting it again asks whether to restart Wine. *(VM, with zenity installed: without it there's no dialog and
