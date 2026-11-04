@@ -19,6 +19,7 @@ def launch(file_to_open=""):
         # GPU for AI plug-ins (Cantai): "auto" (strongest GPU), "off" (CPU only) or (part of) a GPU's name
         "AI_GPU": config.get_text("ai_gpu", "auto"),
         "TORQUIO_DATA_DIR": paths.data_dir(),
+        "TORQUIO_REPO_DIR": paths.repo_dir(),
     }))
     common.handover("launch_path.txt", file_to_open)
     common.run_program(runner, MISSING)

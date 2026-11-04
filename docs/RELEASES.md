@@ -4,6 +4,52 @@ This document tracks known-good, tested "snapshots" of the entire system. It ser
 
 ---
 
+## **Release v0.6.5-alpha (Fixes from the v0.6.0 Testing: Dialogs, Sign-In, MediaBay)**
+**Date:** 2026-11-03
+**Status:** Alpha / Milestone
+
+**Description:** Fixes for what testing v0.6.0 found, released ahead of the GUI (v0.7.0) because one of them stops Dorico from closing with unsaved work. The Activation Manager now stays signed in, Dorico and HALion Sonic no longer abort on exit, MediaBay updates get installed, and the installer and launchers handle more situations gracefully. Torquio's Wine engine gains two patches, so Update Torquio offers the new engine (a download of about 1.5 GB; Dorico, your settings and your licenses are kept). Verified in a Fedora Workstation 44 VM (GNOME, no zenity) and on RedFoxOS, a Bazzite-based Fedora Atomic image (Intel Iris Xe + NVIDIA RTX 3080 Ti Laptop): signed in to the Activation Manager across restarts of it and of Dorico, MediaBay at 1.4.10 with no error from the Download Assistant, Cantai rendering on the GPU, HALion Sonic's editor opened and Dorico quit cleanly.
+
+**Key Improvements:**
+*   **No Restarts Without Asking:** On desktops without zenity or kdialog (stock Fedora Workstation, for one), the launchers took every question as a yes: with Dorico open and the display scale changed, starting a Steinberg program again restarted Wine and closed Dorico, losing unsaved work. Questions and warnings now use a GTK dialog where zenity and kdialog are missing (PyGObject, which GNOME desktops have), and where nobody can be asked Wine isn't restarted; a notification says the change applies on the next start. The "could not be located" errors are shown at last (the container has no dialog tools), and the clock warning appears before the Activation Manager starts instead of behind its window.
+*   **The Activation Manager Stays Signed In:** Wine didn't store a credential's attributes, and Steinberg's License Engine keeps its sign-in with one, so it took its own sign-in for an outdated one and signed you out on every start. Wine patch 0013, vstenv's advapi32 patch (credited below), stores and returns them.
+*   **Clean Exits:** The same patch provides `CloseThreadWaitChainSession`, which Dorico's processes and HALion Sonic call on exit; without it Wine aborted the process and started its debugger.
+*   **MediaBay Updates:** Steinberg's Install Assistant checks the signature of a script in each MediaBay update, and Wine couldn't check PowerShell scripts' signatures (error 231). Wine patch 0012, Torquio's own PowerShell signature provider, verifies them as Windows does (changed or unsigned scripts are still refused). The Install Assistant still can't run the script under Wine, so Torquio installs the update the Download Assistant downloaded after it closes, and after Update Torquio: MediaBay stays current, and the Download Assistant reports a problem at most once per MediaBay update instead of on every start. Running the script natively is planned for v0.7.0.
+*   **NotePerformer & Cantai Template:** With both plug-ins installed, Dorico gets a "NotePerformer & Cantai" playback template: Cantai for the voices, NotePerformer for everything else.
+*   **Installer:** `torquio -i -y` keeps your settings instead of resetting them; missing installers are reported before anything is changed; and an open Steinberg program is closed (after asking) instead of stopping the reinstall at its installer's "still running" warning.
+*   **Leftovers:** The uninstaller and Fix Icons also remove the icons Wine's menu builder made for Steinberg's programs, and Fix Icons removes the `.vstsound` file types of Wine's old launchers.
+*   **Smaller Fixes:** "Choose a GPU" says when there's no GPU instead of asking `GPU (1-0)`; after `torquio --rebuild-wine` the dashboard says the engine was compiled locally (and replacing the container keeps that engine).
+*   **Groundwork for the GUI:** `torquio api version` and `torquio api status` answer in JSON, for the app coming in v0.7.0.
+*   **Thanks:** to [vstenv](https://github.com/dguedry/vstenv) for the credential-attributes patch (0013, LGPL-2.1-or-later, like Wine) and the cause of the Activation Manager's sign-outs, and to [steinberg_fix](https://github.com/chiarfe/steinberg_fix), which confirmed what MediaBay's error 231 is. `docs/REFERENCE_PROJECTS.md` compares the three projects.
+
+**Build Environment Artifacts:**
+*   **Custom Wine Source (`zhiyi/wine`):** Commit `883970826c62286c3da998072a5f49813d333a31` (`wine-11.5-191-g883970826c6`)
+*   **Torquio Wine Patches:** `0001-dcomp-dxgi-composition-swapchain`, `0002-dcomp-virtual-surface`, `0003-dcomp-d2d1-device-context-support`, `0004-dxgi-vblank-and-frame-latency-dcomp-presented-buffer`, `0005-dcomp-layered-popups-transparent-corners-no-black-flash`, `0006-ole32-revokedragdrop-other-process-windows`, `0007-dcomp-dwmapi-windows11-rounded-popup-corners`, `0008-winex11-hide-layered-windows-until-drawn`, `0009-dcomp-cross-process-targets-compose-on-change`, `0010-kernelbase-answer-wmic-uuid-query-without-a-process`, `0011-dxcore-report-d3d12-ml-adapters-for-native-d3d12`, `0012-wintrust-verify-powershell-script-signatures`, `0013-advapi32-credential-attributes`
+*   **Container Image:** `ghcr.io/snakeeyes021/torquio-env:build-3f3a8cb19fee`
+*   **Container:** `Ubuntu 24.04.5 LTS`, Mesa `25.2.8-0ubuntu0.24.04.4`
+*   **vkd3d-proton:** `3.0.1`
+*   **WebView2 Runtime:** `156.0.4314.42` (fetched at install time)
+*   **Winetricks Version:** `20240105`
+*   **Wine-ICU MSI Version:** `72.1`
+
+**Verified Application Versions:**
+*   **Steinberg Download Assistant:** `1.40.1`
+*   **Steinberg Activation Manager:** `1.10.0.1489`
+*   **Steinberg MediaBay:** `1.4.10.19`
+*   **Steinberg Dorico 6:** `6.2.30.6245`
+*   **Cantai (3rd Party):** `4.0.0.926`
+*   **NotePerformer (3rd Party):** `5.1.2`
+
+**Known Issues:**
+*   The Download Assistant can still report a failed MediaBay update once per MediaBay update, before Torquio installs it (planned for v0.7.0).
+*   Cantai's editor shows white for a few seconds when first opened (WebView2 start-up); its renderer stays running for ~2 minutes after Dorico quits.
+*   GPU rendering for Cantai is verified on Intel Iris Xe (Mesa) and NVIDIA (proprietary 615); other GPUs/drivers are untested. It can be turned off in Wine Tools > GPU for AI Plug-ins.
+*   A new container's first start takes about a minute longer (distrobox installs its base packages).
+*   32-bit programs that crash use Wine's default crash handling rather than Torquio's (only the 64-bit debugger setting points at it); Dorico and its audio engine are 64-bit.
+*   ntsync requires a host kernel 6.14+ with `CONFIG_NTSYNC`. On older kernels Wine falls back to the wineserver path.
+
+---
+
 ## **Release v0.6.0-alpha (Torquio in Python)**
 **Date:** 2026-11-02
 **Status:** Alpha / Milestone
