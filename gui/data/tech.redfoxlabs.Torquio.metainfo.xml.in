@@ -30,6 +30,26 @@
   <launchable type="desktop-id">tech.redfoxlabs.Torquio.desktop</launchable>
   <content_rating type="oars-1.1" />
 
+  <!-- Taken in a test VM (gui/data/screenshots/); the URLs point at the release's tag -->
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/snakeeyes021/torquio/v0.7.0-alpha/gui/data/screenshots/overview.png</image>
+      <caption>Dorico, the Activation Manager and the Download Assistant one click away</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/snakeeyes021/torquio/v0.7.0-alpha/gui/data/screenshots/display.png</image>
+      <caption>Display scaling for Dorico, automatic or by hand</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/snakeeyes021/torquio/v0.7.0-alpha/gui/data/screenshots/plugins.png</image>
+      <caption>The GPU AI plug-ins such as Cantai render on</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/snakeeyes021/torquio/v0.7.0-alpha/gui/data/screenshots/maintenance.png</image>
+      <caption>Wine's tools, repairs, engine updates and logs</caption>
+    </screenshot>
+  </screenshots>
+
   <requires>
     <display_length compare="ge">360</display_length>
   </requires>

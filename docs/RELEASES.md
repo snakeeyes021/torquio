@@ -4,6 +4,21 @@ This document tracks known-good, tested "snapshots" of the entire system. It ser
 
 ---
 
+## **Release v0.7.0-alpha (The Torquio App; MediaBay Updates Without Errors)** *(draft, not released yet)*
+**Date:** TBD
+**Status:** Alpha / Milestone
+
+**Description:** Torquio's app: everything the `torquio` menu does, in a GNOME window, for people who'd rather not use a terminal (built from this repository, for Flathub as `tech.redfoxlabs.Torquio`). The command line stays, and both use the same core. MediaBay updates from the Download Assistant now install with no error. The Wine engine is unchanged from v0.6.5 (`build-3f3a8cb19fee`), so there's nothing large to download.
+
+**Key Improvements:**
+*   **The App:** a setup assistant (it checks what's needed, finds your installers, asks a few questions and installs Torquio, downloading Torquio itself first if the computer has none), then Overview (start Dorico, the Activation Manager and the Download Assistant; the engine, container, kernel fast sync and playback plug-ins), Display & Scaling, Folders, Key Commands, AI Plug-ins and Maintenance (Wine's tools, repairs, engine updates and rebuilds, logs for bug reports, uninstalling, with the same license and project checks as the terminal). It drives the computer's own copy of Torquio (`torquio api`, JSON), offers to update one that's too old for it, finishes a task even if its window is closed, and runs one task at a time.
+*   **MediaBay Updates Without Errors:** Steinberg's Install Assistant runs a step of each MediaBay update through Windows PowerShell's .NET library, which Wine doesn't have, so it skipped MediaBay. Torquio now builds its own small stand-in for that library in the prefix (with the prefix's .NET compiler; our own code, nothing of Microsoft's or Steinberg's). It does that step's job: it stops MediaBay's server, or cancels the update cleanly while Dorico uses MediaBay (Torquio then installs it after the Download Assistant closes, as before).
+*   **`torquio api`:** the interface the app uses (API 2): settings, display, folders, key commands, GPUs, prerequisites, updates, the uninstall checks, and long tasks as streamed JSON events.
+
+**Build Environment Artifacts:** as v0.6.5-alpha (container image `ghcr.io/snakeeyes021/torquio-env:build-3f3a8cb19fee`). The app: GNOME 50 runtime.
+
+---
+
 ## **Release v0.6.5-alpha (Fixes from the v0.6.0 Testing: Dialogs, Sign-In, MediaBay)**
 **Date:** 2026-11-03
 **Status:** Alpha / Milestone

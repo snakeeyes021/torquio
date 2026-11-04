@@ -1,6 +1,12 @@
 # Design: Torquio's GUI
 
-Status: **first full version** (`gui/`, on `feat/gui`), for v0.7.0 (the GUI release).
+Status: **ready for v0.7.0 review** (`gui/`, on `feat/gui`): reviewed and fixed, tasks checked end to end in a VM; the look and Flathub wait for the maintainer.
+
+**Who decided what.** Owner-given (the maintainer's own decisions): a graphical Torquio distributed on
+Flathub; it ships as v0.7.0; it's built from this repository's checkout in GNOME Builder (no separate
+worktree, nothing installed for previews). Everything else in this document (the architecture, the screens,
+the API, the icon, the wording, the Flathub listing) is agent-proposed and open until the maintainer confirms
+it.
 
 ## Goal
 
@@ -72,17 +78,36 @@ install and keep running than `flatpak-spawn`, for no gain over a command-line i
 - Data: `version`, `status`, `running` (is Dorico or a Steinberg program open), `settings [set KEY VALUE]`
   (validated; graphics settings are applied at once, which restarts Wine), `display [restore]`,
   `folders [map PATH drive|desktop | unmap ...]`, `keycommands [export | import PATH]`, `gpus`, `prereqs`,
-  `updates [check]`, `guards` (activated licenses and projects in the prefix, for the uninstall dialog).
+  `updates [check | daily]`, `guards` (activated licenses and projects in the prefix, for the uninstall dialog).
 - Tasks, `task NAME ARGS...`: `install OPTIONS_JSON`, `update`, `fix-icons`, `engine-update`,
   `engine-rebuild`, `setup-gpu`, `ntsync` (pkexec), `logs`, `wine PROGRAM`, `uninstall RESTORE`. A task runs in a
   child process with empty input and a session log; its output becomes `log` events, its steps `phase` events
-  (the CLI's step headings, renamed for people), and it ends with `done` and the exit code.
+  (the CLI's step headings, renamed for people), and it ends with `done` and the exit code. Only one task
+  that changes the installation runs at a time (a lock; a second ends with `done` code 3, `"error": "busy"`;
+  `wine` is exempt). If the GUI goes away mid-task, the task still finishes (its output then only goes to the
+  session log). A data verb's stdout is only its JSON; anything the CLI helpers print goes to stderr.
 
 ## Flathub
 
 Permissions: `--talk-name=org.freedesktop.Flatpak` (essential, explained in the submission), Wayland with
 X11 fallback, `--share=ipc`, `--device=dri`. No network or filesystem access is needed in the sandbox: the
 host does the downloading and the file work. Nothing from Steinberg is bundled.
+
+Submitting is the maintainer's decision (it's public); nothing has been submitted yet. Prepared
+(agent-proposed, for the maintainer to confirm): `build-aux/flathub/tech.redfoxlabs.Torquio.json`, the
+manifest Flathub builds from (the repository at the release's tag; its `commit` is filled in when the tag
+exists), and the metainfo's screenshots (`gui/data/screenshots/`, taken in a test VM, not on anyone's own
+computer; their URLs point at the release tag). The steps, once approved: tag the release; fill in the commit;
+fork `flathub/flathub`, add the manifest on a branch from `new-pr`, and open the pull request, explaining
+`--talk-name=org.freedesktop.Flatpak` (the app drives the host's Torquio, as DistroShelf drives distrobox).
+The app ID's domain (`redfoxlabs.tech`) is verified afterwards for Flathub's "verified" badge.
+
+## Compatibility with the host's Torquio
+
+The app needs `torquio api` version `MIN_API` (`gui/src/host.py`) or newer; `API_VERSION` in
+`lib/torquio/api.py` says what a Torquio has (1: v0.6.5, `version` and `status` only; 2: v0.7.0). An older
+Torquio gets an Update Torquio button (a fast-forward from GitHub and `--post-update`, as `torquio -u` does).
+The app remembers the checkout it last used, so after an uninstall it doesn't offer to download a second copy.
 
 ## What's in this version
 
