@@ -11,7 +11,7 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from .window import TorquioWindow  # noqa: E402
 
-RELEASE_NOTES = """<p>The first look at Torquio's app: everything the torquio menu does, in a window.</p>
+RELEASE_NOTES = """<p>The first release of Torquio's app: everything the torquio menu does, in a window.</p>
 <ul>
   <li>A setup assistant that checks what's needed, finds your installers and installs Torquio</li>
   <li>Dorico, the Activation Manager and the Download Assistant one click away</li>

@@ -192,7 +192,7 @@ class Setup(Adw.Bin):
         prefs.add(speed)
 
         extras = Adw.PreferencesGroup(title=_("Optional"))
-        self.folder_row = Adw.ActionRow(title=_("A Folder for Your Scores"),
+        self.folder_row = Adw.ActionRow(title=_("A Folder for Your Scores"), use_markup=False,
                                         subtitle=_("Shown as drive D: in Dorico's dialogs"))
         self.folder_row.add_prefix(Gtk.Image(icon_name="folder-music-symbolic"))
         self.folder_row.add_suffix(suffix_button(_("Choose…"), self._choose_folder))
@@ -216,7 +216,8 @@ class Setup(Adw.Bin):
         if error or not data.get("backups"):
             return
         path = data["backups"][0]
-        row = Adw.SwitchRow(title=_("Import Key Commands"), subtitle=os.path.basename(path), active=True)
+        row = Adw.SwitchRow(title=_("Import Key Commands"), subtitle=os.path.basename(path), active=True,
+                            use_markup=False)
         row.add_prefix(Gtk.Image(icon_name="input-keyboard-symbolic"))
         self.options["import_path"] = path
         row.connect("notify::active", lambda r, *_: self.options.update(import_path=path if r.get_active() else ""))

@@ -11,7 +11,7 @@ import threading
 from gi.repository import Gio, GLib
 
 # The oldest `torquio api` this GUI understands
-MIN_API = 1
+MIN_API = 2
 IN_FLATPAK = os.path.exists("/.flatpak-info")
 HOME = os.path.expanduser("~")
 
@@ -92,6 +92,27 @@ def check_version():
     if data.get("api", 0) < MIN_API:
         raise TooOld()
     return data
+
+
+# Updating a Torquio too old for this GUI's API, the way `torquio -u` does it: fast-forward the host's checkout
+# to GitHub's version, then let the new copy refresh launchers and settings (its own --post-update).
+UPDATE_OLD = r'''
+repo=$(dirname "$(readlink -f "$1")") && cd "$repo" || exit 2
+[ -z "$(git status --porcelain --untracked-files=no)" ] || exit 3
+old=$(git rev-parse HEAD) && git fetch --quiet && git merge --ff-only --quiet '@{u}' || exit 4
+exec ./torquio --post-update "$old" </dev/null
+'''
+
+
+def update_old_torquio():
+    """Update the host's Torquio when it predates this GUI's API (raises HostError with the reason)."""
+    code, _out = run(["sh", "-c", UPDATE_OLD, "sh", torquio()], timeout=900)
+    if code == 3:
+        raise HostError("Torquio's files were changed on this computer, so it can't update itself. Run "
+                        "torquio -u in a terminal to see what changed.")
+    if code in (2, 4, 124):
+        raise HostError("Torquio couldn't be updated from GitHub. Check your internet connection and try again.")
+    return code
 
 
 def in_background(work, done):

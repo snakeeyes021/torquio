@@ -25,7 +25,7 @@ class Preferences(Adw.PreferencesDialog):
         v = window.version
         for title, value in ((_("Version"), v.get("torquio", "")), (_("Branch"), v.get("branch", "")),
                              (_("Folder"), v.get("repo", ""))):
-            row = Adw.ActionRow(title=title, subtitle=value or "—")
+            row = Adw.ActionRow(title=title, subtitle=value or "—", use_markup=False)
             row.add_css_class("property")
             about.add(row)
         page.add(about)

@@ -33,11 +33,27 @@
   <requires>
     <display_length compare="ge">360</display_length>
   </requires>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#f6c3a8</color>
+    <color type="primary" scheme_preference="dark">#8e2f1b</color>
+  </branding>
 
   <releases>
-    <release version="0.1.0" date="2026-11-02">
+    <release version="0.7.0" date="2026-11-04">
       <description translate="no">
-        <p>Scaffold: an overview of the Torquio installation on this computer, and starting Dorico.</p>
+        <p>The first release of Torquio's app: everything the torquio menu does, in a window.</p>
+        <ul>
+          <li>A setup assistant that checks what's needed, finds your installers and installs Torquio</li>
+          <li>Dorico, the Activation Manager and the Download Assistant one click away</li>
+          <li>Display scaling, folders, key commands and the GPU for AI plug-ins</li>
+          <li>Wine's tools, repairs, engine updates, logs for bug reports, and uninstalling</li>
+        </ul>
       </description>
     </release>
   </releases>

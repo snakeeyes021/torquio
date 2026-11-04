@@ -9,8 +9,10 @@ Two kinds of verbs:
   {"event": "done", "code": N}. The job runs in a child process whose output (and that of everything it runs)
   becomes the log events; it never waits on a prompt: every answer is passed in, and its input is empty.
 
-Bump API_VERSION when a verb's output changes in a way an older GUI would misread; adding verbs or fields
-doesn't need it."""
+The GUI asks for a minimum API_VERSION (gui/src/host.py, MIN_API) and offers to update an older Torquio. Bump
+API_VERSION when a verb's output changes in a way an older GUI would misread, or when the GUI starts using a verb,
+task or field that a released Torquio lacks (then raise MIN_API with it). Additions nothing uses yet don't need
+it. 1: v0.6.5 (`version`, `status`); 2: v0.7.0 (everything the first GUI uses)."""
 import glob
 import json
 import os
@@ -21,7 +23,7 @@ import sys
 
 from . import config, container, engine, graphics, identity, paths, run
 
-API_VERSION = 1
+API_VERSION = 2
 
 # A task's own markers in its output, turned into events by the parent
 PHASE = "::torquio-phase::"

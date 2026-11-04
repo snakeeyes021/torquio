@@ -1,7 +1,7 @@
 # Torquio's GUI (gui/, docs/GUI.md). The command-line Torquio doesn't use Meson; this is only for building the
 # GUI, from GNOME Builder or with flatpak-builder (tech.redfoxlabs.Torquio.json).
 project('torquio-gui',
-          version: '0.1.0',
+          version: '0.7.0',
     meson_version: '>= 1.0.0',
   default_options: [ 'warning_level=2', 'werror=false', ],
 )

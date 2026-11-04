@@ -35,6 +35,14 @@ class TorquioWindow(Adw.ApplicationWindow):
         super().__init__(**kwargs)
         self.status, self.version = {}, {}
         self.setup = None
+        # The window's size is kept between runs (when the app's settings schema is installed)
+        app_id = self.get_application().get_application_id()
+        source = Gio.SettingsSchemaSource.get_default()
+        if source and source.lookup(app_id, True):
+            self.settings = Gio.Settings.new(app_id)
+            for key, prop in (("window-width", "default-width"), ("window-height", "default-height"),
+                              ("window-maximized", "maximized")):
+                self.settings.bind(key, self, prop, Gio.SettingsBindFlags.DEFAULT)
         for name, callback, param in (("refresh", lambda *_: self.refresh(), None),
                                       ("launch", self._launch, GLib.VariantType.new("s")),
                                       ("update", lambda *_: self._show_update(), None)):
@@ -53,6 +61,18 @@ class TorquioWindow(Adw.ApplicationWindow):
             row.set_child(box)
             row._view = view
             self.sidebar.append(row)
+        # The message page's buttons: Try Again (from window.ui), and Update Torquio when it's too old for us
+        try_again = self.message_page.get_child()
+        self.message_page.set_child(None)
+        self.update_old = Gtk.Button(label=_("_Update Torquio"), use_underline=True, visible=False)
+        self.update_old.add_css_class("pill")
+        self.update_old.add_css_class("suggested-action")
+        self.update_old.connect("clicked", self._update_old)
+        buttons = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, halign=Gtk.Align.CENTER)
+        buttons.append(self.update_old)
+        buttons.append(try_again)
+        self.message_page.set_child(buttons)
+
         self.sidebar.connect("row-activated", self._select)
         self.sidebar.select_row(self.sidebar.get_row_at_index(0))
         self.refresh()
@@ -83,6 +103,7 @@ class TorquioWindow(Adw.ApplicationWindow):
         self.message_page.set_title(title)
         self.message_page.set_description(description)
         self.message_page.set_icon_name(icon)
+        self.update_old.set_visible(False)
         self.stack.set_visible_child_name("message")
 
     def _show_status(self, result, err):
@@ -92,8 +113,9 @@ class TorquioWindow(Adw.ApplicationWindow):
             return
         if isinstance(err, host.TooOld):
             self._message(_("Torquio Needs Updating"),
-                          _("The Torquio on this computer is older than this app. Update it with "
-                            "<tt>torquio -u</tt> in a terminal, then try again."), "software-update-available-symbolic")
+                          _("The Torquio on this computer is older than this app. Updating it takes a minute and "
+                            "keeps your settings, Dorico and its licenses."), "software-update-available-symbolic")
+            self.update_old.set_visible(True)
             return
         if err is not None:
             self._message(_("Couldn't Reach Torquio"), GLib.markup_escape_text(str(err)))
@@ -108,6 +130,19 @@ class TorquioWindow(Adw.ApplicationWindow):
         for view in self.views:
             view.refresh(self.status)
         self.stack.set_visible_child_name("main")
+
+    def _update_old(self, *args):
+        self.update_old.set_sensitive(False)
+        self.update_old.set_label(_("Updating…"))
+
+        def done(result, err):
+            self.update_old.set_sensitive(True)
+            self.update_old.set_label(_("_Update Torquio"))
+            if err:
+                self.show_error(_("Couldn't Update Torquio"), err)
+            else:
+                self.refresh()
+        host.in_background(host.update_old_torquio, done)
 
     def _show_setup(self, torquio_missing=False):
         if self.setup is None:
