@@ -2,8 +2,9 @@
 # Build Torquio's stand-in for Windows PowerShell's hosting library (powershell_host/, see the top of its source)
 # and install it into the prefix's GAC, so Steinberg's Install Assistant can run MediaBay's pre-install step and
 # install MediaBay updates itself (docs/MEDIABAY_UPDATES.md). Built in the prefix with the compiler of its .NET
-# Framework 4.8 (winetricks dotnet48), so nothing prebuilt is shipped. Runs during prefix setup and on every
-# Update Torquio / Fix Icons; does nothing when the installed copy is already built from this source.
+# Framework 4.8 (winetricks dotnet48), so nothing prebuilt is shipped. Runs from setup_prefix.sh: during prefix
+# setup, after Update Torquio and from the menu's Fix Icons & Refresh Launchers; does nothing when the installed
+# copy is already built from this source.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

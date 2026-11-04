@@ -1,8 +1,10 @@
-"""Keeping MediaBay up to date. The Download Assistant downloads MediaBay updates itself but can't install them
-under Wine: Setup.exe checks the signature of the update's preinstall.ps1, which Wine can't verify (error 231),
-and the Download Assistant tries again, and fails again, every time it starts. Torquio installs the download it
-leaves behind the way it installs the user's MediaBay zip (without preinstall.ps1), so the Download Assistant
-then finds MediaBay up to date."""
+"""Keeping MediaBay up to date. The Download Assistant downloads and installs MediaBay updates itself: Wine patch
+0012 verifies the signature of the update's preinstall.ps1, and Torquio's PowerShell host
+(scripts/2-install/install_powershell_host.sh) does that script's job in Steinberg's Install Assistant. This is the
+safety net for an update it downloaded but didn't install (cancelled because Dorico or another MediaBay client was
+open, or an older engine or prefix without those): Torquio installs the download it leaves behind the way it
+installs the user's MediaBay zip (without preinstall.ps1), so the Download Assistant then finds MediaBay up to
+date."""
 import glob
 import os
 import re
