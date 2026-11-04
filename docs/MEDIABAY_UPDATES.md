@@ -1,6 +1,6 @@
 # MediaBay updates without errors: options
 
-Status: **brainstorm** (2026-11-03), for deciding how v0.6.5 handles MediaBay updates. Goal: the Download
+Status: **background** (2026-11-03). Decided: v0.6.5 ships patch 0012 with the install-after-the-Download-Assistant fallback; v0.7.0 runs `preinstall.ps1` natively (backlog item 16). Goal: the Download
 Assistant never reports a failed MediaBay update. Today it does, once per MediaBay update (v0.6.5's current fix
 installs the update after that failure).
 
