@@ -633,6 +633,23 @@ def run_task(name, args):
     return code
 
 
+def _quietly(function, *args):
+    """function(*args) with whatever it (or a program it runs) prints sent to stderr, so a data verb's stdout is
+    only its JSON (the CLI's helpers, such as folder mapping, print for the terminal)."""
+    sys.stdout.flush()
+    try:
+        saved = os.dup(1)
+    except OSError:  # no real stdout (tests)
+        return function(*args)
+    os.dup2(2, 1)
+    try:
+        return function(*args)
+    finally:
+        sys.stdout.flush()
+        os.dup2(saved, 1)
+        os.close(saved)
+
+
 def main(args):
     """Returns the exit code: 0, 1 for a refused request ({"error": ...}), 2 for an unknown verb."""
     verb = args[0] if args else ""
@@ -648,7 +665,7 @@ def main(args):
         print()
         return 2
     try:
-        data = VERBS[verb](*args[1:])
+        data = _quietly(VERBS[verb], *args[1:])
     except Error as e:
         json.dump({"error": str(e)}, sys.stdout)
         print()
