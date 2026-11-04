@@ -151,10 +151,16 @@ class Setup(Adw.Bin):
     def _choose_installer(self, pattern):
         def chosen(path):
             folder = self.prereqs["installers_dir"]
-            code, _out = host.run(["sh", "-c", 'mkdir -p "$1" && cp -f "$2" "$1/"', "sh", folder, path], timeout=120)
-            if code != 0:
-                self.window.show_error(_("Couldn't Use That File"), _("It couldn't be copied to {}.").format(folder))
-            self._check()
+            self.window.toast(_("Copying the installer…"))
+
+            def copied(code, error):
+                if error or code != 0:
+                    self.window.show_error(_("Couldn't Use That File"),
+                                           _("It couldn't be copied to {}.").format(folder))
+                self._check()
+            # Installers can be gigabytes: copy off the main loop
+            host.in_background(lambda: host.run(["sh", "-c", 'mkdir -p "$1" && cp -f "$2" "$1/"', "sh", folder, path],
+                                                timeout=900)[0], copied)
         choose_file(self.window, _("Choose the Installer"), [pattern], chosen)
 
     # ---- choices ----------------------------------------------------------------------------------------------

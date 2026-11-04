@@ -110,7 +110,7 @@ class Display(Page):
 
             def answered(d, response):
                 if response == "ok":
-                    self.window.apply_setting("manage_graphics", "true")
+                    self.window.apply_setting("manage_graphics", "true", on_cancel=self._revert)
                 else:
                     self._revert()
             dialog.connect("response", answered)

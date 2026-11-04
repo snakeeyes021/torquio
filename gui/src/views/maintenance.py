@@ -79,19 +79,26 @@ class Maintenance(Page):
 
     def _wine(self, name, title):
         self.window.toast(_("Opening {}…").format(title))
-        host.Task("wine", name).start()
+        host.Task("wine", name, on_done=lambda code: self._wine_failed(title) if code not in (0, None) else None).start()
+
+    def _wine_failed(self, title):
+        self.window.show_error(_("{} Didn't Start").format(title),
+                               _("Wine couldn't run it. Is Torquio's container working? Export Logs collects the "
+                                 "details for a bug report."))
 
     def _run_exe(self):
         def chosen(path):
             self.window.toast(_("Running {}…").format(os.path.basename(path)))
-            host.Task("wine", "exe", path).start()
+            host.Task("wine", "exe", path, on_done=lambda code: self._wine_failed(os.path.basename(path))
+                      if code != 0 else None).start()
         choose_file(self.window, _("Choose a Windows Program"), ["*.exe", "*.msi", "*.EXE", "*.MSI"], chosen)
 
     def _stop_wine(self, how):
         def go():
             self.window.toast(_("Restarting Wine…") if how == "reboot" else _("Closing Wine programs…"))
             host.Task("wine", how, on_done=lambda code: self.window.toast(
-                _("Wine restarted") if how == "reboot" else _("Wine programs closed"))).start()
+                (_("Wine restarted") if how == "reboot" else _("Wine programs closed")) if code == 0
+                else _("Wine didn't respond; try again, or restart your computer"))).start()
 
         def check(data, error):
             if data and data.get("running"):
@@ -148,7 +155,14 @@ class UninstallDialog(Adw.Dialog):
         self.aware = Adw.SwitchRow(title=_("I understand those licenses can't be deactivated afterwards"),
                                    visible=False)
         self.aware.connect("notify::active", lambda *_: self._update())
-        for row in (self.restore, self.aware, self.entry):
+        # As in the terminal, every uninstall asks about licenses and projects, whatever the checks found
+        self.deactivated = Adw.SwitchRow(title=_("I've deactivated every license in this installation"),
+                                         subtitle=_("Steinberg's products and any plug-ins such as Cantai"),
+                                         visible=False)
+        self.deactivated.connect("notify::active", lambda *_: self._update())
+        self.saved = Adw.SwitchRow(title=_("I've saved the projects I want to keep elsewhere"), visible=False)
+        self.saved.connect("notify::active", lambda *_: self._update())
+        for row in (self.restore, self.aware, self.deactivated, self.saved, self.entry):
             self.confirm_group.add(row)
         self.page.add(self.confirm_group)
         self.button = Gtk.Button(label=_("_Uninstall"), use_underline=True, sensitive=False,
@@ -176,9 +190,12 @@ class UninstallDialog(Adw.Dialog):
                 ", ".join(active)), "error")
             self.aware.set_visible(True)
         elif data["steinberg_unknown"]:
-            lic.set_state(_("Couldn't tell whether Steinberg's licenses are deactivated"), "warn")
+            lic.set_state(_("Couldn't tell whether Steinberg's licenses are deactivated. Check in the Activation "
+                            "Manager that every product is deactivated."), "warn")
+            self.deactivated.set_visible(True)
         else:
             lic.set_state(_("None activated"), "ok")
+            self.deactivated.set_visible(True)
         self.checks.add(lic)
         projects = StatusRow(_("Projects in the Prefix"), "x-office-document-symbolic")
         if data["projects"]:
@@ -186,7 +203,9 @@ class UninstallDialog(Adw.Dialog):
             more = len(data["projects"]) - 5
             projects.set_state(_("Deleted with it: {}").format(names) + (f" (+{more})" if more > 0 else ""), "error")
         else:
-            projects.set_state(_("None"), "ok")
+            projects.set_state(_("None found"), "ok")
+            self.saved.set_title(_("I've backed up any projects I kept in the prefix"))
+        self.saved.set_visible(True)
         self.checks.add(projects)
         self.restore.set_visible(bool(data.get("restorable")))
         if data.get("restorable"):
@@ -196,8 +215,9 @@ class UninstallDialog(Adw.Dialog):
 
     def _update(self):
         ok = self.entry.get_text().strip().lower() == self.WORD
-        if self.aware.get_visible():
-            ok = ok and self.aware.get_active()
+        for row in (self.aware, self.deactivated, self.saved):
+            if row.get_visible():
+                ok = ok and row.get_active()
         self.button.set_sensitive(ok)
 
     def _go(self):

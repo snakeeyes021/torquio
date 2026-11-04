@@ -97,7 +97,9 @@ def choose_file(parent, title, patterns, callback, folder=False):
         except GLib.Error:
             return  # cancelled
         if gfile and gfile.get_path():
-            callback(host.host_path(gfile.get_path()))
+            path = gfile.get_path()
+            # The Documents portal's answer comes over D-Bus: ask it off the main loop
+            host.in_background(lambda: host.host_path(path), lambda found, err: callback(found or path))
 
     (dialog.select_folder if folder else dialog.open)(parent, None, done)
 

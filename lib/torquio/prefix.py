@@ -4,6 +4,7 @@ The scripts are the same text the Bash version sends to `distrobox enter ... -- 
 sees exactly what it did before.
 """
 import os
+import shlex
 
 from . import paths, run
 
@@ -24,7 +25,7 @@ def enter_quietly(script):
 
 def enter_visibly(script):
     """distrobox enter ... -- bash -c SCRIPT || true, output and input on the terminal."""
-    run.interactive(["distrobox", "enter", paths.container_name(), "--", "bash", "-c", script])
+    return run.interactive(["distrobox", "enter", paths.container_name(), "--", "bash", "-c", script])
 
 
 def set_dpi(dpi, freetype):
@@ -55,7 +56,7 @@ def apply_settings():
 
 def windows_path(unix_path):
     """`winepath -w` for a host path (stderr shows on the terminal, as in Bash)."""
-    script = f'export WINEDEBUG=-all; {env_script().rstrip()} winepath -w "{unix_path}"'
+    script = f'export WINEDEBUG=-all; {env_script().rstrip()} winepath -w {shlex.quote(unix_path)}'
     return run.capture(["distrobox", "enter", paths.container_name(), "--", "bash", "-c", script],
                        stderr=None, stdin=None)[1].replace("\r", "").rstrip("\n")
 

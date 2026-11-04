@@ -102,7 +102,11 @@ def rebuild_wine(strict=True):
     print("Running build_wine.sh inside container...")
     code = run.check(_enter("bash", "-c", f'cd "{paths.repo_dir()}" && ./scripts/1-build/build_wine.sh --rebuild'),
                      strict)
-    if code == 0 and engine.is_prebuilt(container.image()):
+    if code != 0:
+        print()
+        echo(f"{RED}The Wine rebuild failed (exit code {code}); the output above shows where.{RESET}")
+        return code
+    if engine.is_prebuilt(container.image()):
         # So the dashboard (and engine updates) know this isn't the image's engine any more
         _quiet(["distrobox", "enter", paths.container_name(), "--", "sudo", "touch", engine.COMPILED_MARKER])
     print()

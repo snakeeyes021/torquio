@@ -17,6 +17,7 @@ import glob
 import json
 import os
 import re
+import signal
 import stat
 import subprocess
 import sys
@@ -229,7 +230,7 @@ def restore_desktop_scaling():
 def display(*args):
     """The monitor, scale and desktop as Torquio sees them, and what it would set. `display restore` puts the
     desktop's XWayland setting back."""
-    if args[:1] == ["restore"]:
+    if args[:1] == ("restore",):
         restore_desktop_scaling()
     try:
         data = json.loads(graphics.query() or "{}")
@@ -244,15 +245,15 @@ def folders(*args):
     """`folders` lists the mapped folders; `folders map PATH drive|desktop` and `folders unmap drive LETTER` /
     `folders unmap desktop PATH` change them."""
     from . import folders as f
-    if args[:1] == ["map"] and len(args) == 3 and args[2] in ("drive", "desktop"):
+    if args[:1] == ("map",) and len(args) == 3 and args[2] in ("drive", "desktop"):
         from .cli import folders as cli_folders
         if not os.path.isdir(args[1]):
             raise Error("That folder doesn't exist.")
         if cli_folders.map_folder(args[1], args[2], strict=False) != 0:
             raise Error("The folder couldn't be mapped.")
-    elif args[:1] == ["unmap"] and len(args) == 3 and args[1] == "drive":
+    elif args[:1] == ("unmap",) and len(args) == 3 and args[1] == "drive":
         f.unmap_drive(args[2].rstrip(":").lower())
-    elif args[:1] == ["unmap"] and len(args) == 3 and args[1] == "desktop":
+    elif args[:1] == ("unmap",) and len(args) == 3 and args[1] == "desktop":
         if not any(path == args[2] for path, _ in f.desktop_shortcuts()):
             raise Error("That isn't one of the mapped Desktop shortcuts.")
         f.remove_link(args[2])
@@ -269,7 +270,7 @@ def keycommands(*args):
     """`keycommands` (backups in Downloads, whether Dorico has key commands), `keycommands export`,
     `keycommands import PATH` (imported on Dorico's next start)."""
     from .cli import keycommands as k
-    if args[:1] == ["export"]:
+    if args[:1] == ("export",):
         folder = k.dorico_appdata()
         files = glob.glob(os.path.join(glob.escape(folder), "keycommands_*.json")) if folder else []
         if not files:
@@ -282,7 +283,7 @@ def keycommands(*args):
             for name in files:
                 z.write(name, os.path.basename(name))
         return {"exported": zip_file, "files": [os.path.basename(n) for n in files]}
-    if args[:1] == ["import"] and len(args) == 2:
+    if args[:1] == ("import",) and len(args) == 2:
         if not os.path.isfile(args[1]) or not args[1].endswith((".zip", ".json")):
             raise Error("Choose a key commands backup (.zip or .json).")
         k.stage(args[1])
@@ -332,14 +333,18 @@ def prereqs():
 
 
 def updates(*args):
-    """`updates` (what's waiting on GitHub since the last check), `updates check` (fetch now)."""
+    """`updates` (what's waiting on GitHub since the last check), `updates check` (fetch now), `updates daily`
+    (fetch if the setting allows and the last check is a day old, as the terminal menu does)."""
     repo = paths.repo_dir()
-    if args[:1] == ["check"]:
+    if args[:1] == ("check",):
         env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
         if not run.succeeds(["timeout", "20", "git", "-C", repo, "fetch", "--quiet"], env=env):
             raise Error("Couldn't reach GitHub.")
+    elif args[:1] == ("daily",):
+        from .cli import tools
+        tools.check_for_updates()
     elif args:
-        raise Error("usage: updates [check]")
+        raise Error("usage: updates [check | daily]")
     tracking = run.succeeds(["git", "-C", repo, "rev-parse", "--abbrev-ref", "@{u}"])
     log = run.capture(["git", "-C", repo, "log", "--format=%s", "HEAD..@{u}"])[1].splitlines() if tracking else []
     changed = run.capture(["git", "-C", repo, "status", "--porcelain", "--untracked-files=no"])[1].strip()
@@ -383,7 +388,7 @@ def task_install(options="{}"):
     config.set_text("match_physical_dpi", config.get_text("match_physical_dpi", "false"))
     if opts.get("manage"):
         config.set_text("warn_xwayland_change", "true")  # the GUI showed what Automated Mode changes
-    code = install.main(["-y"])
+    code = install.main(["-y", "--no-ntsync"])  # the setup assistant offers NTsync itself
     if code != 0:
         return code
     if opts.get("map_path"):
@@ -496,20 +501,25 @@ def task_wine(name, *args):
     `shutdown`)."""
     from . import prefix
     freetype = config.get_text("freetype_interpreter", "40")
+    import shlex
     if name == "reboot":
-        prefix.enter_visibly(prefix.env_script(freetype) + "wineboot -r")
-    elif name == "shutdown":
-        prefix.enter_visibly(prefix.env_script() + "wineserver -k && wineserver -w")
-    elif name == "exe" and args:
+        return prefix.enter_visibly(prefix.env_script(freetype) + "wineboot -r")
+    if name == "shutdown":
+        return prefix.enter_visibly(prefix.env_script() + "wineserver -k && wineserver -w")
+    if name == "exe" and args:
         windows = prefix.windows_path(args[0])
-        program = f'msiexec /i "{windows}"' if args[0].lower().endswith(".msi") else f'"{windows}"'
+        if not windows:
+            print(f"Wine couldn't find {args[0]}")
+            return 1
+        program = (f"msiexec /i {shlex.quote(windows)}" if args[0].lower().endswith(".msi")
+                   else shlex.quote(windows))
+        # A program's own exit code isn't Torquio's to judge (installers return 3010 and the like)
         prefix.enter_visibly(prefix.env_script(freetype) + f"wine {program}")
-    elif name in WINE_PROGRAMS:
-        prefix.enter_visibly(prefix.env_script(freetype) + WINE_PROGRAMS[name])
-    else:
-        print(f"Unknown program {name}")
-        return 1
-    return 0
+        return 0
+    if name in WINE_PROGRAMS:
+        return prefix.enter_visibly(prefix.env_script(freetype) + WINE_PROGRAMS[name])
+    print(f"Unknown program {name}")
+    return 1
 
 
 def task_uninstall(restore="true"):
@@ -546,9 +556,43 @@ TASKS = {"install": task_install, "update": task_update, "fix-icons": task_fix_i
          "ntsync": task_ntsync, "logs": task_logs, "wine": task_wine, "uninstall": task_uninstall}
 
 
+class _Events:
+    """Events on stdout. If the GUI goes away mid-task (its window closed, the app quit), stdout breaks; the task
+    must still finish (an update half applied or a container half replaced is worse than no answer), so from then
+    on events are dropped and the task's output only goes to its session log."""
+    gone = False
+
+
 def _emit(event, **fields):
-    sys.stdout.write(json.dumps(dict(event=event, **fields)) + "\n")
-    sys.stdout.flush()
+    if _Events.gone:
+        return
+    try:
+        sys.stdout.write(json.dumps(dict(event=event, **fields)) + "\n")
+        sys.stdout.flush()
+    except (BrokenPipeError, OSError):
+        _Events.gone = True
+        try:
+            # Point stdout at nothing, so Python's own flush at exit doesn't fail again
+            os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        except OSError:
+            pass
+
+
+# One task at a time: two would fight over the container (engine update, install, uninstall...)
+TASK_LOCK = "task.lock"
+
+
+def _task_lock():
+    """The open lock file if this is the only running task, else None."""
+    import fcntl
+    os.makedirs(paths.cache_dir(), exist_ok=True)
+    lock = open(os.path.join(paths.cache_dir(), TASK_LOCK), "w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        lock.close()
+        return None
+    return lock
 
 
 def run_task(name, args):
@@ -556,9 +600,17 @@ def run_task(name, args):
     if name not in TASKS:
         _emit("done", code=2, error=f"unknown task {name!r}")
         return 2
+    lock = _task_lock() if name != "wine" else True  # Wine's tools stay open; they don't take the lock
+    if lock is None:
+        _emit("log", text="Another Torquio task is still running. Try again when it has finished.")
+        _emit("done", code=3, error="busy")
+        return 3
+    signal.signal(signal.SIGHUP, signal.SIG_IGN)  # the GUI going away doesn't stop the task
     env = dict(os.environ, PYTHONUNBUFFERED="1", TERM="dumb", NO_COLOR="1")
+    # Its own session, so a signal meant for the GUI's process group doesn't stop it halfway
     child = subprocess.Popen([os.path.join(paths.repo_dir(), "torquio"), "api", "_task", name, *args],
-                             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
+                             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env,
+                             start_new_session=True)
     for raw in iter(child.stdout.readline, b""):
         line = ANSI.sub("", raw.decode("utf-8", "replace")).rstrip("\r\n")
         line = line.split("\r")[-1]  # progress bars redraw with \r: keep the last state

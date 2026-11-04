@@ -324,7 +324,8 @@ def main(args=()):
             print(f"Please place them in {paths.installers_dir()} or ~/Downloads and run this script again.")
             return 1
 
-    if create_container:
+    # The GUI asks about NTsync itself (and enables it through pkexec), so it passes --no-ntsync
+    if create_container and "--no-ntsync" not in args:
         ntsync_offer(auto_accept)
 
     current = {"manage": config.get_text("manage_graphics", "false"), "manual_dpi": config.get_text("manual_dpi", "96"),

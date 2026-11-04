@@ -94,6 +94,8 @@ class TorquioWindow(Adw.ApplicationWindow):
     # ---- state ----------------------------------------------------------------------------------------------
 
     def refresh(self):
+        if self.stack.get_visible_child_name() == "setup" and host.Task.busy():
+            return  # the setup assistant's install is running: keep showing its progress
         if self.stack.get_visible_child_name() != "main":
             self.stack.set_visible_child_name("loading")
         self.refresh_button.set_sensitive(False)
@@ -130,6 +132,15 @@ class TorquioWindow(Adw.ApplicationWindow):
         for view in self.views:
             view.refresh(self.status)
         self.stack.set_visible_child_name("main")
+        if not getattr(self, "_checked_updates", False):
+            # Once per run: fetch from GitHub if the last check is a day old (as the terminal menu does), so the
+            # banner can tell there's an update
+            self._checked_updates = True
+            host.in_background(lambda: host.api("updates", "daily", timeout=60), self._daily_checked)
+
+    def _daily_checked(self, data, err):
+        if data and data.get("commits") and not data.get("local_changes"):
+            self.update_banner.set_revealed(True)
 
     def _update_old(self, *args):
         self.update_old.set_sensitive(False)
@@ -162,18 +173,57 @@ class TorquioWindow(Adw.ApplicationWindow):
         name = parameter.get_string()
         labels = {"torquio-dorico": _("Starting Dorico…"), "torquio-sam": _("Starting the Activation Manager…"),
                   "torquio-sda-handler": _("Starting the Download Assistant…")}
-        try:
-            host.spawn([host.launcher(name)])
-            self.toast(labels.get(name, _("Starting…")))
-        except OSError as e:
-            self.show_error(_("Couldn't Start It"), e)
+        path = host.launcher(name)
+
+        def checked(code, err):
+            if err or code != 0:
+                self.show_error(_("Couldn't Start It"), _("Its launcher ({}) is missing. Fix Icons & Launchers in "
+                                                          "Maintenance puts it back.").format(path))
+                return
+            try:
+                host.spawn([path])
+                self.toast(labels.get(name, _("Starting…")))
+            except OSError as e:
+                self.show_error(_("Couldn't Start It"), e)
+        host.in_background(lambda: host.run(["test", "-x", path], timeout=10)[0], checked)
+
+    # Tasks that replace the container, which stops Wine and with it Dorico
+    STOPS_WINE = ("engine-update", "engine-rebuild", "setup-gpu")
+
+    def task_busy(self):
+        """True (and says so) when a task that changes the installation is already running."""
+        if host.Task.busy():
+            self.toast(_("Another task is still running; try again when it has finished"))
+            return True
+        return False
 
     def run_task(self, title, heading, done_heading, name, *args, on_done=None):
+        if self.task_busy():
+            return
+
         def finished(code, result):
             self.refresh()
             if on_done:
                 on_done(code, result)
-        TaskDialog(self, title, heading, done_heading, name, *args, on_done=finished).present(self)
+
+        def start():
+            if not self.task_busy():
+                TaskDialog(self, title, heading, done_heading, name, *args, on_done=finished).present(self)
+        if name in self.STOPS_WINE:
+            self.when_wine_can_stop(start, _("This replaces Torquio's container, which closes Dorico and "
+                                             "Steinberg's programs. Save your work first."), _("_Continue"))
+        else:
+            start()
+
+    def when_wine_can_stop(self, callback, body, action_label, on_cancel=None):
+        """callback() at once when Dorico and Steinberg's programs are closed, else after asking."""
+        def check(data, err):
+            if data and data.get("running"):
+                dialog = confirm(self, _("Close Dorico?"), body, action_label, callback, destructive=True)
+                dialog.connect("response", lambda d, r: on_cancel() if r != "ok" and on_cancel else None)
+            else:
+                callback()
+        host.in_background(lambda: host.api("running"), check)
 
     def apply_setting(self, key, value, on_done=None, on_cancel=None, quiet_success=None):
         """Change a setting; graphics settings restart Wine, so ask first when Dorico is open."""
@@ -195,16 +245,8 @@ class TorquioWindow(Adw.ApplicationWindow):
         if not restarts_wine:
             apply()
             return
-
-        def check(data, err):
-            if data and data.get("running"):
-                dialog = confirm(self, _("Restart Wine?"),
-                                 _("Applying this restarts Wine, which closes Dorico and Steinberg's programs. Save "
-                                   "your work first."), _("_Restart Wine"), apply, destructive=True)
-                dialog.connect("response", lambda d, r: on_cancel() if r != "ok" and on_cancel else None)
-            else:
-                apply()
-        host.in_background(lambda: host.api("running"), check)
+        self.when_wine_can_stop(apply, _("Applying this restarts Wine, which closes Dorico and Steinberg's "
+                                         "programs. Save your work first."), _("_Restart Wine"), on_cancel=on_cancel)
 
     def enable_ntsync(self, on_done=None):
         def done(code):
@@ -215,7 +257,8 @@ class TorquioWindow(Adw.ApplicationWindow):
                 self.toast(_("Kernel fast sync wasn't enabled"))
             if on_done:
                 on_done(code == 0)
-        host.Task("ntsync", on_done=done).start()
+        if not self.task_busy():
+            host.Task("ntsync", on_done=done).start()
 
     def _show_update(self):
         dialog = Adw.AlertDialog(heading=_("Update Torquio"), body=_("Checking what's new…"))
