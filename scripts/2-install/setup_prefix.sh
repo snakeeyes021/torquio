@@ -127,6 +127,10 @@ if [ ! -f /opt/wine-custom/bin/torquio-winedbg.exe ] && command -v x86_64-w64-mi
     x86_64-w64-mingw32-gcc -mwindows -O2 "$SCRIPT_DIR/../1-build/torquio-winedbg.c" -o "/opt/wine-custom/bin/torquio-winedbg.exe"
 fi
 
+# Steinberg's Install Assistant runs MediaBay's pre-install script through Windows PowerShell's .NET library, which
+# Wine doesn't have; without it the Download Assistant's MediaBay updates are skipped (docs/MEDIABAY_UPDATES.md)
+"$SCRIPT_DIR/install_powershell_host.sh" || echo "WARNING: the PowerShell host for Steinberg's installer couldn't be installed."
+
 echo "Configuring Keyboard Focus Loss Mitigation & Accessibility Registry Overrides..."
 
 # FocusOnClick forces window focus acquisition upon mouse click, preventing focus loss in modals

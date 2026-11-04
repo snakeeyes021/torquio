@@ -32,3 +32,13 @@ jobs:
         run: |
           shellcheck --version
           shellcheck -S error scripts/*.sh scripts/1-build/*.sh scripts/2-install/*.sh scripts/templates/*.sh.in
+
+  powershell-host:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: The PowerShell host for Steinberg's installer compiles as C# 5 (the prefix's .NET 4.8 compiler builds it)
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends mono-mcs
+          mcs -langversion:5 -warnaserror+ -nowarn:1699 -target:library -r:System.dll -out:/tmp/sma.dll \
+              scripts/2-install/powershell_host/System.Management.Automation.cs
