@@ -17,6 +17,7 @@ To maintain repository stability and allow clean parallel development, follow th
 *   **Feature & Fix Branches (`feat/*`, `fix/*`, `test/*`, etc.):** Dedicated topic branches used for developing **AND TESTING** individual features or fixes in isolation. Never implement new logic or bugfixes directly on integration branches; always work and test within the appropriate topic branch first.
 *   **`develop` (Feature Integration Testing):** A permanent integration branch used to test multiple merged features and fixes concurrently. This is where cross-feature compatibility, Wine build interactions, and system regressions are tested together.
 *   **Release Lifecycle:** Once all features and fixes merged into `develop` are verified to work seamlessly together across real-world testing with zero regressions, `develop` is merged into `main` to create a new stable release. The release entry's "Build Environment Artifacts" and "Verified Application Versions" sections come from `./torquio --manifest`, run on the system the release was tested on; resolve any warnings it prints first (e.g. a Wine engine built from older patches).
+*   **Deleting Branches:** A feature or fix branch is deleted only once all its commits are in `main` (`git branch -r --merged origin/main`), not when it's merged into `develop`. `develop` is the integration and testing branch, which adventurous users can choose to run; a feature isn't shipped until it's in `main`, so its branch stays until then.
 
 ## The Public Container Image
 

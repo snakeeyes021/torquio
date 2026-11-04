@@ -36,7 +36,7 @@ def container_section(listing):
     expected = engine.prebuilt_image()
     tag = image.rsplit(":", 1)[-1]
     update = "(Wine Tools > Update / Rebuild Wine Engine)"
-    if not engine.is_prebuilt(image):
+    if not engine.from_image(image):
         if engine.outdated(image):
             echo(f"  - Wine Engine: {YELLOW}Compiled locally, update available{RESET} {update}")
         else:

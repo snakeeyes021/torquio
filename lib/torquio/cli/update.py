@@ -3,7 +3,7 @@ Refresh Launchers."""
 import glob
 import os
 
-from .. import container, engine, paths, prefix, run, ui, uninstall
+from .. import container, engine, mediabay, paths, prefix, run, ui, uninstall
 from ..ui import BLUE, GREEN, RED, RESET, YELLOW, echo
 from . import engine as engine_cli
 
@@ -74,6 +74,9 @@ def post_update(old_head):
         run.check(engine_cli.setup_gpu_access(quiet=True), True)
         prefix.apply_settings()
         run.check(engine_cli.fix_machine_identity(quiet=True), True)
+        from ..launch.common import apps_running
+        if not apps_running():
+            mediabay.install_failed_update()
         # Also when the engine was already out of date (e.g. Torquio was updated with git pull, or an earlier
         # offer was declined), not only when this update changed it
         if any(line.startswith("scripts/1-build/") for line in changed.splitlines()) or engine.outdated():

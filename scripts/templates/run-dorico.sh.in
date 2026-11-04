@@ -25,14 +25,9 @@ fi
 
 if [ -z "$DORICO_EXE" ]; then
     MSG="Dorico could not be located in your Wine prefix.\n\nPlease open the Steinberg Download Assistant (SDA) to download and install Dorico."
-    if command -v zenity >/dev/null 2>&1; then
-        zenity --error --text="$MSG" --title="Torquio Launch Error" --width=400 2>/dev/null
-    elif command -v kdialog >/dev/null 2>&1; then
-        kdialog --error "$MSG" --title "Torquio Launch Error" 2>/dev/null
-    else
-        echo -e "\033[1;31mError: $MSG\033[0m"
-    fi
-    exit 1
+    echo -e "\033[1;31mError: $MSG\033[0m"
+    # The launcher shows it in a dialog (the container has no dialog tools)
+    exit 3
 fi
 
 DORICO_DIR=$(dirname "$DORICO_EXE")
@@ -79,6 +74,24 @@ for CANTAI_PT in "$WINEPREFIX"/drive_c/users/*/AppData/Local/"Cantai Local Rende
     fi
     touch "$WINEPREFIX/.torquio_cantai_template_added"
 done
+
+# With NotePerformer installed too: a "NotePerformer & Cantai" template (Cantai for the voices, NotePerformer for
+# everything else). It uses Cantai's own endpoint configuration (from its template above), so only its spec
+# is Torquio's (scripts/templates/playback/noteperformer-cantai.xml). Added once, unless one of that name exists.
+COMBINED_PT="@TORQUIO_REPO_DIR@/scripts/templates/playback/noteperformer-cantai.xml"
+if [ -f "$COMBINED_PT" ] && [ ! -f "$WINEPREFIX/.torquio_combined_template_added" ] && \
+        compgen -G "$WINEPREFIX/drive_c/Program Files/Common Files/VST3/NotePerformer*.vst3" >/dev/null; then
+    for USER_DIR in "$WINEPREFIX"/drive_c/users/*; do
+        SETTINGS_DIR="$USER_DIR/AppData/Roaming/Steinberg/Dorico $DORICO_VER"
+        [ -f "$SETTINGS_DIR/EndpointConfigs/Cantai/endpointconfig.xml" ] || continue
+        SPEC_DIR="$SETTINGS_DIR/PlaybackTemplateSpecs/NotePerformer & Cantai"
+        if [ ! -e "$SPEC_DIR" ]; then
+            mkdir -p "$SPEC_DIR"
+            cp "$COMBINED_PT" "$SPEC_DIR/playbacktemplatespec.xml" && echo "Added the NotePerformer & Cantai playback template to Dorico."
+        fi
+        touch "$WINEPREFIX/.torquio_combined_template_added"
+    done
+fi
 
 # AI plug-ins that run their models on the GPU through DirectML (Cantai) get vkd3d-proton as their
 # Direct3D 12 (Wine's builtin d3d12 computes DirectML wrong), via a DLL copy next to the plug-in's

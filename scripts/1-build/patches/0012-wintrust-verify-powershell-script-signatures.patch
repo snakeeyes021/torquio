@@ -1,0 +1,290 @@
+diff --git a/dlls/crypt32/sip.c b/dlls/crypt32/sip.c
+index d9da19b..443fe6c 100644
+--- a/dlls/crypt32/sip.c
++++ b/dlls/crypt32/sip.c
+@@ -308,6 +308,21 @@ BOOL WINAPI CryptSIPRetrieveSubjectGuid
+     /* Set pgSubject to zero's */
+     memset(pgSubject, 0 , sizeof(GUID));
+ 
++    /* PowerShell scripts carry their signature in a comment block, so nothing in their header identifies them;
++     * Windows' PowerShell SIP (pwrshsip.dll) goes by the extension, and so does wintrust's. */
++    if (FileName)
++    {
++        static const GUID powershellGUID = { 0x603BCC1F, 0x4B59, 0x4E08, { 0xB7,0x24,0xD2,0xC6,0x29,0x7E,0xF3,0x51 }};
++        const WCHAR *ext = wcsrchr(FileName, '.');
++
++        if (ext && (!wcsicmp(ext, L".ps1") || !wcsicmp(ext, L".psm1") || !wcsicmp(ext, L".psd1")))
++        {
++            *pgSubject = powershellGUID;
++            SetLastError(S_OK);
++            return TRUE;
++        }
++    }
++
+     if (hFileIn)
+         /* Use the given handle, make sure not to close this one ourselves */
+         hFile = hFileIn;
+diff --git a/dlls/wintrust/crypt.c b/dlls/wintrust/crypt.c
+index ad6f264..5e4a081 100644
+--- a/dlls/wintrust/crypt.c
++++ b/dlls/wintrust/crypt.c
+@@ -26,6 +26,7 @@
+ #include <stdio.h>
+ #include "windef.h"
+ #include "winbase.h"
++#include "winnls.h"
+ #include "wintrust.h"
+ #include "winver.h"
+ #include "mscat.h"
+@@ -33,6 +34,7 @@
+ #include "imagehlp.h"
+ #include "winternl.h"
+ 
++#include "wintrust_priv.h"
+ #include "wine/debug.h"
+ 
+ WINE_DEFAULT_DEBUG_CHANNEL(wintrust);
+@@ -1611,6 +1613,138 @@ static BOOL WINTRUST_GetSignedMsgFromCatFile(SIP_SUBJECTINFO *pSubjectInfo,
+     return ret;
+ }
+ 
++/* The PowerShell SIP (pwrshsip.dll on Windows): a script's signature is a base64 PKCS #7 message in comment
++ * lines at its end ("# SIG # Begin signature block" ... "# SIG # End signature block"), and the signed digest
++ * is of the script's text, as UTF-16LE, up to the line break that starts the block. */
++const GUID WINTRUST_PowerShellSIP = { 0x603BCC1F, 0x4B59, 0x4E08, { 0xB7,0x24,0xD2,0xC6,0x29,0x7E,0xF3,0x51 }};
++static const WCHAR script_sig_begin[] = L"\r\n# SIG # Begin signature block\r\n";
++static const WCHAR script_sig_end[] = L"# SIG # End signature block";
++
++/* A script's text as UTF-16 (UTF-16 or UTF-8 with a byte order mark; without one, UTF-8 if it's valid UTF-8,
++ * else the ANSI code page), NUL-terminated; free() it. NULL on failure. */
++WCHAR *WINTRUST_ReadScript(HANDLE file, const WCHAR *name, DWORD *len)
++{
++    LARGE_INTEGER size;
++    BYTE *raw = NULL, *p;
++    WCHAR *text = NULL;
++    DWORD read, n, i;
++    BOOL opened = FALSE;
++    UINT cp;
++
++    if (!file || file == INVALID_HANDLE_VALUE)
++    {
++        file = CreateFileW(name, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
++        if (file == INVALID_HANDLE_VALUE) return NULL;
++        opened = TRUE;
++    }
++    if (!GetFileSizeEx(file, &size) || size.QuadPart > 64 * 1024 * 1024) goto done;
++    if (!(raw = malloc(size.LowPart + 1))) goto done;
++    SetFilePointer(file, 0, NULL, FILE_BEGIN);
++    if (!ReadFile(file, raw, size.LowPart, &read, NULL) || read != size.LowPart) goto done;
++
++    if (read >= 2 && raw[0] == 0xff && raw[1] == 0xfe)
++    {
++        n = (read - 2) / sizeof(WCHAR);
++        if ((text = malloc((n + 1) * sizeof(WCHAR)))) memcpy(text, raw + 2, n * sizeof(WCHAR));
++    }
++    else if (read >= 2 && raw[0] == 0xfe && raw[1] == 0xff)
++    {
++        n = (read - 2) / sizeof(WCHAR);
++        if ((text = malloc((n + 1) * sizeof(WCHAR))))
++            for (i = 0; i < n; i++) text[i] = raw[2 + 2 * i] << 8 | raw[3 + 2 * i];
++    }
++    else
++    {
++        p = raw;
++        n = read;
++        cp = CP_UTF8;
++        if (n >= 3 && p[0] == 0xef && p[1] == 0xbb && p[2] == 0xbf)
++        {
++            p += 3;
++            n -= 3;
++        }
++        else if (n && !MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, (char *)p, n, NULL, 0))
++            cp = CP_ACP;
++        read = n;
++        n = read ? MultiByteToWideChar(cp, 0, (char *)p, read, NULL, 0) : 0;
++        if ((text = malloc((n + 1) * sizeof(WCHAR)))) MultiByteToWideChar(cp, 0, (char *)p, read, text, n);
++    }
++    if (text)
++    {
++        text[n] = 0;
++        *len = n;
++    }
++done:
++    free(raw);
++    if (opened) CloseHandle(file);
++    return text;
++}
++
++/* Where a script's signature block starts (the last one: it's at the end), or NULL. */
++const WCHAR *WINTRUST_ScriptSignature(const WCHAR *text)
++{
++    const WCHAR *found = NULL, *p = text;
++
++    while ((p = wcsstr(p, script_sig_begin))) found = p++;
++    return found;
++}
++
++static BOOL WINTRUST_GetSignedMsgFromScript(SIP_SUBJECTINFO *pSubjectInfo, DWORD *pdwEncodingType,
++ DWORD dwIndex, DWORD *pcbSignedDataMsg, BYTE *pbSignedDataMsg)
++{
++    const WCHAR *begin, *end, *line, *eol, *c;
++    WCHAR *text, *b64 = NULL, *dst;
++    DWORD len, size = 0;
++    BOOL ret = FALSE;
++
++    TRACE("(%p %p %ld %p %p)\n", pSubjectInfo, pdwEncodingType, dwIndex, pcbSignedDataMsg, pbSignedDataMsg);
++
++    if (!pcbSignedDataMsg)
++    {
++        SetLastError(ERROR_INVALID_PARAMETER);
++        return FALSE;
++    }
++    if (!(text = WINTRUST_ReadScript(pSubjectInfo->hFile, pSubjectInfo->pwsFileName, &len)))
++        return FALSE;
++    if (dwIndex || !(begin = WINTRUST_ScriptSignature(text)) || !(end = wcsstr(begin, script_sig_end)))
++    {
++        SetLastError(TRUST_E_NOSIGNATURE);
++        goto done;
++    }
++    /* The base64 data: the comment lines between the markers, without their "# " */
++    if (!(b64 = dst = malloc((end - begin + 1) * sizeof(WCHAR)))) goto done;
++    for (line = begin + wcslen(script_sig_begin); line < end; line = eol + 1)
++    {
++        if (!(eol = wcschr(line, '\n')) || eol > end) eol = end;
++        if (line[0] == '#' && line[1] == ' ')
++            for (c = line + 2; c < eol; c++)
++                if (*c != '\r') *dst++ = *c;
++        if (eol == end) break;
++    }
++    *dst = 0;
++    if (!CryptStringToBinaryW(b64, dst - b64, CRYPT_STRING_BASE64, NULL, &size, NULL, NULL))
++        SetLastError(TRUST_E_NOSIGNATURE);
++    else if (!pbSignedDataMsg)
++    {
++        *pcbSignedDataMsg = size;
++        ret = TRUE;
++    }
++    else if (*pcbSignedDataMsg < size)
++    {
++        *pcbSignedDataMsg = size;
++        SetLastError(ERROR_INSUFFICIENT_BUFFER);
++    }
++    else
++        ret = CryptStringToBinaryW(b64, dst - b64, CRYPT_STRING_BASE64, pbSignedDataMsg, pcbSignedDataMsg,
++         NULL, NULL);
++    if (ret && pdwEncodingType)
++        *pdwEncodingType = X509_ASN_ENCODING | PKCS_7_ASN_ENCODING;
++done:
++    free(b64);
++    free(text);
++    return ret;
++}
++
+ /* GUIDs used by CryptSIPGetSignedDataMsg and CryptSIPPutSignedDataMsg */
+ static const GUID unknown = { 0xC689AAB8, 0x8E78, 0x11D0, { 0x8C,0x47,
+     0x00,0xC0,0x4F,0xC2,0x95,0xEE } };
+@@ -1645,6 +1779,9 @@ BOOL WINAPI CryptSIPGetSignedDataMsg(SIP_SUBJECTINFO* pSubjectInfo, DWORD* pdwEn
+     else if (!memcmp(pSubjectInfo->pgSubjectType, &catGUID, sizeof(catGUID)))
+         ret = WINTRUST_GetSignedMsgFromCatFile(pSubjectInfo, pdwEncodingType,
+          dwIndex, pcbSignedDataMsg, pbSignedDataMsg);
++    else if (!memcmp(pSubjectInfo->pgSubjectType, &WINTRUST_PowerShellSIP, sizeof(GUID)))
++        ret = WINTRUST_GetSignedMsgFromScript(pSubjectInfo, pdwEncodingType,
++         dwIndex, pcbSignedDataMsg, pbSignedDataMsg);
+     else
+     {
+         FIXME("unimplemented for subject type %s\n",
+diff --git a/dlls/wintrust/register.c b/dlls/wintrust/register.c
+index 49b8ce0..77a39b0 100644
+--- a/dlls/wintrust/register.c
++++ b/dlls/wintrust/register.c
+@@ -1011,6 +1011,8 @@ HRESULT WINAPI DllRegisterServer(void)
+     static GUID Unknown4 = { 0xC689AAB9, 0x8E78, 0x11D0, { 0x8C,0x47,0x00,0xC0,0x4F,0xC2,0x95,0xEE }};
+     static GUID Unknown5 = { 0xDE351A43, 0x8E59, 0x11D0, { 0x8C,0x47,0x00,0xC0,0x4F,0xC2,0x95,0xEE }};
+     static GUID Unknown6 = { 0x9BA61D3F, 0xE73A, 0x11D0, { 0x8C,0xD2,0x00,0xC0,0x4F,0xC2,0x95,0xEE }};
++    /* PowerShell scripts (pwrshsip.dll on Windows; built into wintrust here) */
++    static GUID PowerShell = { 0x603BCC1F, 0x4B59, 0x4E08, { 0xB7,0x24,0xD2,0xC6,0x29,0x7E,0xF3,0x51 }};
+     static WCHAR MagicNumber2[] = {'M','S','C','F', 0};
+     static WCHAR MagicNumber3[] = {'0','x','0','0','0','0','4','5','5','0', 0};
+     static WCHAR CafeBabe[] = {'0','x','c','a','f','e','b','a','b','e', 0};
+@@ -1126,6 +1128,8 @@ add_trust_providers:
+         SIPAddProviderRes = S_FALSE;
+     if (!WINTRUST_SIPPAddProvider(&Unknown6, CafeBabe))
+         SIPAddProviderRes = S_FALSE;
++    if (!WINTRUST_SIPPAddProvider(&PowerShell, NULL))
++        SIPAddProviderRes = S_FALSE;
+ 
+     /* Native does a CryptSIPRemoveProvider here for {941C2937-1292-11D1-85BE-00C04FC295EE}.
+      * This SIP Provider is however not found on up-to-date window install and native will
+diff --git a/dlls/wintrust/softpub.c b/dlls/wintrust/softpub.c
+index 609d240..0f9edd8 100644
+--- a/dlls/wintrust/softpub.c
++++ b/dlls/wintrust/softpub.c
+@@ -26,6 +26,7 @@
+ #include "mssip.h"
+ #include "softpub.h"
+ #include "winnls.h"
++#include "wintrust_priv.h"
+ #include "wine/debug.h"
+ 
+ WINE_DEFAULT_DEBUG_CHANNEL(wintrust);
+@@ -305,6 +306,22 @@ static BOOL SOFTPUB_HashPEFile(HANDLE file, HCRYPTHASH hash)
+     return TRUE;
+ }
+ 
++/* A PowerShell script's digest is of its text, as UTF-16LE, up to its signature block. */
++static BOOL SOFTPUB_HashScript(CRYPT_PROVIDER_DATA *data, HANDLE file, HCRYPTHASH hash)
++{
++    const WCHAR *sig;
++    WCHAR *text;
++    DWORD len;
++    BOOL ret;
++
++    if (!(text = WINTRUST_ReadScript(file, data->pWintrustData->pFile->pcwszFilePath, &len)))
++        return FALSE;
++    if ((sig = WINTRUST_ScriptSignature(text))) len = sig - text;
++    ret = CryptHashData(hash, (BYTE *)text, len * sizeof(WCHAR), 0);
++    free(text);
++    return ret;
++}
++
+ static DWORD SOFTPUB_VerifyImageHash(CRYPT_PROVIDER_DATA *data, HANDLE file)
+ {
+     SPC_INDIRECT_DATA_CONTENT *indirect = (SPC_INDIRECT_DATA_CONTENT *)data->pPDSip->psIndirectData;
+@@ -315,8 +332,12 @@ static DWORD SOFTPUB_VerifyImageHash(CRYPT_PROVIDER_DATA *data, HANDLE file)
+     HCRYPTHASH hash = 0;
+     ALG_ID algID;
+ 
+-    if (((ULONG_PTR)indirect->Data.pszObjId >> 16) == 0 ||
+-        strcmp(indirect->Data.pszObjId, SPC_PE_IMAGE_DATA_OBJID))
++    BOOL script = ((ULONG_PTR)indirect->Data.pszObjId >> 16) != 0 &&
++        !strcmp(indirect->Data.pszObjId, SPC_SIGINFO_OBJID) &&
++        IsEqualGUID(&data->pPDSip->gSubject, &WINTRUST_PowerShellSIP);
++
++    if (!script && (((ULONG_PTR)indirect->Data.pszObjId >> 16) == 0 ||
++        strcmp(indirect->Data.pszObjId, SPC_PE_IMAGE_DATA_OBJID)))
+     {
+         FIXME("Cannot verify hash for pszObjId=%s\n", debugstr_a(indirect->Data.pszObjId));
+         return ERROR_SUCCESS;
+@@ -338,7 +359,7 @@ static DWORD SOFTPUB_VerifyImageHash(CRYPT_PROVIDER_DATA *data, HANDLE file)
+         goto done;
+     }
+ 
+-    if (!SOFTPUB_HashPEFile(file, hash))
++    if (!(script ? SOFTPUB_HashScript(data, file, hash) : SOFTPUB_HashPEFile(file, hash)))
+     {
+         err = TRUST_E_NOSIGNATURE;
+         goto done;
+diff --git a/dlls/wintrust/wintrust_priv.h b/dlls/wintrust/wintrust_priv.h
+index 1e2e7a7..8e476c4 100644
+--- a/dlls/wintrust/wintrust_priv.h
++++ b/dlls/wintrust/wintrust_priv.h
+@@ -25,4 +25,9 @@ BOOL WINAPI WINTRUST_AddCert(CRYPT_PROVIDER_DATA *data, DWORD idxSigner,
+  BOOL fCounterSigner, DWORD idxCounterSigner, PCCERT_CONTEXT pCert2Add);
+ BOOL WINAPI WINTRUST_AddPrivData(CRYPT_PROVIDER_DATA *data, CRYPT_PROVIDER_PRIVDATA *pPrivData2Add);
+ 
++/* PowerShell scripts (crypt.c) */
++extern const GUID WINTRUST_PowerShellSIP;
++WCHAR *WINTRUST_ReadScript(HANDLE file, const WCHAR *name, DWORD *len);
++const WCHAR *WINTRUST_ScriptSignature(const WCHAR *text);
++
+ #endif /* ndef __WINTRUST_PRIV_H__ */

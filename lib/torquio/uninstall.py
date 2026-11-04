@@ -20,6 +20,12 @@ ICONS = ["torquio-dorico.png", "torquio-dorico-project.png", "torquio-dorico-aud
 MIME_PACKAGES = ["application-x-dorico.xml", "x-wine-extension-dorico.xml", "x-wine-extension-vstsound.xml",
                  "x-wine-extension-slm.xml"]
 DEFAULT_APP = re.compile(r"^[^=]+=(Dorico|Steinberg Download Assistant|Steinberg Activation Manager|Dorico Audio Engine)\.desktop;?$")
+# Icons Wine's menu builder put in the icon theme: a hash of the Windows path, the program's name, the icon index
+WINE_ICON = re.compile(r"^[0-9A-F]{4}_(.+)\.\d+\.png$")
+# Programs only Torquio's prefix has (Steinberg's and the plug-ins Torquio installs). Icons of programs every
+# prefix has (msiexec, winhlp32, ...) are removed only along with a Torquio-prefix launcher that used them.
+TORQUIO_PROGRAMS = re.compile(r"^(Dorico|Steinberg|Sam$|Cubase|HALion|Groove ?Agent|asiobtinsetup|VSTAudioEngine|"
+                              r"MediaBay|Library ?Manager|NotePerformer|Cantai)", re.I)
 WINDOWS_SHORTCUTS = ["Activation Manager.lnk", "Steinberg Activation Manager.lnk", "Dorico*.lnk", "HALion*.lnk",
                      "Groove Agent*.lnk", "Steinberg Library Manager.lnk"]
 
@@ -118,7 +124,7 @@ def remove_integrations():
 
 def remove_menu_builder_leftovers():
     """What Wine's menu builder created for Torquio's prefix (Torquio disables it, but older versions and
-    some setup steps didn't): launchers, file types, menu entries and folders. Also run by Fix Icons."""
+    some setup steps didn't): launchers, file types, menu entries, folders and icons. Also run by Fix Icons."""
     home = paths.home()
     apps = os.path.join(home, ".local/share/applications")
     needles = torquio_dir_patterns()
@@ -131,10 +137,12 @@ def remove_menu_builder_leftovers():
     wine_menu = os.path.join(apps, "wine")
     for root, dirs, files in os.walk(wine_menu):
         candidates += [os.path.join(root, f) for f in files + dirs if fnmatch.fnmatchcase(f, "*.desktop")]
+    removed_icons = set()
     for launcher in candidates:
         if not _mentions(launcher, needles):
             continue
         name = os.path.basename(launcher)[:-len(".desktop")]
+        removed_icons |= _icon_names([launcher])
         _rm(launcher)
         if name.startswith("wine-extension-"):
             _rm(os.path.join(home, ".local/share/mime/packages", f"x-wine-extension-{name[len('wine-extension-'):]}.xml"))
@@ -169,6 +177,39 @@ def remove_menu_builder_leftovers():
         needle = [f"<Directory>{os.path.basename(directory)}</Directory>"]
         if not any(_mentions(m, needle) for m in menus):
             _rm(directory)
+    # 4. their icons, unless a remaining launcher uses them
+    remove_wine_icons(removed_icons)
+
+
+def _icon_names(launchers):
+    """The Icon= names the given .desktop files use."""
+    names = set()
+    for path in launchers:
+        try:
+            with open(path, errors="replace") as f:
+                names |= {line[len("Icon="):].strip() for line in f if line.startswith("Icon=")}
+        except OSError:
+            pass
+    return names
+
+
+def remove_wine_icons(also=()):
+    """The icons Wine's menu builder made for Torquio's prefix: those of programs only Torquio's prefix has, and
+    `also` (icon names of removed Torquio-prefix launchers). Kept while any launcher still uses them."""
+    home = paths.home()
+    theme = os.path.join(home, ".local/share/icons/hicolor")
+    launchers = [os.path.join(root, f) for root, dirs, files in os.walk(os.path.join(home, ".local/share/applications"))
+                 for f in files if f.endswith(".desktop")]
+    in_use = _icon_names(launchers)
+    removed = False
+    for icon in sorted(glob.glob(os.path.join(glob.escape(theme), "*", "apps", "*.png"))):
+        m = WINE_ICON.match(os.path.basename(icon))
+        name = os.path.basename(icon)[:-len(".png")]
+        if m and name not in in_use and (name in also or TORQUIO_PROGRAMS.match(m.group(1))):
+            _rm(icon)
+            removed = True
+    if removed and os.path.isfile(os.path.join(theme, "index.theme")) and run.have("gtk-update-icon-cache"):
+        run.interactive(["gtk-update-icon-cache", "-f", "-t", theme], stdout=run.DEVNULL, stderr=run.DEVNULL)
 
 
 def remove_default_apps(path):

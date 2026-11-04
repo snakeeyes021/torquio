@@ -10,6 +10,7 @@ import time
 from .. import config, container, engine, folders, graphics, identity, paths, prefix, run, uninstall, ui, versions
 from ..ui import BLUE, GRAY, GREEN, RED, RESET, WINE, YELLOW, echo
 from . import keycommands
+from ..launch.common import apps_running
 from .update import install_launchers
 
 CANCELLED = 10
@@ -302,21 +303,8 @@ def main(args=()):
             echo(f"{RED}Error: Neither docker nor podman was found.{RESET}")
             print("Please install one of them to use with distrobox.")
             return 1
-        ntsync_offer(auto_accept)
 
-    current = {"manage": config.get_text("manage_graphics", "false"), "manual_dpi": config.get_text("manual_dpi", "96"),
-               "match_phys": config.get_text("match_physical_dpi", "false"),
-               "freetype": config.get_text("freetype_interpreter", "40")}
-    settings = dict(current, map_path="", map_type="drive", import_path="")
-    if auto_accept:
-        settings.update(manage="false", manual_dpi="96", match_phys="false", freetype="40")
-    else:
-        wizard(settings)
-    config.set_text("manage_graphics", settings["manage"])
-    config.set_text("manual_dpi", settings["manual_dpi"])
-    config.set_text("match_physical_dpi", settings["match_phys"])
-    config.set_text("freetype_interpreter", settings["freetype"])
-
+    # Before anything is changed (NTsync, the settings file), so a missing installer leaves the system as it was
     installers = {}
     if install_software:
         print("Validating installers...")
@@ -335,6 +323,22 @@ def main(args=()):
             echo(f"{RED}Error: Mandatory installers were not found.{RESET}")
             print(f"Please place them in {paths.installers_dir()} or ~/Downloads and run this script again.")
             return 1
+
+    if create_container:
+        ntsync_offer(auto_accept)
+
+    current = {"manage": config.get_text("manage_graphics", "false"), "manual_dpi": config.get_text("manual_dpi", "96"),
+               "match_phys": config.get_text("match_physical_dpi", "false"),
+               "freetype": config.get_text("freetype_interpreter", "40")}
+    # -y keeps the current settings (on a new install they're the defaults: Manual Mode, 96 DPI, FreeType v40);
+    # resetting them turned Automated Mode off without restoring the XWayland setting it had changed
+    settings = dict(current, map_path="", map_type="drive", import_path="")
+    if not auto_accept:
+        wizard(settings)
+    config.set_text("manage_graphics", settings["manage"])
+    config.set_text("manual_dpi", settings["manual_dpi"])
+    config.set_text("match_physical_dpi", settings["match_phys"])
+    config.set_text("freetype_interpreter", settings["freetype"])
 
     banner()
     echo(f"{BLUE}=== Installation Manifest ==={RESET}")
@@ -361,6 +365,17 @@ def main(args=()):
     if not auto_accept and ui.no(ui.ask("Proceed with the wizard installation tasks? [Y/n]: ")):
         echo(f"{RED}Installation cancelled.{RESET}")
         return CANCELLED
+    # Steinberg's installers stop at a "still running" warning (and Wine's prefix setup would change it under
+    # them) while Dorico or a Steinberg program is open
+    if (setup_prefix or install_software) and container.exists() and apps_running():
+        echo(f"{YELLOW}Dorico or another Steinberg program is open. It has to be closed to continue.{RESET}")
+        if auto_accept:
+            print("Close it (save your work first), then run the installer again.")
+            return 1
+        if ui.no(ui.ask("Save your work in it, then close it now? [Y/n]: ")):
+            echo(f"{RED}Installation cancelled.{RESET}")
+            return CANCELLED
+        prefix.restart_wineserver()
 
     name = paths.container_name()
     if create_container:

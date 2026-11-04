@@ -26,6 +26,21 @@ def is_prebuilt(image):
     return image.startswith(paths.image_repo() + ":")
 
 
+# Left by `torquio --rebuild-wine` in a container from a prebuilt image: the engine in it was compiled here since.
+# A container from an image doesn't have it, so swapping the container (engine updates) takes it away again.
+COMPILED_MARKER = "/opt/wine-custom/share/torquio/compiled-locally"
+
+
+def compiled_locally():
+    """Whether the engine in this prebuilt-image container was recompiled here (`torquio --rebuild-wine`)."""
+    return run.succeeds(["distrobox", "enter", paths.container_name(), "--", "test", "-e", COMPILED_MARKER])
+
+
+def from_image(image):
+    """Whether the engine is the prebuilt image's own (not compiled locally, nor recompiled in its container)."""
+    return is_prebuilt(image) and not compiled_locally()
+
+
 def wanted_build_record():
     """The build record (zhiyi/wine commit and patches) an engine compiled from this copy would have."""
     repo = paths.repo_dir()
@@ -43,7 +58,7 @@ def outdated(image=None):
     """Whether the engine in the container isn't the one this copy builds: a prebuilt image other than the
     matching one, or a locally compiled engine whose build record differs (or that has none)."""
     image = container.image() if image is None else image
-    if is_prebuilt(image):
+    if from_image(image):
         expected = prebuilt_image()
         return bool(expected) and image != expected
     out = container.enter("cat", "/opt/wine-custom/share/torquio/build-info")

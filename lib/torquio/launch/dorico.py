@@ -1,6 +1,9 @@
 """torquio-dorico: start Dorico, optionally opening a project (the .dorico file association)."""
-from .. import config, paths, run
+from .. import config, paths
 from . import common
+
+MISSING = ("Dorico could not be located in your Wine prefix.\n\nPlease open the Steinberg Download Assistant (SDA) "
+           "to download and install Dorico.")
 
 
 def launch(file_to_open=""):
@@ -16,8 +19,9 @@ def launch(file_to_open=""):
         # GPU for AI plug-ins (Cantai): "auto" (strongest GPU), "off" (CPU only) or (part of) a GPU's name
         "AI_GPU": config.get_text("ai_gpu", "auto"),
         "TORQUIO_DATA_DIR": paths.data_dir(),
+        "TORQUIO_REPO_DIR": paths.repo_dir(),
     }))
     common.handover("launch_path.txt", file_to_open)
-    run.check(common.run_in_container(runner), True)
+    common.run_program(runner, MISSING)
     common.report_crashes()
     return 0

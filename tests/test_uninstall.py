@@ -85,3 +85,28 @@ class MenuBuilderLeftovers(unittest.TestCase):
             left = {p for p in files if os.path.exists(p)}
             self.assertEqual(left, {f"{apps}/wine-extension-txt.desktop", f"{mime}/x-wine-extension-txt.xml",
                                     f"{apps}/wine/Programs/Other.desktop", f"{apps}/Dorico.desktop"})
+
+    def test_removes_only_torquio_prefix_icons(self):
+        with tempfile.TemporaryDirectory() as home:
+            apps = os.path.join(home, ".local/share/applications")
+            icons = os.path.join(home, ".local/share/icons/hicolor")
+            os.makedirs(apps)
+            for size in ("48x48", "256x256"):
+                os.makedirs(os.path.join(icons, size, "apps"))
+            with open(f"{apps}/wine-extension-chm.desktop", "w") as f:
+                f.write(f'Exec=env "WINEPREFIX={home}/.local/share/torquio/prefix" wine start %f\nIcon=D15F_hh.0\n')
+            with open(f"{apps}/wine-extension-hlp.desktop", "w") as f:  # another prefix's
+                f.write('Exec=env "WINEPREFIX=/home/x/.wine" wine start %f\nIcon=C06E_winhlp32.0\n')
+            with open(f"{apps}/other-app.desktop", "w") as f:
+                f.write("Exec=other\nIcon=1234_HALionSonic.0\n")
+            names = ["9A05_Dorico6.0", "64A2_SteinbergActivationManager.0", "420C_Sam.0", "D15F_hh.0",
+                     "C06E_winhlp32.0", "D23E_msiexec.0", "1234_HALionSonic.0", "torquio-dorico", "Sampler"]
+            files = [os.path.join(icons, size, "apps", n + ".png") for size in ("48x48", "256x256") for n in names]
+            for path in files:
+                open(path, "w").close()
+            with mock.patch.dict(os.environ, {"HOME": home, "XDG_DATA_HOME": ""}):
+                uninstall.remove_menu_builder_leftovers()
+            left = {os.path.basename(p)[:-4] for p in files if os.path.exists(p)}
+            # Torquio's own icons, other prefixes' and generic programs' icons, and icons still in use stay
+            self.assertEqual(left, {"C06E_winhlp32.0", "D23E_msiexec.0", "1234_HALionSonic.0", "torquio-dorico",
+                                    "Sampler"})
