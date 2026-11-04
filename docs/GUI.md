@@ -1,16 +1,17 @@
 # Design: Torquio's GUI
 
-Status: **ready for v0.7.0 review** (`gui/`, on `feat/gui`): reviewed and fixed, tasks checked end to end in a VM; the look and Flathub wait for the maintainer.
+Status: **ready for v0.7.0 review** (`gui/`, on `feat/gui`): reviewed and fixed, tasks checked end to end in a VM; the icon waits for the maintainer.
 
-**Who decided what.** Owner-given (the maintainer's own decisions): a graphical Torquio distributed on
-Flathub; it ships as v0.7.0; it's built from this repository's checkout in GNOME Builder (no separate
-worktree, nothing installed for previews). Everything else in this document (the architecture, the screens,
-the API, the icon, the wording, the Flathub listing) is agent-proposed and open until the maintainer confirms
-it.
+**Who decided what.** Owner-given (the maintainer's own decisions): a graphical Torquio; it ships as
+v0.7.0, without Flathub; it's built from this repository's checkout in GNOME Builder (no separate worktree,
+nothing installed for previews); Flathub comes later (v0.8.0 or v0.9.0) and needs an overhaul of the
+architecture below, since this design isn't Flathub-compliant (see `docs/BACKLOG.md`). Everything else in this
+document (the architecture, the screens, the API, the icon, the wording) is agent-proposed and open until the
+maintainer confirms it.
 
 ## Goal
 
-A GNOME app on Flathub that does everything the `torquio` menu does, for people who'd rather not use a
+A GNOME app (a Flatpak; Flathub later, see above) that does everything the `torquio` menu does, for people who'd rather not use a
 terminal: install, launch, settings, updates, maintenance, uninstall. The command line stays, and both use the
 same core (`lib/torquio`), so behaviour can't drift apart.
 
@@ -87,20 +88,14 @@ install and keep running than `flatpak-spawn`, for no gain over a command-line i
   `wine` is exempt). If the GUI goes away mid-task, the task still finishes (its output then only goes to the
   session log). A data verb's stdout is only its JSON; anything the CLI helpers print goes to stderr.
 
-## Flathub
+## Not Flathub (yet)
 
-Permissions: `--talk-name=org.freedesktop.Flatpak` (essential, explained in the submission), Wayland with
-X11 fallback, `--share=ipc`, `--device=dri`. No network or filesystem access is needed in the sandbox: the
-host does the downloading and the file work. Nothing from Steinberg is bundled.
-
-Submitting is the maintainer's decision (it's public); nothing has been submitted yet. Prepared
-(agent-proposed, for the maintainer to confirm): `build-aux/flathub/tech.redfoxlabs.Torquio.json`, the
-manifest Flathub builds from (the repository at the release's tag; its `commit` is filled in when the tag
-exists), and the metainfo's screenshots (`gui/data/screenshots/`, taken in a test VM, not on anyone's own
-computer; their URLs point at the release tag). The steps, once approved: tag the release; fill in the commit;
-fork `flathub/flathub`, add the manifest on a branch from `new-pr`, and open the pull request, explaining
-`--talk-name=org.freedesktop.Flatpak` (the app drives the host's Torquio, as DistroShelf drives distrobox).
-The app ID's domain (`redfoxlabs.tech`) is verified afterwards for Flathub's "verified" badge.
+This design runs as a Flatpak (built from the repository, in GNOME Builder) with
+`--talk-name=org.freedesktop.Flatpak`, Wayland with X11 fallback, `--share=ipc` and `--device=dri`, and drives
+the host's Torquio. That isn't Flathub-compliant: the maintainer has moved a Flathub submission to v0.8.0 or
+v0.9.0, with an overhaul (`docs/BACKLOG.md`, "v0.8.0/0.9.0: Flathub-compliant architecture"). The metainfo and
+its screenshots (`gui/data/screenshots/`, taken in a test VM) serve the local build and GNOME Software; the
+only manifest is the local one at the repository's root.
 
 ## Compatibility with the host's Torquio
 

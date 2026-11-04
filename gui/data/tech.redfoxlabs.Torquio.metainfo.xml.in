@@ -5,7 +5,7 @@
   <project_license>GPL-3.0-or-later</project_license>
 
   <name>Torquio</name>
-  <summary>Run Steinberg Dorico on Linux</summary>
+  <summary>Run Dorico on Linux</summary>
   <description>
     <p>
       Torquio installs and runs Steinberg's Dorico, with its Activation Manager, Download Assistant and
@@ -15,6 +15,10 @@
     <p>
       Dorico and Steinberg's other software aren't included: you download them with your own Steinberg
       account.
+    </p>
+    <p>
+      Torquio is an independent project, not affiliated with or endorsed by Steinberg Media Technologies GmbH.
+      Dorico is a trademark of Steinberg.
     </p>
   </description>
 
@@ -58,11 +62,6 @@
     <control>keyboard</control>
     <control>touch</control>
   </supports>
-
-  <branding>
-    <color type="primary" scheme_preference="light">#f6c3a8</color>
-    <color type="primary" scheme_preference="dark">#8e2f1b</color>
-  </branding>
 
   <releases>
     <release version="0.7.0" date="2026-11-04">

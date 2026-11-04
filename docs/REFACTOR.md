@@ -8,7 +8,7 @@ Status: **done** (stages 0-7 merged to develop, 2026-10-24); manual testing befo
 Rewrite Torquio's host-side Bash in dependency-free Python, so that it's legible and maintainable for its
 maintainers (and contributors, and LLM-assisted work), with **no change in behaviour for users**: same
 commands, flags, menus, wording, files and results. The new code is organised as a core library with a thin
-command-line interface on top, which the v0.7.0 GUI (GTK4/libadwaita via PyGObject, for Flathub) will reuse
+command-line interface on top, which the v0.7.0 GUI (GTK4/libadwaita via PyGObject, a Flatpak) will reuse
 as a second interface.
 
 Non-goals: new features, new dependencies, changing what runs inside the container, changing the user

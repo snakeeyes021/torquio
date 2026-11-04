@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=Torquio
-Comment=Run Steinberg Dorico on Linux
+Comment=Run Dorico on Linux
 Exec=torquio-gui
 Icon=tech.redfoxlabs.Torquio
 Terminal=false
