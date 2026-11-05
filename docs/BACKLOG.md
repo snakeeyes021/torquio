@@ -10,6 +10,9 @@ This section tracks epics that have been broken down into concrete, actionable s
     *   [x] **v0.6.0:** Refactor in Python (epic below; released 2026-11-02).
     *   [x] **v0.6.5:** Fixes for what the v0.6.0 testing found (epic below). Items 14 and 15 move to v0.7.0.
     *   [ ] **v0.7.0:** The GUI app, a Flatpak built from the repository in GNOME Builder (design and status in `docs/GUI.md`, on `feat/gui`), plus the fixes that land after v0.6.5. Not on Flathub: that is v0.8.0 or v0.9.0 (epic below). *2026-11-04:* `feat/gui` has develop merged in (with item 16); the app was reviewed and 15 bugs fixed, its tasks checked end to end in the Fedora VM, and a preview with screenshots went to the maintainer. Waiting on the maintainer: the icon, a read-only check with Dorico open (does it load MediaBay's `mediaclient.dll`; item 16), and the release PR.
+        *   [ ] **GUI fixes and changes (the maintainer's notes, to come; the release waits on them):**
+            *   [ ] Overview: a stopped container ("Exited") shows a green check; it should read as stopped (it starts with Dorico), not as an error or as running. (Found 2026-11-05.)
+            *   [ ] Copy: every user-facing string rewritten by the maintainer from a blind list (branch `copy/blind-pass`).
     *   [ ] **v0.8.0 or v0.9.0:** Flathub, after the architecture overhaul (epic below).
 
 ### Epic: v0.8.0/0.9.0: Flathub-compliant architecture
