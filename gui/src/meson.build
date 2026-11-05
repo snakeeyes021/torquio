@@ -29,6 +29,9 @@ configure_file(
 
 sources = [
   '__init__.py',
+  'copyfake.py',
+  'copyhints.py',
+  'copy-hints.json',
   'host.py',
   'main.py',
   'preferences.py',

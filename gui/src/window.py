@@ -4,7 +4,7 @@ from gettext import gettext as _
 
 from gi.repository import Adw, Gio, GLib, Gtk
 
-from . import host
+from . import copyhints, host
 from .task import TaskDialog
 from .views.display import Display
 from .views.folders import Folders
@@ -16,7 +16,7 @@ from .views.setup import Setup
 from .widgets import confirm, error
 
 
-@Gtk.Template(resource_path='/tech/redfoxlabs/Torquio/window.ui')
+@Gtk.Template(**copyhints.template('/tech/redfoxlabs/Torquio/window.ui'))
 class TorquioWindow(Adw.ApplicationWindow):
     __gtype_name__ = 'TorquioWindow'
 

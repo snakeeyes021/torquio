@@ -7,6 +7,7 @@ import os
 import re
 import subprocess
 import threading
+from gettext import gettext as _
 
 from gi.repository import Gio, GLib
 
@@ -23,8 +24,8 @@ class NotInstalled(Exception):
 class TooOld(Exception):
     """The host's Torquio predates the API this GUI needs (it can be updated)."""
 
-    def __init__(self, message="The Torquio on this computer is older than this app. Update it first."):
-        super().__init__(message)
+    def __init__(self, message=None):
+        super().__init__(message or _("The Torquio on this computer is older than this app. Update it first."))
 
 
 class HostError(Exception):
@@ -42,7 +43,7 @@ def run_full(cmd, timeout=60):
         p = subprocess.run(command(cmd), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                            stderr=subprocess.PIPE, text=True, errors="replace", timeout=timeout)
     except FileNotFoundError:
-        return 127, "", f"{command(cmd)[0]} isn't available"
+        return 127, "", _("{} isn't available").format(command(cmd)[0])
     except subprocess.TimeoutExpired:
         return 124, "", ""
     return p.returncode, p.stdout, p.stderr
@@ -89,9 +90,9 @@ def reach_host():
     """Raise HostError when host commands can't run at all (no permission to talk to the host, say)."""
     code, _out, err = run_full(["true"], timeout=20)
     if code != 0:
-        raise HostError("This app can't run programs on this computer"
-                        + (f" ({err.strip().splitlines()[-1]})" if err.strip() else f" (exit code {code})")
-                        + ". It needs permission to talk to org.freedesktop.Flatpak.")
+        detail = err.strip().splitlines()[-1] if err.strip() else _("exit code {}").format(code)
+        raise HostError(_("This app can't run programs on this computer ({}). It needs permission to talk to "
+                          "org.freedesktop.Flatpak.").format(detail))
 
 
 def torquio():
@@ -126,15 +127,17 @@ def api(verb, *args, timeout=120):
         data = None
     if not isinstance(data, dict):
         if code == 124:
-            raise HostError(f"Torquio took too long to answer ({verb}).")
+            raise HostError(_("Torquio took too long to answer ({}).").format(verb))
         # A Torquio from before the API treats `api` as an unknown option and prints its usage; anything else
         # (a crash, a missing Python) is an error to show as it is
         if verb == "version" and code != 127 and "Traceback" not in err and "Traceback" not in out:
             raise TooOld()
         detail = _last_lines(err) or _last_lines(out)
-        raise HostError(f"torquio api {verb} failed (exit code {code})" + (f":\n{detail}" if detail else "."))
+        raise HostError(_("torquio api {verb} failed (exit code {code})").format(verb=verb, code=code)
+                        + (f":\n{detail}" if detail else "."))
     if code != 0:
-        raise HostError(data.get("error", f"torquio api {verb} failed (exit code {code})"))
+        raise HostError(data.get("error") or
+                        _("torquio api {verb} failed (exit code {code})").format(verb=verb, code=code))
     return data
 
 
@@ -164,24 +167,24 @@ def update_old_torquio():
     that the update was enough."""
     code, _out, err = run_full(["sh", "-c", UPDATE_OLD, "sh", torquio()], timeout=900)
     if code == 2:
-        raise HostError("The Torquio on this computer isn't a git checkout, so it can't update itself.")
+        raise HostError(_("The Torquio on this computer isn't a git checkout, so it can't update itself."))
     if code == 3:
-        raise HostError("Torquio's files were changed on this computer, so it can't update itself. Run "
-                        "torquio -u in a terminal to see what changed.")
+        raise HostError(_("Torquio's files were changed on this computer, so it can't update itself. Run "
+                          "torquio -u in a terminal to see what changed."))
     if code == 5:
-        raise HostError("The Torquio on this computer is on a branch that doesn't follow GitHub, so it can't update "
-                        "itself. Switch it to main (git checkout main) and try again.")
+        raise HostError(_("The Torquio on this computer is on a branch that doesn't follow GitHub, so it can't "
+                          "update itself. Switch it to main (git checkout main) and try again."))
     if code in (4, 124):
-        raise HostError("Torquio couldn't be updated from GitHub. Check your internet connection and try again.")
+        raise HostError(_("Torquio couldn't be updated from GitHub. Check your internet connection and try again."))
     if code != 0:
         detail = _last_lines(err)
-        raise HostError("Torquio was updated, but refreshing its launchers and settings failed"
-                        + (f":\n{detail}" if detail else ".") + "\nRun torquio -u in a terminal to finish.")
+        raise HostError(_("Torquio was updated, but refreshing its launchers and settings failed")
+                        + (f":\n{detail}" if detail else ".") + "\n" + _("Run torquio -u in a terminal to finish."))
     try:
         check_version()
     except TooOld:
-        raise TooOld("Torquio is updated, but its newest version is still older than this app. A newer Torquio "
-                     "should follow soon; until then, use the terminal (torquio).") from None
+        raise TooOld(_("Torquio is updated, but its newest version is still older than this app. A newer Torquio "
+                       "should follow soon; until then, use the terminal (torquio).")) from None
     return code
 
 

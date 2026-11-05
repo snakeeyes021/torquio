@@ -9,6 +9,7 @@ gi.require_version('Adw', '1')
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
+from . import copyhints  # noqa: E402
 from .window import TorquioWindow  # noqa: E402
 
 RELEASE_NOTES = """<p>The first release of Torquio's app: everything the torquio menu does, in a window.</p>
@@ -58,7 +59,7 @@ class TorquioApplication(Adw.Application):
                                 website='https://github.com/snakeeyes021/torquio',
                                 issue_url='https://github.com/snakeeyes021/torquio/issues',
                                 license_type=Gtk.License.GPL_3_0,
-                                release_notes=RELEASE_NOTES,
+                                release_notes=copyhints.markup(RELEASE_NOTES),
                                 release_notes_version=self.version,
                                 debug_info=f"App {self.version}\nTorquio {torquio}\n",
                                 # Translators: Replace "translator-credits" with your name/username, and optionally an email or URL.
@@ -81,7 +82,7 @@ class TorquioApplication(Adw.Application):
         Preferences(self.props.active_window).present(self.props.active_window)
 
     def on_shortcuts_action(self, *args):
-        builder = Gtk.Builder.new_from_resource('/tech/redfoxlabs/Torquio/shortcuts-dialog.ui')
+        builder = copyhints.builder('/tech/redfoxlabs/Torquio/shortcuts-dialog.ui')
         builder.get_object('shortcuts_dialog').present(self.props.active_window)
 
     def create_action(self, name, callback, shortcuts=None):
