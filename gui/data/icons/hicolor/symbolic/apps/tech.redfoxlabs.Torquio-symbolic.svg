@@ -1,7 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
   <g fill="#2e3436">
-    <rect x="2.5" y="1.5" width="11" height="2.5" rx="0.75"/>
-    <rect x="7" y="1.5" width="2.2" height="10"/>
-    <ellipse cx="6.6" cy="12" rx="3" ry="2.2" transform="rotate(-22 6.6 12)"/>
+    <!-- rim line -->
+    <rect x="3" y="1" width="10" height="1"/>
+    <!-- narrower, deeper goblet bowl -->
+    <path d="M3 3 H13 C13 5 11.5 6 10 6 H6 C4.5 6 3 5 3 3 Z"/>
+    <!-- tommy bar with knobbed ends -->
+    <rect x="2" y="7" width="12" height="2"/>
+    <circle cx="1.5" cy="8" r="1.5"/>
+    <circle cx="14.5" cy="8" r="1.5"/>
+    <!-- thick screw stem; one bold stepped diagonal notch, rising left to right -->
+    <path fill-rule="evenodd" d="M6 6 H10 V15 H6 Z M8 11 H10 V12 H8 Z M6 12 H8 V13 H6 Z"/>
+    <!-- tapered foot -->
+    <path d="M6 14 H10 L13 16 H3 Z"/>
   </g>
 </svg>

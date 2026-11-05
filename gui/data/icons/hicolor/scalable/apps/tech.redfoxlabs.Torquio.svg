@@ -1,25 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
   <defs>
-    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ef7446"/>
-      <stop offset="1" stop-color="#d04b2c"/>
+    <!-- gradients only on curved (turned) surfaces -->
+    <linearGradient id="bowl" x1="21" x2="107" y1="0" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#865e3c"/>
+      <stop offset="0.14" stop-color="#b5835a"/>
+      <stop offset="0.3" stop-color="#cdab8f"/>
+      <stop offset="0.5" stop-color="#b5835a"/>
+      <stop offset="0.86" stop-color="#986a44"/>
+      <stop offset="1" stop-color="#865e3c"/>
     </linearGradient>
-    <linearGradient id="ink" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#fffaf4"/>
-      <stop offset="1" stop-color="#f6e7d8"/>
+    <linearGradient id="shaft" x1="50" x2="78" y1="0" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#63452c"/>
+      <stop offset="0.3" stop-color="#b5835a"/>
+      <stop offset="0.6" stop-color="#986a44"/>
+      <stop offset="1" stop-color="#63452c"/>
     </linearGradient>
+    <linearGradient id="groove" x1="50" x2="78" y1="0" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3d2a1a"/>
+      <stop offset="0.35" stop-color="#63452c"/>
+      <stop offset="1" stop-color="#3d2a1a"/>
+    </linearGradient>
+    <linearGradient id="collar" x1="45" x2="83" y1="0" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#865e3c"/>
+      <stop offset="0.28" stop-color="#cdab8f"/>
+      <stop offset="0.55" stop-color="#b5835a"/>
+      <stop offset="1" stop-color="#865e3c"/>
+    </linearGradient>
+    <linearGradient id="dark" x1="44" x2="84" y1="0" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#63452c"/>
+      <stop offset="0.3" stop-color="#986a44"/>
+      <stop offset="1" stop-color="#63452c"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" x2="0" y1="57" y2="69" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#986a44"/>
+      <stop offset="0.28" stop-color="#cdab8f"/>
+      <stop offset="0.58" stop-color="#b5835a"/>
+      <stop offset="1" stop-color="#865e3c"/>
+    </linearGradient>
+    <linearGradient id="cone" x1="31" x2="97" y1="0" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#865e3c"/>
+      <stop offset="0.25" stop-color="#b5835a"/>
+      <stop offset="0.45" stop-color="#cdab8f"/>
+      <stop offset="0.68" stop-color="#b5835a"/>
+      <stop offset="1" stop-color="#865e3c"/>
+    </linearGradient>
+    <radialGradient id="knob" cx="0.38" cy="0.32" r="0.72">
+      <stop offset="0" stop-color="#cdab8f"/>
+      <stop offset="0.55" stop-color="#b5835a"/>
+      <stop offset="1" stop-color="#865e3c"/>
+    </radialGradient>
+    <linearGradient id="baseside" x1="20" x2="108" y1="0" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#63452c"/>
+      <stop offset="0.3" stop-color="#865e3c"/>
+      <stop offset="1" stop-color="#63452c"/>
+    </linearGradient>
+    <clipPath id="shaftclip"><path d="M50 62 L78 62 L78 62.2 L75.4 65 L78 67.8 L78 72.2 L75.4 75 L78 77.8 L78 82.2 L75.4 85 L78 87.8 L78 92.2 L75.4 95 L78 97.8 L78 98 A14 2.5 0 0 1 50 98 L50 92.8 L52.6 90 L50 87.2 L50 82.8 L52.6 80 L50 77.2 L50 72.8 L52.6 70 L50 67.2 Z"/></clipPath>
+    <clipPath id="collarclip"><path d="M49 54 C45 57 45 64 49 67 A15 3 0 0 0 79 67 C83 64 83 57 79 54 Z"/></clipPath>
   </defs>
-  <!-- the tile, with its lower edge for depth -->
-  <rect x="12" y="18" width="104" height="98" rx="22" fill="#8e2f1b"/>
-  <rect x="12" y="12" width="104" height="98" rx="22" fill="url(#face)"/>
-  <!-- a staff -->
-  <g stroke="#fff" stroke-opacity="0.16" stroke-width="2">
-    <path d="M24 42h80M24 52h80M24 62h80M24 72h80M24 82h80"/>
+
+  <!-- base: flat rim ring (flat colour) with 4 px darker front profile, bottom on the 116 baseline -->
+  <path d="M20 104 A44 8 0 0 0 108 104 V108 A44 8 0 0 1 20 108 Z" fill="url(#baseside)"/>
+  <ellipse cx="64" cy="104" rx="44" ry="8" fill="#cdab8f"/>
+
+  <!-- goblet foot: conical flare whose silhouette leaves the screw exactly at the corners of its bottom edge (50,100)/(78,100), landing on the ring-top ellipse -->
+  <path d="M50 98 C50 101 40 104 31 104 A33 6 0 0 0 97 104 C88 104 78 101 78 98 Z" fill="url(#cone)"/>
+
+  <!-- carved press screw: thick turned shaft with deep helical grooves -->
+  <path d="M50 62 L78 62 L78 62.2 L75.4 65 L78 67.8 L78 72.2 L75.4 75 L78 77.8 L78 82.2 L75.4 85 L78 87.8 L78 92.2 L75.4 95 L78 97.8 L78 98 A14 2.5 0 0 1 50 98 L50 92.8 L52.6 90 L50 87.2 L50 82.8 L52.6 80 L50 77.2 L50 72.8 L52.6 70 L50 67.2 Z" fill="url(#shaft)"/>
+  <g clip-path="url(#shaftclip)" fill="none" stroke-linecap="butt">
+    <path d="M48 67.1571 Q64 70.3 80 61.4429" stroke="#cdab8f" stroke-width="1.6"/>
+    <path d="M48 70.3571 Q64 73.5 80 64.6429" stroke="url(#groove)" stroke-width="4.6"/>
+    <path d="M48 73.2571 Q64 76.4 80 67.5429" stroke="#865e3c" stroke-width="1.2" opacity="0.8"/>
+    <path d="M48 77.1571 Q64 80.3 80 71.4429" stroke="#cdab8f" stroke-width="1.6"/>
+    <path d="M48 80.3571 Q64 83.5 80 74.6429" stroke="url(#groove)" stroke-width="4.6"/>
+    <path d="M48 83.2571 Q64 86.4 80 77.5429" stroke="#865e3c" stroke-width="1.2" opacity="0.8"/>
+    <path d="M48 87.1571 Q64 90.3 80 81.4429" stroke="#cdab8f" stroke-width="1.6"/>
+    <path d="M48 90.3571 Q64 93.5 80 84.6429" stroke="url(#groove)" stroke-width="4.6"/>
+    <path d="M48 93.2571 Q64 96.4 80 87.5429" stroke="#865e3c" stroke-width="1.2" opacity="0.8"/>
+    <path d="M48 97.1571 Q64 100.3 80 91.4429" stroke="#cdab8f" stroke-width="1.6"/>
+    <path d="M48 100.357 Q64 103.5 80 94.6429" stroke="url(#groove)" stroke-width="4.6"/>
+    <path d="M48 103.257 Q64 106.4 80 97.5429" stroke="#865e3c" stroke-width="1.2" opacity="0.8"/>
   </g>
-  <!-- a T whose stem is a note's -->
-  <g fill="url(#ink)">
-    <rect x="34" y="28" width="60" height="13" rx="4"/>
-    <rect x="58" y="28" width="12" height="56" rx="2"/>
-    <ellipse cx="55" cy="86" rx="16" ry="11.5" transform="rotate(-22 55 86)"/>
+
+  <!-- modest turned collar (nut) -->
+  <path d="M49 54 C45 57 45 64 49 67 A15 3 0 0 0 79 67 C83 64 83 57 79 54 Z" fill="url(#collar)"/>
+  <path d="M49 67 A15 3 0 0 0 79 67 V69 A15 3 0 0 1 49 69 Z" fill="#63452c"/>
+  <path d="M44 61.5 H46.8 A17.2 3 0 0 0 81.2 61.5 H84" fill="none" stroke="#865e3c" stroke-width="1.6" clip-path="url(#collarclip)"/>
+
+  <!-- contact shade on the collar around each bar root (darker wood, 1-2 px, clipped to the collar) -->
+  <g clip-path="url(#collarclip)" fill="none" stroke="#5a3d25" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M20 57 H47.9 C49.2 59.5 49.3 65.5 49.8 69 H20 Z" stroke-width="3.6" opacity="0.08"/>
+    <path d="M20 57 H47.9 C49.2 59.5 49.3 65.5 49.8 69 H20 Z" stroke-width="2.2" opacity="0.18"/>
+    <path d="M108 57 H80.1 C78.8 59.5 78.7 65.5 78.2 69 H108 Z" stroke-width="3.6" opacity="0.08"/>
+    <path d="M108 57 H80.1 C78.8 59.5 78.7 65.5 78.2 69 H108 Z" stroke-width="2.2" opacity="0.18"/>
   </g>
+
+  <!-- tommy bar: each half is drawn over the collar at its root, hiding the collar's side edge where it passes -->
+  <path d="M20 57 H47.9 C49.2 59.5 49.3 65.5 49.8 69 H20 Z" fill="url(#bar)"/>
+  <path d="M108 57 H80.1 C78.8 59.5 78.7 65.5 78.2 69 H108 Z" fill="url(#bar)"/>
+  <circle cx="16" cy="63" r="8" fill="url(#knob)"/>
+  <circle cx="112" cy="63" r="8" fill="url(#knob)"/>
+
+  <!-- bowl: halfway between the squat G3 and the narrow G4 -->
+  <path d="M21 21 C21 42 40 57 57 57 H71 C88 57 107 42 107 21 Z" fill="url(#bowl)"/>
+  <!-- rim top, inner back wall, wine -->
+  <ellipse cx="64" cy="21" rx="43" ry="12" fill="#cdab8f"/>
+  <ellipse cx="64" cy="21" rx="38" ry="9.5" fill="#63452c"/>
+  <ellipse cx="64" cy="23" rx="37" ry="7.5" fill="#c01c28"/>
 </svg>
