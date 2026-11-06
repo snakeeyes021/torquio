@@ -353,6 +353,10 @@ class Setup(Adw.Bin):
     def _installed(self, code):
         self.install_page.set_can_pop(True)
         if code != 0:
+            # The main window (and its Maintenance page) isn't there until Torquio is installed: collecting the
+            # logs for a bug report is offered here
+            maintenance = next(v for v in self.window.views if v.name == "maintenance")
+            self.task_view.append(footer(pill(_("_Export Logs"), maintenance._logs, suggested=False)))
             return
         status = Adw.StatusPage(icon_name="object-select-symbolic", title=_("You're All Set"),
                                 description=_("The Steinberg Download Assistant is opening: sign in and install "

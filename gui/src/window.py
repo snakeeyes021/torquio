@@ -104,6 +104,7 @@ class TorquioWindow(Adw.ApplicationWindow):
         self.message_page.set_title(title)
         self.message_page.set_description(description)
         self.message_page.set_icon_name(icon)
+        self.message_page.get_child().set_visible(True)  # Try Again
         self.stack.set_visible_child_name("message")
 
     def _show_status(self, result, err):
@@ -132,6 +133,7 @@ class TorquioWindow(Adw.ApplicationWindow):
         self._message(_("Torquio Has Been Removed"),
                       _("You can remove this app now, in your software manager or with "
                         "<tt>flatpak uninstall tech.redfoxlabs.Torquio</tt>."), "user-trash-symbolic")
+        self.message_page.get_child().set_visible(False)  # nothing to try again: that would put the copy back
 
     def _refresh_install(self):
         """The app placed a new copy of Torquio (an update of the app, or its first run over an install from a
