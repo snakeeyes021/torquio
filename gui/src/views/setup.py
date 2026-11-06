@@ -169,13 +169,13 @@ class Setup(Adw.Bin):
         prefs = Adw.PreferencesPage()
         display = Adw.PreferencesGroup(title=_("Display"))
         wayland = self.prereqs.get("session_type") != "x11"
-        manage = Adw.SwitchRow(title=_("Manage Scaling Automatically"), active=wayland, sensitive=wayland,
+        manage = Adw.SwitchRow(use_markup=False, title=_("Manage Scaling Automatically"), active=wayland, sensitive=wayland,
                                subtitle=_("Sizes Dorico for your screen each time it starts (adjusts your desktop's "
                                           "XWayland setting, which you can restore later)") if wayland else
                                _("For Wayland sessions; set Wine's DPI later in Display & Scaling"))
         manage.connect("notify::active", lambda r, *_: self.options.update(manage=r.get_active()))
         self.options["manage"] = wayland
-        fonts = Adw.ComboRow(title=_("Font Smoothing"), model=Gtk.StringList.new([_("Bolder"), _("Crisper")]),
+        fonts = Adw.ComboRow(use_markup=False, title=_("Font Smoothing"), model=Gtk.StringList.new([_("Bolder"), _("Crisper")]),
                              subtitle=_("Bolder is FreeType v40, Crisper v35; easy to change later"))
         fonts.connect("notify::selected", lambda r, *_: self.options.update(freetype="40" if r.get_selected() == 0
                                                                             else "35"))
