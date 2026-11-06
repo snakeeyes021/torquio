@@ -10,10 +10,8 @@ from ..task import TaskDialog, TaskView
 from ..widgets import StatusRow, add, choose_file, clear, suffix_button
 
 SDA_PAGE = "https://o.steinberg.net/index.php?id=steinberg_download_assistant&L=1"
-MEDIABAY_PAGE = "https://o.steinberg.net/index.php?id=15368&L=1"
 INSTALLERS = [("sda", _("Steinberg Download Assistant"), True, SDA_PAGE,
                "Steinberg_Download_Assistant_*_Installer_win*.exe"),
-              ("mediabay", _("Steinberg MediaBay"), False, MEDIABAY_PAGE, "MediaBay_Installer_win64*.zip"),
               ("noteperformer", _("NotePerformer"), False, "https://www.noteperformer.com/", "NotePerformer-Installer-*.exe"),
               ("cantai", _("Cantai"), False, "https://www.cantai.app/", "Cantai-Windows-*Installer-*.exe.zip")]
 

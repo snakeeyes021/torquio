@@ -46,7 +46,7 @@ BASE = {
     "prereqs": {"distrobox": True, "container_manager": "podman", "session_type": "wayland", "ntsync": "dormant",
                 "installers_dir": DOWNLOADS,
                 "installers": {"sda": os.path.join(DOWNLOADS, "Steinberg_Download_Assistant_1.38_Installer_win.exe"),
-                               "mediabay": "", "noteperformer": "", "cantai": ""}},
+                               "noteperformer": "", "cantai": ""}},
     "updates": {"local_changes": False,
                 "commits": [f"Change number {n} in this update" for n in range(1, 16)]},
     "guards": {"steinberg_active": ["Dorico Pro 6"], "steinberg_unknown": False,
@@ -143,13 +143,13 @@ def _manual():
 def _nothing():
     """The setup assistant on a computer with nothing it needs."""
     DATA["prereqs"].update(distrobox=False, container_manager="", ntsync="unavailable",
-                           installers={"sda": "", "mediabay": "", "noteperformer": "", "cantai": ""})
+                           installers={"sda": "", "noteperformer": "", "cantai": ""})
 
 
 def _everything():
     DATA["prereqs"]["ntsync"] = "active"
     DATA["prereqs"]["installers"] = {k: os.path.join(DOWNLOADS, f"{k}-installer.exe")
-                                     for k in ("sda", "mediabay", "noteperformer", "cantai")}
+                                     for k in ("sda", "noteperformer", "cantai")}
 
 
 def _unsure():

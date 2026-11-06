@@ -51,14 +51,13 @@ On many immutable distros, the above are included by default, so you're good to 
 
 You must provide your own Steinberg installers. 
 
-Download the following files from the Steinberg download pages for [Steinberg Download Assistant](https://o.steinberg.net/index.php?id=steinberg_download_assistant&L=1) and [Steinberg MediaBay](https://o.steinberg.net/index.php?id=15368&L=1) to your `~/Downloads` folder:
+Download the following files to your `~/Downloads` folder (the Download Assistant from Steinberg's [download page](https://o.steinberg.net/index.php?id=steinberg_download_assistant&L=1)):
 
 *   `Steinberg_Download_Assistant_*_Installer_win.exe` (Mandatory)
-*   `MediaBay_Installer_win64.zip` (Mandatory)
 *   `NotePerformer-Installer-*.exe` (3rd-party, Optional)
 *   `Cantai-Windows-Installer-*.exe.zip` (3rd-party, Optional; Torquio also adds its "Auto & Cantai" playback template to Dorico)
 
-*Note: You do not need to download the Dorico installer itself. The Download Assistant will handle that once the environment is built.*
+*Note: You do not need to download the Dorico installer itself, or MediaBay's. The Download Assistant installs both once the environment is built.*
 
 ## Step 2: Install & Build
 Open your terminal and run the following commands to clone the repository and start the automated build process:
@@ -77,7 +76,7 @@ Then just follow the interactive prompts to go through the install wizard.
 The build pipeline automatically handles all the heavy lifting:
 1. Sets up an isolated Ubuntu container with Torquio's custom version of WINE (with fixes required by Dorico), downloaded ready-made. If none is available for your version of Torquio, it's compiled on your machine instead (20-40 minutes).
 2. Initializes a Windows prefix, applies ClearType font configurations, and installs core dependencies.
-3. Installs MediaBay, the Download Assistant, and NotePerformer and Cantai (if provided), without you having to click through their installers.
+3. Installs the Download Assistant, and NotePerformer and Cantai (if provided), without you having to click through their installers.
 4. Registers all application desktop shortcuts and web-login handlers to your native Linux application menu.
 5. Installs the globally accessible `torquio` console utility to manage your environment easily.
 
