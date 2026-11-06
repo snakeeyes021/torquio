@@ -18,3 +18,6 @@ gnome.post_install(
     gtk_update_icon_cache: true,
   update_desktop_database: true,
 )
+
+# Torquio itself, inside the app: the app places this copy on the host and runs everything from it
+meson.add_install_script('gui/bundle.py', meson.project_version())
