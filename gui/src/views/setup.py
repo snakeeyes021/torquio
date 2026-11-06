@@ -13,7 +13,7 @@ SDA_PAGE = "https://o.steinberg.net/index.php?id=steinberg_download_assistant&L=
 MEDIABAY_PAGE = "https://o.steinberg.net/index.php?id=15368&L=1"
 INSTALLERS = [("sda", _("Steinberg Download Assistant"), True, SDA_PAGE,
                "Steinberg_Download_Assistant_*_Installer_win*.exe"),
-              ("mediabay", _("Steinberg MediaBay"), True, MEDIABAY_PAGE, "MediaBay_Installer_win64*.zip"),
+              ("mediabay", _("Steinberg MediaBay"), False, MEDIABAY_PAGE, "MediaBay_Installer_win64*.zip"),
               ("noteperformer", _("NotePerformer"), False, "https://www.noteperformer.com/", "NotePerformer-Installer-*.exe"),
               ("cantai", _("Cantai"), False, "https://www.cantai.app/", "Cantai-Windows-*Installer-*.exe.zip")]
 
@@ -127,8 +127,8 @@ class Setup(Adw.Bin):
                 else:
                     row.set_state(_("Not found in Downloads") if required else _("Not found; you can add it later"),
                                   "warn" if required else "off")
-                    row.add_suffix(suffix_button(_("Download"), lambda u=url: open_uri(self.window, u), "flat",
-                                                 tooltip=_("Open the download page")))
+                    row.add_suffix(suffix_button(_("Open Download Page"), lambda u=url: open_uri(self.window, u),
+                                                 "flat", tooltip=_("Opens it in your web browser")))
                     row.add_suffix(suffix_button(_("Choose…"), lambda p=pattern: self._choose_installer(p),
                                                  tooltip=_("An installer saved somewhere else")))
                 ok &= bool(path) or not required

@@ -72,7 +72,9 @@ class Plans(unittest.TestCase):
         p = prereqs.install_plan("pacman", ["distrobox", "podman"])
         self.assertEqual(p["shown"], "sudo pacman -S distrobox podman")
         self.assertTrue(p["root"])
-        self.assertEqual(prereqs.install_plan("apt", ["distrobox"])["alternative"], prereqs.DISTROBOX_USER_INSTALL)
+        # On a distribution that packages Distrobox, only its package manager: no curl install next to it
+        for family in ("dnf", "apt", "zypper", "pacman"):
+            self.assertEqual(prereqs.install_plan(family, ["distrobox"])["alternative"], "")
 
     def test_image_based_systems_are_never_changed(self):
         for family in prereqs.IMAGE_FAMILIES:

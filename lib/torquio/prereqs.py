@@ -79,8 +79,8 @@ def missing(have_python, have_distrobox, have_podman, have_docker):
 
 def install_plan(fam, keys):
     """How to install `keys` here. Returns {"command": a shell command ("" where there's no button), "root":
-    whether it runs as root (with pkexec), "shown": the same as a user would type it, "alternative": another
-    command for Distrobox alone (its user-level install, offered next to the package manager's), "config": NixOS
+    whether it runs as root (with pkexec), "shown": the same as a user would type it, "alternative": unused
+    (kept empty: the user-level install is only for image-based systems, where it's the command), "config": NixOS
     configuration lines, "note": why there's no button for some of `keys` ("image", "nix", "builtin",
     "unknown"), "note_keys": which ones}."""
     plan = {"command": "", "root": False, "shown": "", "alternative": "", "config": "", "note": "",
@@ -122,6 +122,6 @@ def install_plan(fam, keys):
     elif fam == "pacman":
         plan["shown"] = f"sudo pacman -S {names}"
         plan["command"] = f"pacman -S --noconfirm {names}"
-    if "distrobox" in keys:
-        plan["alternative"] = DISTROBOX_USER_INSTALL
+    # No user-level alternative here: on a distribution that packages Distrobox, its package manager is the one
+    # way (the maintainer, 2026-11-06: the curl install only confuses people there; it's for image-based systems)
     return plan
