@@ -162,7 +162,12 @@ class UninstallDialog(Adw.Dialog):
         self.deactivated.connect("notify::active", lambda *_: self._update())
         self.saved = Adw.SwitchRow(use_markup=False, title=_("I've saved the projects I want to keep elsewhere"), visible=False)
         self.saved.connect("notify::active", lambda *_: self._update())
-        for row in (self.restore, self.aware, self.deactivated, self.saved, self.entry):
+        # For someone removing the app as well: its copy of Torquio goes too (otherwise the app puts it back the
+        # next time it starts). Not offered when the app runs a developer's checkout.
+        self.remove_app = Adw.SwitchRow(use_markup=False, title=_("I'm Removing the App Too"),
+                                        subtitle=_("Also deletes the app's own copy of Torquio's files"),
+                                        visible=not host.DEV_REPO)
+        for row in (self.restore, self.remove_app, self.aware, self.deactivated, self.saved, self.entry):
             self.confirm_group.add(row)
         self.page.add(self.confirm_group)
         self.button = Gtk.Button(label=_("_Uninstall"), use_underline=True, sensitive=False,
@@ -222,6 +227,13 @@ class UninstallDialog(Adw.Dialog):
 
     def _go(self):
         restore = "true" if self.restore.get_visible() and self.restore.get_active() else "false"
+        app = "remove" if self.remove_app.get_visible() and self.remove_app.get_active() else "keep"
         self.close()
+        def done(code, result):
+            if code == 0 and app == "remove":
+                # No refresh: it would put the app's copy straight back
+                self.window.removed()
+            else:
+                self.window.refresh()
         self.window.run_task(_("Uninstall Torquio"), _("Uninstalling…"), _("Torquio has been removed"),
-                             "uninstall", restore, on_done=lambda code, r: self.window.refresh())
+                             "uninstall", restore, app, on_done=done)

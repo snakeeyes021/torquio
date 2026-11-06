@@ -94,9 +94,33 @@ def torquio_dir_patterns():
 
 
 def remove_data():
-    _rm_rf(paths.data_dir())
+    """Torquio's data (the prefix, the engine's extras, logs), cache and settings. The app's copy of Torquio in
+    the data folder (app/) stays: it may be the code doing this uninstall; remove_app_copy() is the last step."""
+    data = paths.data_dir()
+    keep = os.path.realpath(paths.app_dir())
+    if os.path.isdir(data) and not os.path.islink(data):
+        for name in os.listdir(data):
+            path = os.path.join(data, name)
+            if os.path.realpath(path) != keep:
+                _rm_rf(path)
+        try:
+            os.rmdir(data)  # only when nothing (no app/) is left
+        except OSError:
+            pass
+    else:
+        _rm_rf(data)
     _rm_rf(paths.cache_dir())
     _rm_rf(os.path.join(paths.home(), ".config/torquio"))
+
+
+def remove_app_copy():
+    """The very last step of uninstalling the app too: its copy of Torquio (the code running now; Python has
+    what it needs loaded), and the data folder if that leaves it empty."""
+    _rm_rf(paths.app_dir())
+    try:
+        os.rmdir(paths.data_dir())
+    except OSError:
+        pass
 
 
 def remove_integrations():

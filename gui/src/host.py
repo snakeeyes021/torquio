@@ -1,6 +1,6 @@
 """Running Torquio on the host. Everything Torquio does happens there (distrobox, the container, the Wine prefix,
 the launchers in ~/.local/bin), so the app carries its own copy of Torquio, places it on the host (in
-~/.local/share/torquio-app, silently, whenever the app's copy differs from the one there) and runs that copy:
+~/.local/share/torquio/app, silently, whenever the app's copy differs from the one there) and runs that copy:
 through `flatpak-spawn --host` inside the Flatpak sandbox, directly otherwise. The app and the copy it runs are
 always the same version (docs/GUI.md, "One app"). Torquio answers `torquio api VERB` with JSON, and
 `torquio api task NAME` with one JSON event per line."""
@@ -20,9 +20,12 @@ HOME = os.path.expanduser("~")
 # Torquio inside the app (gui/bundle.py puts it there)
 BUNDLE = "/app/share/torquio/tree"
 STAMP = ".torquio-app.json"
-# Where the app places its copy on the host. Outside Torquio's data folder, which uninstalling deletes; its
-# installers/ folder (installers the user chose) is kept each time the copy is replaced.
-HOST_COPY = os.path.join(HOME, ".local/share/torquio-app")
+# Where the app places its copy on the host: in Torquio's data folder, with everything else Torquio keeps (the
+# uninstaller leaves it until last). Its installers/ folder (installers the user chose) is kept each time the copy
+# is replaced.
+HOST_COPY = os.path.join(HOME, ".local/share/torquio/app")
+# Where an early 0.7.0 build placed it; moved to HOST_COPY (with its installers) on the next start
+OLD_HOST_COPY = os.path.join(HOME, ".local/share/torquio-app")
 # For developing Torquio: run a checkout instead of the app's copy (e.g. in GNOME Builder's run environment)
 DEV_REPO = os.environ.get("TORQUIO_HOST_REPO", "")
 
@@ -97,7 +100,12 @@ def bundled_stamp():
 # over, then swapped in (the old copy goes only once the new one is in place)
 PLACE = r'''
 set -e
-dest=$1; parent=$(dirname "$dest"); mkdir -p "$parent"
+dest=$1; legacy=$2; parent=$(dirname "$dest"); mkdir -p "$parent"
+# A copy where an early build put it moves here first (with its installers); only one copy of the app's
+# own: a checkout someone keeps there (with .git) is left alone
+if [ -d "$legacy" ] && [ ! -e "$legacy/.git" ] && [ -f "$legacy/.torquio-app.json" ] && [ ! -e "$dest" ]; then
+    mv "$legacy" "$dest"
+fi
 new=$(mktemp -d "$parent/.torquio-app-new.XXXXXX")
 trap 'rm -rf "$new"' EXIT
 tar -x -C "$new" -f -
@@ -110,6 +118,11 @@ fi
 if ! mv "$new" "$dest"; then [ -n "$old" ] && mv "$old" "$dest"; exit 1; fi
 trap - EXIT
 [ -n "$old" ] && rm -rf "$old"
+# An early build's copy still there (both existed): keep its installers, then it goes
+if [ -d "$legacy" ] && [ ! -e "$legacy/.git" ] && [ -f "$legacy/.torquio-app.json" ]; then
+    if [ -d "$legacy/installers" ]; then mkdir -p "$dest/installers"; cp -an "$legacy/installers/." "$dest/installers/"; fi
+    rm -rf "$legacy"
+fi
 exit 0
 '''
 
@@ -123,13 +136,14 @@ def place_copy():
     if not stamp:
         raise HostError(_("This build of the app doesn't contain Torquio (gui/bundle.py didn't run)."))
     code, out = run(["cat", os.path.join(HOST_COPY, STAMP)], timeout=20)
+    legacy = run(["test", "-f", os.path.join(OLD_HOST_COPY, STAMP)], timeout=20)[0] == 0
     try:
-        if code == 0 and json.loads(out) == stamp:
+        if code == 0 and json.loads(out) == stamp and not legacy:
             return False
     except ValueError:
         pass
     try:
-        proc = subprocess.Popen(command(["sh", "-c", PLACE, "sh", HOST_COPY]), stdin=subprocess.PIPE,
+        proc = subprocess.Popen(command(["sh", "-c", PLACE, "sh", HOST_COPY, OLD_HOST_COPY]), stdin=subprocess.PIPE,
                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         with tarfile.open(fileobj=proc.stdin, mode="w|") as tar:
             for name in sorted(os.listdir(BUNDLE)):

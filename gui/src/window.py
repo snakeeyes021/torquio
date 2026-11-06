@@ -80,6 +80,8 @@ class TorquioWindow(Adw.ApplicationWindow):
     # ---- state ----------------------------------------------------------------------------------------------
 
     def refresh(self):
+        if getattr(self, "removed_all", False):
+            return  # uninstalled with the app's copy: nothing to show until the app starts again
         if self.stack.get_visible_child_name() == "setup" and host.Task.busy():
             return  # the setup assistant's install is running: keep showing its progress
         if self.stack.get_visible_child_name() != "main":
@@ -122,6 +124,14 @@ class TorquioWindow(Adw.ApplicationWindow):
         for view in self.views:
             view.refresh(self.status)
         self.stack.set_visible_child_name("main")
+
+    def removed(self):
+        """After uninstalling Torquio with the app's copy too: the last screen, without refreshing (which would
+        put the copy back)."""
+        self.removed_all = True
+        self._message(_("Torquio Has Been Removed"),
+                      _("You can remove this app now, in your software manager or with "
+                        "<tt>flatpak uninstall tech.redfoxlabs.Torquio</tt>."), "user-trash-symbolic")
 
     def _refresh_install(self):
         """The app placed a new copy of Torquio (an update of the app, or its first run over an install from a

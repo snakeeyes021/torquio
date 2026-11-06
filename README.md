@@ -175,6 +175,15 @@ This document details the scaling formulas, a visual strategy guide flowchart, m
 
 ----
 
+## Where Torquio Keeps Things
+
+* **The Wine prefix** (Dorico, its settings, your folder mappings): `~/.local/share/torquio/prefix`
+* **Settings**: `~/.config/torquio/config.json`
+* **The container**: `torquio-env` (Distrobox)
+* **Launchers and the `torquio` command**: `~/.local/bin`
+* **Logs**: `~/.local/share/torquio/logs`
+* **The Torquio app's own copy of Torquio** (when you use the app): `~/.local/share/torquio/app`. The app keeps it up to date by itself.
+
 ## Uninstallation / Clean Start
 
 If you ever need to completely wipe the Torquio environment (including the container, WINE prefix, configuration profiles, desktop integrations, and cache) to start fresh, simply run:

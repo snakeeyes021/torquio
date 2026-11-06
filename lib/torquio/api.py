@@ -532,9 +532,10 @@ def task_wine(name, *args):
     return 1
 
 
-def task_uninstall(restore="true"):
+def task_uninstall(restore="true", app="keep"):
     """Everything the uninstaller removes, after the GUI's checks and confirmation (`restore`: put back the
-    desktop's XWayland setting)."""
+    desktop's XWayland setting; `app`: "remove" also removes the app's copy of Torquio, last, for someone
+    uninstalling the app too; otherwise it stays, and the app puts it back on its next start anyway)."""
     from . import uninstall
     name = paths.container_name()
     if restore == "true" and _restorable():
@@ -557,6 +558,8 @@ def task_uninstall(restore="true"):
     run.interactive(["update-mime-database", os.path.join(home, ".local/share/mime/")])
     if run.have("gtk-update-icon-cache"):
         run.interactive(["gtk-update-icon-cache", "-f", "-t", os.path.join(home, ".local/share/icons/hicolor/")])
+    if app == "remove":
+        uninstall.remove_app_copy()
     print("Torquio has been removed.")
     return 0
 

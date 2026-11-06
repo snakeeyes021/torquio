@@ -31,23 +31,47 @@ Everything Torquio does happens on the host: distrobox and podman, the container
 (`distrobox enter -- bash -c 'cd REPO && ./scripts/...'`), and the launchers name that copy. A Flatpak can't do
 any of this from inside its sandbox, and its own files (`/app`) aren't visible to the host or the container.
 
-So **the host keeps one copy of Torquio** (the git checkout it has today, updated by Update Torquio), and the
-**GUI is a front end to it**:
+So the app is **one thing that carries Torquio**, a "Flatpak in name only" (the maintainer, 2026-11-06): it uses
+the same host pieces in the same places as the terminal Torquio, with broad permissions, and works with
+existing installs (v0.8.0/0.9.0 is the real Flatpak, for Flathub):
 
-- The GUI runs the host's `torquio` through `flatpak-spawn --host` (Flatpak permission
-  `--talk-name=org.freedesktop.Flatpak`; DistroShelf on Flathub does the same to drive distrobox, and Thirties
-  uses it too). Outside Flatpak (development) the same calls run directly.
+- **Torquio is inside the app** (`/app/share/torquio/tree`, put there by `gui/bundle.py` with a stamp naming its
+  version and a hash of its files). On every start, when the host's copy has a different stamp, the app places
+  its own there, silently: a tar stream through `flatpak-spawn` (no filesystem permission needed), unpacked next
+  to the old copy and swapped in, with the user's `installers/` folder kept. When it replaced the copy and
+  Torquio is installed, it runs the `app-refresh` task: launchers, the `torquio` command, icons and the prefix's
+  settings, from the new copy (what Update Torquio's refresh did). The app and the Torquio it runs are always
+  the same version; there's nothing to update separately and no git.
+- The GUI runs that copy's `torquio` through `flatpak-spawn --host` (Flatpak permission
+  `--talk-name=org.freedesktop.Flatpak`; DistroShelf on Flathub does the same to drive distrobox). Outside
+  Flatpak (development) the same calls run directly. For developing Torquio, `TORQUIO_HOST_REPO=/path/to/checkout`
+  in the app's environment (e.g. GNOME Builder's run environment) makes it run that checkout instead.
 - `torquio api VERB` is the GUI's interface: JSON on stdout and nothing else (no session log header, no
-  colours, no prompts). `torquio api version` returns `{"api": N, "torquio": "<git describe>", ...}`; the GUI
-  needs a minimum `api` and otherwise offers Update Torquio.
-- Long tasks (install, update, engine download or rebuild, uninstall) print one JSON event per line
+  colours, no prompts).
+- Long tasks (install, engine download or rebuild, uninstall) print one JSON event per line
   (`{"event": "phase", ...}`, `{"event": "log", "text": ...}`, `{"event": "done", "code": 0}`), which the GUI
   shows as progress plus a log view. The GUI collects every answer first (the wizard's settings, confirmations)
   and passes them as options, so nothing waits on a terminal prompt. Where Torquio needs root (NTsync), it
   uses `pkexec` so polkit shows its own password dialog.
-- First run without Torquio on the host: the GUI checks the prerequisites (git, Python 3.9+, distrobox,
-  podman or docker) on the host, explains how to install missing ones for the user's distro (as the README
-  does), then clones Torquio on the host and continues with the setup assistant.
+- What the host needs (Python 3.9+, Distrobox, Podman or Docker) is checked with the shell alone, before
+  Torquio can run; the setup's "What Torquio Needs" page shows what's missing and the README's command for the
+  system, and runs it (with pkexec, or for the user only) or lets the user copy it (`lib/torquio/prereqs.py`).
+  Image-based systems are never changed: only Distrobox's user-level install, into `~/.local`.
+
+**Where things live** (the same for the app and the terminal Torquio):
+
+| What | Where |
+|---|---|
+| The app's copy of Torquio | `~/.local/share/torquio/app` (the installers you chose are in its `installers/`) |
+| The Wine prefix (Dorico, its settings, your folder mappings) | `~/.local/share/torquio/prefix` |
+| Settings | `~/.config/torquio/config.json` |
+| The container | `torquio-env` (distrobox) |
+| Launchers and the `torquio` command | `~/.local/bin` (they name the copy of Torquio they run) |
+| Logs | `~/.local/share/torquio/logs` |
+
+Uninstalling removes all of it except the app's copy (it may be the code doing the uninstall); with "I'm
+Removing the App Too" that goes last, and otherwise the app puts it back the next time it starts. An early 0.7.0
+build put the copy in `~/.local/share/torquio-app`; the app moves it on its next start.
 
 Rejected: running the core inside the sandbox (it needs the host's programs and files, and the container's
 scripts and launchers need a host copy anyway), and a separate host helper service over D-Bus (more to
@@ -97,12 +121,13 @@ v0.9.0, with an overhaul (`docs/BACKLOG.md`, "v0.8.0/0.9.0: Flathub-compliant ar
 its screenshots (`gui/data/screenshots/`, taken in a test VM) serve the local build and GNOME Software; the
 only manifest is the local one at the repository's root.
 
-## Compatibility with the host's Torquio
+## Existing installs
 
-The app needs `torquio api` version `MIN_API` (`gui/src/host.py`) or newer; `API_VERSION` in
-`lib/torquio/api.py` says what a Torquio has (1: v0.6.5, `version` and `status` only; 2: v0.7.0). An older
-Torquio gets an Update Torquio button (a fast-forward from GitHub and `--post-update`, as `torquio -u` does).
-The app remembers the checkout it last used, so after an uninstall it doesn't offer to download a second copy.
+An install made with the terminal Torquio (a git checkout, its launchers) is adopted as it is: the prefix,
+settings and container are where the app looks, so nothing needs pointing at. On its first start the app places
+its copy and moves the launchers and the `torquio` command to it; the checkout keeps working as a developer copy
+(`./torquio -f` in it points the launchers back). Nothing is wiped. The app can only miss an install moved or
+renamed by hand, or one made with a custom `XDG_DATA_HOME` or `TORQUIO_CONTAINER_NAME`.
 
 ## What's in this version
 

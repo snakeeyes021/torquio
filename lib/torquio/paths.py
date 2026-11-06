@@ -36,6 +36,11 @@ def data_dir():
     return os.path.join(_env("XDG_DATA_HOME", os.path.join(home(), ".local/share")), "torquio")
 
 
+def app_dir():
+    """Where the Torquio app places its own copy of Torquio on the host (docs/GUI.md, "One app")."""
+    return os.path.join(data_dir(), "app")
+
+
 def cache_dir():
     return os.path.join(_env("XDG_CACHE_HOME", os.path.join(home(), ".cache")), "torquio")
 
