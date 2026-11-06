@@ -137,13 +137,6 @@
                                 </child>
                               </object>
                             </child>
-                            <child type="top">
-                              <object class="AdwBanner" id="update_banner">
-                                <property name="title" translatable="yes">An update for Torquio is available</property>
-                                <property name="button-label" translatable="yes">_Details</property>
-                                <property name="action-name">win.update</property>
-                              </object>
-                            </child>
                             <property name="content">
                               <object class="GtkStack" id="pages">
                                 <property name="transition-type">crossfade</property>

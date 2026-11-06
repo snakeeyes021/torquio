@@ -3,15 +3,14 @@ import json
 import os
 from gettext import gettext as _
 
-from gi.repository import Adw, Gtk
+from gi.repository import Adw, Gdk, Gtk, Pango
 
 from .. import host
-from ..task import TaskView
+from ..task import TaskDialog, TaskView
 from ..widgets import StatusRow, add, choose_file, clear, suffix_button
 
 SDA_PAGE = "https://o.steinberg.net/index.php?id=steinberg_download_assistant&L=1"
 MEDIABAY_PAGE = "https://o.steinberg.net/index.php?id=15368&L=1"
-REPO_URL = "https://github.com/snakeeyes021/torquio.git"
 INSTALLERS = [("sda", _("Steinberg Download Assistant"), True, SDA_PAGE,
                "Steinberg_Download_Assistant_*_Installer_win*.exe"),
               ("mediabay", _("Steinberg MediaBay"), True, MEDIABAY_PAGE, "MediaBay_Installer_win64*.zip"),
@@ -47,54 +46,27 @@ def pill(label, callback, suggested=True):
 
 
 class Setup(Adw.Bin):
-    """Welcome → (get Torquio) → requirements → choices → install → done."""
+    """Welcome → what's needed (installing what's missing) → choices → install → done."""
 
-    def __init__(self, window, torquio_missing=False):
+    def __init__(self, window):
         super().__init__()
         self.window = window
         self.options = {"manage": True, "freetype": "40", "map_path": "", "map_type": "drive", "import_path": ""}
         self.nav = Adw.NavigationView()
         self.set_child(self.nav)
-        self.nav.add(self._welcome(torquio_missing))
+        self.nav.add(self._welcome())
 
     # ---- welcome --------------------------------------------------------------------------------------------
 
-    def _welcome(self, torquio_missing):
+    def _welcome(self):
         status = Adw.StatusPage(icon_name=self.window.get_application().get_application_id(),
                                 title=_("Welcome to Torquio"),
                                 description=_("Steinberg's Dorico on Linux, set up for you. It takes about twenty "
                                               "minutes, mostly downloading."))
         status.add_css_class("hero")
-        self.get_started = pill(_("_Get Started"), lambda: self._get_torquio() if torquio_missing
-                                else self.nav.push(self._requirements()))
+        self.get_started = pill(_("_Get Started"), lambda: self.nav.push(self._requirements()))
         status.set_child(footer(self.get_started))
         return page(_("Welcome"), status, "welcome", show_title=False)
-
-    def _get_torquio(self):
-        """No Torquio on this computer yet: download it from GitHub (on the host, with git)."""
-        target = host.APP_COPY
-        self.get_started.set_sensitive(False)
-        self.get_started.set_label(_("Downloading Torquio…"))
-
-        def work():
-            if host.run(["sh", "-c", "command -v git"])[0] != 0:
-                raise host.HostError(_("Torquio needs git, which isn't installed on this computer. Install it from "
-                                       "your distribution's software (on Fedora Atomic or Bazzite it's included)."))
-            if host.run(["test", "-d", os.path.join(target, ".git")])[0] != 0:
-                code, _out = host.run(["git", "clone", "--quiet", REPO_URL, target], timeout=600)
-                if code != 0:
-                    raise host.HostError(_("Couldn't download Torquio from GitHub. Check your internet connection."))
-            return host.check_version()
-
-        def done(result, error):
-            self.get_started.set_sensitive(True)
-            self.get_started.set_label(_("_Get Started"))
-            if error:
-                self.window.show_error(_("Couldn't Get Torquio"), error)
-            else:
-                self.window.version = result
-                self.nav.push(self._requirements())
-        host.in_background(work, done)
 
     # ---- requirements ---------------------------------------------------------------------------------------
 
@@ -103,50 +75,182 @@ class Setup(Adw.Bin):
                                                   "them there. You don't need Dorico's own installer: the Download "
                                                   "Assistant gets it."))
         self.system_group = Adw.PreferencesGroup(title=_("This Computer"))
+        self.missing_group = Adw.PreferencesGroup(title=_("Install What's Missing"), visible=False)
         self.installer_group = Adw.PreferencesGroup(title=_("Installers"))
-        prefs.add(self.system_group)
-        prefs.add(self.installer_group)
+        for g in (self.system_group, self.missing_group, self.installer_group):
+            prefs.add(g)
         self.req_continue = pill(_("_Continue"), lambda: self.nav.push(self._choices()))
         self.req_continue.set_sensitive(False)
         group = Adw.PreferencesGroup()
         group.add(footer(pill(_("Check _Again"), self._check, suggested=False), self.req_continue))
         prefs.add(group)
+        self.chosen = None  # the missing items ticked for installing (all, at first)
         self._check()
         return page(_("What Torquio Needs"), prefs, "requirements")
 
     def _check(self):
-        host.in_background(lambda: host.api("prereqs"), self._show_requirements)
+        def work():
+            facts = host.facts()
+            return facts, (host.api("prereqs") if facts.get("python") else None)
+        host.in_background(work, self._show_requirements)
 
-    def _show_requirements(self, data, error):
-        clear(self.system_group)
-        clear(self.installer_group)
+    ITEMS = (("python", "Python 3.9+", "application-x-executable-symbolic"),
+             ("distrobox", "Distrobox", "drive-harddisk-symbolic"),
+             ("podman", None, "drive-harddisk-symbolic"))
+
+    def _show_requirements(self, result, error):
+        for g in (self.system_group, self.missing_group, self.installer_group):
+            clear(g)
         if error:
-            add(self.system_group, StatusRow(_("Torquio"))).set_state(str(error), "error")
+            add(self.system_group, StatusRow(_("This Computer"))).set_state(str(error), "error")
             return
-        self.prereqs = data
-        ok = True
-        row = add(self.system_group, StatusRow("Distrobox", "drive-harddisk-symbolic"))
-        row.set_state(_("Installed") if data["distrobox"] else _("Not installed: install it from your distribution's "
-                                                                 "software"), "ok" if data["distrobox"] else "error")
-        ok &= data["distrobox"]
-        row = add(self.system_group, StatusRow(_("Podman or Docker"), "drive-harddisk-symbolic"))
-        row.set_state(data["container_manager"].capitalize() if data["container_manager"] else
-                      _("Neither is installed: Podman is the easier one"), "ok" if data["container_manager"] else "error")
-        ok &= bool(data["container_manager"])
-        for key, title, required, url, pattern in INSTALLERS:
-            path = data["installers"].get(key, "")
-            row = add(self.installer_group, StatusRow(title + ("" if required else " " + _("(optional)"))))
-            if path:
-                row.set_state(os.path.basename(path), "ok")
+        facts, data = result
+        self.facts, self.prereqs = facts, data
+        missing = facts["missing"]
+        for key, title, icon in self.ITEMS:
+            row = add(self.system_group, StatusRow(title or _("Podman or Docker"), icon))
+            if key == "podman" and key not in missing:
+                row.set_state("Podman" if facts.get("podman") else "Docker", "ok")
             else:
-                row.set_state(_("Not found in Downloads") if required else _("Not found; you can add it later"),
-                              "warn" if required else "off")
-                row.add_suffix(suffix_button(_("Download"), lambda u=url: open_uri(self.window, u), "flat",
-                                             tooltip=_("Open the download page")))
-                row.add_suffix(suffix_button(_("Choose…"), lambda p=pattern: self._choose_installer(p),
-                                             tooltip=_("An installer saved somewhere else")))
-            ok &= bool(path) or not required
+                row.set_state(_("Missing") if key in missing else _("Installed"),
+                              "error" if key in missing else "ok")
+        if self.chosen is None or not set(self.chosen) <= set(missing):
+            self.chosen = list(missing)
+        self._show_missing()
+        ok = not missing
+        if data:
+            for key, title, required, url, pattern in INSTALLERS:
+                path = data["installers"].get(key, "")
+                row = add(self.installer_group, StatusRow(title + ("" if required else " " + _("(optional)"))))
+                if path:
+                    row.set_state(os.path.basename(path), "ok")
+                else:
+                    row.set_state(_("Not found in Downloads") if required else _("Not found; you can add it later"),
+                                  "warn" if required else "off")
+                    row.add_suffix(suffix_button(_("Download"), lambda u=url: open_uri(self.window, u), "flat",
+                                                 tooltip=_("Open the download page")))
+                    row.add_suffix(suffix_button(_("Choose…"), lambda p=pattern: self._choose_installer(p),
+                                                 tooltip=_("An installer saved somewhere else")))
+                ok &= bool(path) or not required
+        self.installer_group.set_visible(bool(data))
         self.req_continue.set_sensitive(ok)
+
+    # ---- installing what's missing --------------------------------------------------------------------------
+
+    def _show_missing(self):
+        from torquio import prereqs
+        facts, missing = self.facts, self.facts["missing"]
+        self.missing_group.set_visible(bool(missing))
+        if not missing:
+            return
+        name = facts.get("name") or _("This system")
+        plan = prereqs.install_plan(facts["family"], [k for k in missing if k in self.chosen])
+        titles = {"python": "Python 3", "distrobox": "Distrobox", "podman": "Podman"}
+        # what to install: a tick per missing item (only where there's a command that installs it)
+        installable = prereqs.install_plan(facts["family"], missing)
+        if installable["command"]:
+            for key in missing:
+                if key in installable["note_keys"]:
+                    continue
+                row = Adw.ActionRow(title=titles[key], use_markup=False, activatable=True)
+                check = Gtk.CheckButton(active=key in self.chosen, valign=Gtk.Align.CENTER)
+                check.connect("toggled", lambda c, k=key: self._toggle(k, c.get_active()))
+                row.add_prefix(check)
+                row.set_activatable_widget(check)
+                add(self.missing_group, row)
+        if plan["command"]:
+            self.missing_group.set_description(
+                _("On {name}, Torquio would run this command{root}:").format(
+                    name=name, root=_(" as administrator (it asks for your password)") if plan["root"] else ""))
+            add(self.missing_group, self._command_row(plan["shown"]))
+            buttons = Gtk.Box(spacing=12, halign=Gtk.Align.END, margin_top=6)
+            buttons.append(self._button(_("_Copy Command"), lambda: self._copy(plan["shown"]), suggested=False))
+            install = self._button(_("_Install"), lambda: self._install(plan["command"], plan["root"]))
+            if plan["root"] and not facts.get("pkexec"):
+                install.set_sensitive(False)
+                install.set_tooltip_text(_("This system can't ask for an administrator password here; run the "
+                                           "command in a terminal instead"))
+            buttons.append(install)
+            add(self.missing_group, buttons)
+        else:
+            self.missing_group.set_description("")
+        if plan["alternative"]:
+            add(self.missing_group, Gtk.Label(
+                label=_("Or install Distrobox for your user only, without the package manager:"),
+                xalign=0, wrap=True, margin_top=12, css_classes=["dim-label"]))
+            add(self.missing_group, self._command_row(plan["alternative"]))
+            box = Gtk.Box(spacing=12, halign=Gtk.Align.END, margin_top=6)
+            box.append(self._button(_("Copy"), lambda: self._copy(plan["alternative"]), suggested=False))
+            box.append(self._button(_("Install for Me Only"), lambda: self._install(plan["alternative"], False),
+                                    suggested=False))
+            add(self.missing_group, box)
+        note = installable["note"]
+        if note:
+            add(self.missing_group, self._note(note, name, installable["note_keys"], installable["config"]))
+
+    def _note(self, note, name, keys, config):
+        """Why there's no button for some items, and what to do instead."""
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, margin_top=12)
+        listed = " and ".join({"python": "Python 3", "distrobox": "Distrobox", "podman": "Podman"}[k] for k in keys)
+        if note == "image":
+            text = _("{name} is an image-based system, and Torquio never changes its system image. {items} is "
+                     "normally part of it: use your system's own way to get an image that includes it (an update, "
+                     "or a rebase to such an image), then check again.").format(name=name, items=listed)
+        elif note == "nix":
+            text = _("On NixOS, add these lines to your configuration, rebuild, then check again:")
+        elif note == "builtin":
+            text = _("{name} normally comes with Distrobox and Podman. If they're missing, update the system, then "
+                     "check again.").format(name=name)
+        else:
+            text = _("Torquio needs Distrobox, which runs Torquio's Linux container, and Podman (or Docker), which "
+                     "Distrobox uses. Install them the way your system installs software, then check again.")
+        box.append(Gtk.Label(label=text, xalign=0, wrap=True))
+        if note == "nix" and config:
+            box.append(self._command_row(config))
+            box.append(self._button(_("_Copy Lines"), lambda: self._copy(config), suggested=False,
+                                    halign=Gtk.Align.END))
+        if note == "unknown":
+            links = Gtk.Box(spacing=12)
+            links.append(Gtk.LinkButton(uri="https://distrobox.it/#installation", label=_("Installing Distrobox")))
+            links.append(Gtk.LinkButton(uri="https://podman.io/docs/installation", label=_("Installing Podman")))
+            box.append(links)
+        return box
+
+    def _command_row(self, text):
+        label = Gtk.Label(label=text, xalign=0, wrap=True, wrap_mode=Pango.WrapMode.WORD_CHAR, selectable=True,
+                          margin_top=8, margin_bottom=8, margin_start=12, margin_end=12)
+        label.add_css_class("monospace")
+        frame = Gtk.Frame(child=label)
+        frame.add_css_class("view")
+        return frame
+
+    def _button(self, label, callback, suggested=True, halign=None):
+        b = Gtk.Button(label=label, use_underline=True)
+        if suggested:
+            b.add_css_class("suggested-action")
+        if halign is not None:
+            b.set_halign(halign)
+        b.connect("clicked", lambda *_: callback())
+        return b
+
+    def _toggle(self, key, active):
+        if active and key not in self.chosen:
+            self.chosen.append(key)
+        elif not active and key in self.chosen:
+            self.chosen.remove(key)
+        clear(self.missing_group)
+        self._show_missing()
+
+    def _copy(self, text):
+        Gdk.Display.get_default().get_clipboard().set(text)
+        self.window.toast(_("Copied"))
+
+    def _install(self, command, root):
+        """Run the shown command (as administrator through pkexec when it needs root), with its output live, then
+        check again."""
+        argv = (["pkexec", "sh", "-c", command + " 2>&1"] if root else ["sh", "-c", command + " 2>&1"])
+        TaskDialog(self.window, _("Install What's Missing"), _("Installing…"), _("Installed"), "prereqs",
+                   argv=argv, on_done=lambda code, result: self._check()).present(self.window)
 
     def _choose_installer(self, pattern):
         def chosen(path):

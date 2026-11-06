@@ -28,7 +28,6 @@ class TorquioWindow(Adw.ApplicationWindow):
     sidebar = Gtk.Template.Child()
     content_page = Gtk.Template.Child()
     pages = Gtk.Template.Child()
-    update_banner = Gtk.Template.Child()
     refresh_button = Gtk.Template.Child()
 
     def __init__(self, **kwargs):
@@ -44,8 +43,7 @@ class TorquioWindow(Adw.ApplicationWindow):
                               ("window-maximized", "maximized")):
                 self.settings.bind(key, self, prop, Gio.SettingsBindFlags.DEFAULT)
         for name, callback, param in (("refresh", lambda *_: self.refresh(), None),
-                                      ("launch", self._launch, GLib.VariantType.new("s")),
-                                      ("update", lambda *_: self._show_update(), None)):
+                                      ("launch", self._launch, GLib.VariantType.new("s"))):
             action = Gio.SimpleAction.new(name, param)
             action.connect("activate", callback)
             self.add_action(action)
@@ -61,18 +59,6 @@ class TorquioWindow(Adw.ApplicationWindow):
             row.set_child(box)
             row._view = view
             self.sidebar.append(row)
-        # The message page's buttons: Try Again (from window.ui), and Update Torquio when it's too old for us
-        try_again = self.message_page.get_child()
-        self.message_page.set_child(None)
-        self.update_old = Gtk.Button(label=_("_Update Torquio"), use_underline=True, visible=False)
-        self.update_old.add_css_class("pill")
-        self.update_old.add_css_class("suggested-action")
-        self.update_old.connect("clicked", self._update_old)
-        buttons = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, halign=Gtk.Align.CENTER)
-        buttons.append(self.update_old)
-        buttons.append(try_again)
-        self.message_page.set_child(buttons)
-
         self.sidebar.connect("row-activated", self._select)
         self.sidebar.select_row(self.sidebar.get_row_at_index(0))
         self.refresh()
@@ -99,65 +85,58 @@ class TorquioWindow(Adw.ApplicationWindow):
         if self.stack.get_visible_child_name() != "main":
             self.stack.set_visible_child_name("loading")
         self.refresh_button.set_sensitive(False)
-        host.in_background(lambda: (host.check_version(), host.api("status")), self._show_status)
+        host.in_background(self._prepare, self._show_status)
+
+    def _prepare(self):
+        """(On a worker thread.) The host's Torquio made the app's own (placed there when it differs), what the host
+        has, and, when it can run Torquio, its version and status."""
+        host.reach_host()
+        placed = host.place_copy()
+        facts = host.facts()
+        if not facts.get("python"):
+            return {"placed": placed, "facts": facts, "version": {}, "status": None}
+        return {"placed": placed, "facts": facts, "version": host.api("version", timeout=30),
+                "status": host.api("status")}
 
     def _message(self, title, description, icon="dialog-warning-symbolic"):
         self.message_page.set_title(title)
         self.message_page.set_description(description)
         self.message_page.set_icon_name(icon)
-        self.update_old.set_visible(False)
         self.stack.set_visible_child_name("message")
 
     def _show_status(self, result, err):
         self.refresh_button.set_sensitive(True)
-        if isinstance(err, host.NotInstalled):
-            self._show_setup(torquio_missing=True)
-            return
-        if isinstance(err, host.TooOld):
-            self._message(_("Torquio Needs Updating"),
-                          _("The Torquio on this computer is older than this app. Updating it takes a minute and "
-                            "keeps your settings, Dorico and its licenses."), "software-update-available-symbolic")
-            self.update_old.set_visible(True)
-            return
         if err is not None:
+            # Only a missing permission or a broken host gets here; what Torquio needs is the setup's job
             self._message(_("Couldn't Reach Torquio"), GLib.markup_escape_text(str(err)))
             return
-        self.version, self.status = result
+        self.facts, self.version, self.status = result["facts"], result["version"], result["status"] or {}
+        if result["placed"] and self.status.get("installed"):
+            self._refresh_install()
         # TORQUIO_GUI_SETUP=1 shows the setup assistant on an installed system (for working on it)
-        if not self.status.get("installed") or os.environ.get("TORQUIO_GUI_SETUP") == "1":
+        if result["status"] is None or not self.status.get("installed") or \
+                os.environ.get("TORQUIO_GUI_SETUP") == "1":
             self._show_setup()
             return
         self.setup = None
-        self.update_banner.set_revealed(self.status.get("updates_pending", 0) > 0)
         for view in self.views:
             view.refresh(self.status)
         self.stack.set_visible_child_name("main")
-        if not getattr(self, "_checked_updates", False):
-            # Once per run: fetch from GitHub if the last check is a day old (as the terminal menu does), so the
-            # banner can tell there's an update
-            self._checked_updates = True
-            host.in_background(lambda: host.api("updates", "daily", timeout=60), self._daily_checked)
 
-    def _daily_checked(self, data, err):
-        if data and data.get("commits") and not data.get("local_changes"):
-            self.update_banner.set_revealed(True)
-
-    def _update_old(self, *args):
-        self.update_old.set_sensitive(False)
-        self.update_old.set_label(_("Updating…"))
-
-        def done(result, err):
-            self.update_old.set_sensitive(True)
-            self.update_old.set_label(_("_Update Torquio"))
-            if err:
-                self.show_error(_("Couldn't Update Torquio"), err)
+    def _refresh_install(self):
+        """The app placed a new copy of Torquio (an update of the app, or its first run over an install from a
+        checkout): point the launchers at it and refresh the prefix's settings, quietly."""
+        def done(code):
+            if code == 0:
+                self.toast(_("Torquio's files are up to date"))
             else:
-                self.refresh()
-        host.in_background(host.update_old_torquio, done)
+                self.toast(_("Refreshing Torquio's launchers didn't finish; Fix Icons & Launchers in Maintenance "
+                             "repeats it"), timeout=6)
+        host.Task("app-refresh", on_done=done).start()
 
-    def _show_setup(self, torquio_missing=False):
+    def _show_setup(self):
         if self.setup is None:
-            self.setup = Setup(self, torquio_missing)
+            self.setup = Setup(self)
             self.setup_bin.set_child(self.setup)
         self.stack.set_visible_child_name("setup")
 
@@ -259,35 +238,3 @@ class TorquioWindow(Adw.ApplicationWindow):
                 on_done(code == 0)
         if not self.task_busy():
             host.Task("ntsync", on_done=done).start()
-
-    def _show_update(self):
-        dialog = Adw.AlertDialog(heading=_("Update Torquio"), body=_("Checking what's new…"))
-        dialog.add_response("cancel", _("_Later"))
-        dialog.add_response("update", _("_Update"))
-        dialog.set_response_appearance("update", Adw.ResponseAppearance.SUGGESTED)
-        dialog.set_response_enabled("update", False)
-        dialog.set_close_response("cancel")
-
-        def listed(data, err):
-            if err:
-                dialog.set_body(str(err))
-                return
-            if data["local_changes"]:
-                dialog.set_body(_("Torquio's files were changed on this computer, so it can't update itself. "
-                                  "Run torquio -u in a terminal to see what changed."))
-                return
-            commits = data["commits"]
-            if not commits:
-                dialog.set_body(_("Torquio is up to date."))
-                self.update_banner.set_revealed(False)
-                return
-            shown = "\n".join("• " + c for c in commits[:12])
-            more = len(commits) - 12
-            dialog.set_body(_("{} changes, including:").format(len(commits)) + "\n\n" + shown +
-                            (("\n" + _("…and {} more").format(more)) if more > 0 else ""))
-            dialog.set_response_enabled("update", True)
-        dialog.connect("response", lambda d, r: self.run_task(
-            _("Update Torquio"), _("Updating Torquio…"), _("Torquio is up to date"), "update") if r == "update"
-            else None)
-        dialog.present(self)
-        host.in_background(lambda: host.api("updates", "check", timeout=60), listed)

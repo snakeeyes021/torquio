@@ -1,4 +1,5 @@
-"""Preferences: the few things about Torquio itself (everything about Dorico's setup has its own page)."""
+"""Preferences: about the Torquio the app runs (everything about Dorico's setup has its own page). Torquio comes
+with the app and updates with it, so there's nothing to set here yet."""
 from gettext import gettext as _
 
 from gi.repository import Adw
@@ -11,20 +12,13 @@ class Preferences(Adw.PreferencesDialog):
         super().__init__(title=_("Preferences"))
         self.window = window
         page = Adw.PreferencesPage(title=_("General"), icon_name="preferences-system-symbolic")
-        updates = Adw.PreferencesGroup(title=_("Updates"))
-        self.check = Adw.SwitchRow(use_markup=False, title=_("Check for Updates"),
-                                   subtitle=_("Looks on GitHub at most once a day and shows a banner when there's a "
-                                              "new version"),
-                                   active=window.status.get("settings", {}).get("check_for_updates", True))
-        self.check.connect("notify::active", lambda *_: window.apply_setting(
-            "check_for_updates", "true" if self.check.get_active() else "false",
-            quiet_success=_("Saved")))
-        updates.add(self.check)
-        page.add(updates)
-        about = Adw.PreferencesGroup(title=_("Torquio on This Computer"))
+        about = Adw.PreferencesGroup(title=_("Torquio on This Computer"),
+                                     description=_("Torquio comes with this app and is updated with it."))
         v = window.version
-        for title, value in ((_("Version"), v.get("torquio", "")), (_("Branch"), v.get("branch", "")),
-                             (_("Folder"), v.get("repo", ""))):
+        rows = [(_("Version"), v.get("torquio", "")), (_("Folder"), v.get("repo", "") or host.copy_dir())]
+        if v.get("branch"):  # a developer's checkout (TORQUIO_HOST_REPO)
+            rows.insert(1, (_("Branch"), v["branch"]))
+        for title, value in rows:
             row = Adw.ActionRow(title=title, subtitle=value or "—", use_markup=False)
             row.add_css_class("property")
             about.add(row)

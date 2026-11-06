@@ -1,30 +1,35 @@
 """Running Torquio on the host. Everything Torquio does happens there (distrobox, the container, the Wine prefix,
-the launchers in ~/.local/bin), so the GUI drives the host's copy of Torquio: through `flatpak-spawn --host`
-inside the Flatpak sandbox, directly otherwise. Torquio answers `torquio api VERB` with JSON, and
-`torquio api task NAME` with one JSON event per line (docs/GUI.md)."""
+the launchers in ~/.local/bin), so the app carries its own copy of Torquio, places it on the host (in
+~/.local/share/torquio-app, silently, whenever the app's copy differs from the one there) and runs that copy:
+through `flatpak-spawn --host` inside the Flatpak sandbox, directly otherwise. The app and the copy it runs are
+always the same version (docs/GUI.md, "One app"). Torquio answers `torquio api VERB` with JSON, and
+`torquio api task NAME` with one JSON event per line."""
 import json
 import os
 import re
 import subprocess
+import sys
+import tarfile
 import threading
 
 from gi.repository import Gio, GLib
 
-# The oldest `torquio api` this GUI understands
-MIN_API = 2
 IN_FLATPAK = os.path.exists("/.flatpak-info")
 HOME = os.path.expanduser("~")
+# Torquio inside the app (gui/bundle.py puts it there)
+BUNDLE = "/app/share/torquio/tree"
+STAMP = ".torquio-app.json"
+# Where the app places its copy on the host. Outside Torquio's data folder, which uninstalling deletes; its
+# installers/ folder (installers the user chose) is kept each time the copy is replaced.
+HOST_COPY = os.path.join(HOME, ".local/share/torquio-app")
+# For developing Torquio: run a checkout instead of the app's copy (e.g. in GNOME Builder's run environment)
+DEV_REPO = os.environ.get("TORQUIO_HOST_REPO", "")
 
-
-class NotInstalled(Exception):
-    """There's no Torquio on the host."""
-
-
-class TooOld(Exception):
-    """The host's Torquio predates the API this GUI needs (it can be updated)."""
-
-    def __init__(self, message="The Torquio on this computer is older than this app. Update it first."):
-        super().__init__(message)
+# The prerequisites' rules (lib/torquio/prereqs.py), from the bundled copy, as the app needs them before
+# Torquio itself can run on the host
+for _lib in (os.path.join(BUNDLE, "lib"), os.path.join(DEV_REPO, "lib") if DEV_REPO else ""):
+    if _lib and os.path.isdir(_lib) and _lib not in sys.path:
+        sys.path.insert(0, _lib)
 
 
 class HostError(Exception):
@@ -60,33 +65,9 @@ def spawn(cmd):
                      stderr=subprocess.DEVNULL, start_new_session=True)
 
 
-# Where the GUI downloads Torquio when the computer has none (the uninstaller leaves it alone)
-APP_COPY = os.path.join(HOME, ".local/share/torquio-app")
-# The last Torquio checkout the GUI talked to, remembered so the GUI still finds it if its link in ~/.local/bin is
-# gone (the uninstaller removes it), instead of offering to download a second copy
-KNOWN_REPO = os.path.join(GLib.get_user_config_dir(), "torquio-gui", "repo")
-
-
-def _known_repo():
-    try:
-        with open(KNOWN_REPO) as f:
-            return f.read().strip()
-    except OSError:
-        return ""
-
-
-def _remember_repo(repo):
-    if repo and repo != _known_repo():
-        try:
-            os.makedirs(os.path.dirname(KNOWN_REPO), exist_ok=True)
-            with open(KNOWN_REPO, "w") as f:
-                f.write(repo + "\n")
-        except OSError:
-            pass
-
-
 def reach_host():
-    """Raise HostError when host commands can't run at all (no permission to talk to the host, say)."""
+    """Raise HostError when host commands can't run at all (the app's permission to talk to the host is
+    missing): the one start-up failure left for a normal install."""
     code, _out, err = run_full(["true"], timeout=20)
     if code != 0:
         raise HostError("This app can't run programs on this computer"
@@ -94,17 +75,110 @@ def reach_host():
                         + ". It needs permission to talk to org.freedesktop.Flatpak.")
 
 
+def copy_dir():
+    """The Torquio the app runs on the host: its own copy, or a developer's checkout (TORQUIO_HOST_REPO)."""
+    return DEV_REPO or HOST_COPY
+
+
 def torquio():
-    """The host's `torquio`: the link the installer puts in ~/.local/bin (the same path inside and outside the
-    sandbox, which shares $HOME's path), else the checkout the GUI last used, else the copy it downloaded."""
-    known = _known_repo()
-    candidates = [os.path.join(HOME, ".local/bin/torquio")] + ([os.path.join(known, "torquio")] if known else []) \
-        + [os.path.join(APP_COPY, "torquio")]
-    for path in candidates:
-        if run(["test", "-x", path], timeout=10)[0] == 0:
-            return path
-    reach_host()
-    raise NotInstalled()
+    return os.path.join(copy_dir(), "torquio")
+
+
+def bundled_stamp():
+    try:
+        with open(os.path.join(BUNDLE, STAMP), encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+# Replaces the host copy with the tar archive on stdin: unpacked next to it first, the user's installers moved
+# over, then swapped in (the old copy goes only once the new one is in place)
+PLACE = r'''
+set -e
+dest=$1; parent=$(dirname "$dest"); mkdir -p "$parent"
+new=$(mktemp -d "$parent/.torquio-app-new.XXXXXX")
+trap 'rm -rf "$new"' EXIT
+tar -x -C "$new" -f -
+old=""
+if [ -e "$dest" ]; then
+    old="$parent/.torquio-app-old.$$"
+    mv "$dest" "$old"
+    if [ -d "$old/installers" ]; then rm -rf "$new/installers"; mv "$old/installers" "$new/installers"; fi
+fi
+if ! mv "$new" "$dest"; then [ -n "$old" ] && mv "$old" "$dest"; exit 1; fi
+trap - EXIT
+[ -n "$old" ] && rm -rf "$old"
+exit 0
+'''
+
+
+def place_copy():
+    """Make the host's copy the app's own (silently; only when the stamps differ). Returns True when it was
+    replaced (the caller then refreshes the launchers and settings from it)."""
+    if DEV_REPO:
+        return False
+    stamp = bundled_stamp()
+    if not stamp:
+        raise HostError("This build of the app doesn't contain Torquio (gui/bundle.py didn't run).")
+    code, out = run(["cat", os.path.join(HOST_COPY, STAMP)], timeout=20)
+    try:
+        if code == 0 and json.loads(out) == stamp:
+            return False
+    except ValueError:
+        pass
+    try:
+        proc = subprocess.Popen(command(["sh", "-c", PLACE, "sh", HOST_COPY]), stdin=subprocess.PIPE,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        with tarfile.open(fileobj=proc.stdin, mode="w|") as tar:
+            for name in sorted(os.listdir(BUNDLE)):
+                tar.add(os.path.join(BUNDLE, name), arcname=name)
+        proc.stdin.close()
+        err = proc.stderr.read().decode("utf-8", "replace")
+        code = proc.wait(timeout=300)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        raise HostError(f"Couldn't put Torquio's files on this computer ({e}).")
+    if code != 0:
+        raise HostError("Couldn't put Torquio's files on this computer"
+                        + (f":\n{_last_lines(err)}" if err.strip() else "."))
+    return True
+
+
+# What's on the host, found with the shell alone (before Torquio, which needs Python, can run)
+FACTS = r'''
+PATH="$HOME/.local/bin:$PATH"
+have() { command -v "$1" >/dev/null 2>&1 && echo 1 || echo 0; }
+py=0
+if command -v python3 >/dev/null 2>&1 && python3 -c 'import sys; sys.exit(sys.version_info < (3, 9))' 2>/dev/null; then py=1; fi
+echo "python=$py"
+echo "distrobox=$(have distrobox)"
+echo "podman=$(have podman)"
+echo "docker=$(have docker)"
+echo "ostree=$([ -e /run/ostree-booted ] && echo 1 || echo 0)"
+echo "transactional=$([ -x /usr/sbin/transactional-update ] && [ ! -w /usr ] && echo 1 || echo 0)"
+echo "pkexec=$(have pkexec)"
+echo "---"
+cat /etc/os-release 2>/dev/null || cat /usr/lib/os-release 2>/dev/null
+'''
+
+
+def facts():
+    """{"python", "distrobox", "podman", "docker", "ostree", "transactional", "pkexec": bool, "os": os-release
+    text, "family": the prerequisites' family, "missing": keys of what's needed and not there}."""
+    from torquio import prereqs
+    code, out = run(["sh", "-c", FACTS], timeout=30)
+    head, _, os_text = out.partition("---\n")
+    data = {"os": os_text}
+    for line in head.splitlines():
+        key, _, value = line.partition("=")
+        data[key] = value.strip() == "1"
+    info = prereqs.parse_os_release(os_text)
+    data["name"] = info.get("PRETTY_NAME") or info.get("NAME") or ""
+    data["family"] = prereqs.family(info, ostree=data.get("ostree", False),
+                                    transactional=data.get("transactional", False))
+    data["missing"] = prereqs.missing(data.get("python", False), data.get("distrobox", False),
+                                      data.get("podman", False), data.get("docker", False))
+    return data
 
 
 def launcher(name):
@@ -127,62 +201,11 @@ def api(verb, *args, timeout=120):
     if not isinstance(data, dict):
         if code == 124:
             raise HostError(f"Torquio took too long to answer ({verb}).")
-        # A Torquio from before the API treats `api` as an unknown option and prints its usage; anything else
-        # (a crash, a missing Python) is an error to show as it is
-        if verb == "version" and code != 127 and "Traceback" not in err and "Traceback" not in out:
-            raise TooOld()
         detail = _last_lines(err) or _last_lines(out)
         raise HostError(f"torquio api {verb} failed (exit code {code})" + (f":\n{detail}" if detail else "."))
     if code != 0:
         raise HostError(data.get("error", f"torquio api {verb} failed (exit code {code})"))
     return data
-
-
-def check_version():
-    """The host's `torquio api version`, if this GUI can use it (raises TooOld otherwise)."""
-    data = api("version", timeout=30)
-    if data.get("api", 0) < MIN_API:
-        raise TooOld()
-    _remember_repo(data.get("repo", ""))
-    return data
-
-
-# Updating a Torquio too old for this GUI's API, the way `torquio -u` does it: fast-forward the host's checkout
-# to GitHub's version, then let the new copy refresh launchers and settings (its own --post-update).
-# Exit codes: 2 no checkout, 3 local changes, 5 no upstream branch, 4 fetch or merge failed, else --post-update's.
-UPDATE_OLD = r'''
-repo=$(dirname "$(readlink -f "$1")") && cd "$repo" && git rev-parse --git-dir >/dev/null 2>&1 || exit 2
-[ -z "$(git status --porcelain --untracked-files=no)" ] || exit 3
-git rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1 || exit 5
-old=$(git rev-parse HEAD) && git fetch --quiet && git merge --ff-only --quiet '@{u}' || exit 4
-exec ./torquio --post-update "$old" </dev/null
-'''
-
-
-def update_old_torquio():
-    """Update the host's Torquio when it predates this GUI's API (raises HostError with the reason), then check
-    that the update was enough."""
-    code, _out, err = run_full(["sh", "-c", UPDATE_OLD, "sh", torquio()], timeout=900)
-    if code == 2:
-        raise HostError("The Torquio on this computer isn't a git checkout, so it can't update itself.")
-    if code == 3:
-        raise HostError("Torquio's files were changed on this computer, so it can't update itself. Run "
-                        "torquio -u in a terminal to see what changed.")
-    if code == 5:
-        raise HostError("The Torquio on this computer is on a branch that doesn't follow GitHub, so it can't update "
-                        "itself. Switch it to main (git checkout main) and try again.")
-    if code in (4, 124):
-        raise HostError("Torquio couldn't be updated from GitHub. Check your internet connection and try again.")
-    if code != 0:
-        detail = _last_lines(err)
-        raise HostError("Torquio was updated, but refreshing its launchers and settings failed"
-                        + (f":\n{detail}" if detail else ".") + "\nRun torquio -u in a terminal to finish.")
-    try:
-        check_version()
-    except TooOld:
-        raise TooOld("Torquio is updated, but its newest version is still older than this app. A newer Torquio "
-                     "should follow soon; until then, use the terminal (torquio).") from None
-    return code
 
 
 def in_background(work, done):
@@ -204,8 +227,10 @@ class Task:
     # Tasks that change the installation, running now (Wine's tools aren't counted: they stay open)
     running = set()
 
-    def __init__(self, name, *args, on_event=None, on_done=None):
-        self.name, self.args = name, args
+    def __init__(self, name, *args, on_event=None, on_done=None, argv=None):
+        """`argv`: run that command on the host instead of a Torquio task (installing what Torquio needs, before
+        Torquio can run); each line of its output becomes a log event, and its exit code the result."""
+        self.name, self.args, self.argv = name, args, argv
         self.on_event, self.on_done = on_event, on_done
         self.code = None
 
@@ -242,6 +267,15 @@ class Task:
     def _run(self):
         code = 1
         try:
+            if self.argv:
+                proc = subprocess.Popen(command(self.argv), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                        stderr=subprocess.STDOUT, text=True, errors="replace", bufsize=1)
+                for line in proc.stdout:
+                    GLib.idle_add(self._deliver, {"event": "log", "text": line.rstrip("\n")})
+                code = proc.wait()
+                self.code = code
+                GLib.idle_add(self._finished, code)
+                return
             proc = subprocess.Popen(command([torquio(), "api", "task", self.name, *self.args]),
                                     stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                     text=True, bufsize=1)
@@ -254,7 +288,7 @@ class Task:
                     code = event.get("code", 1)
                 GLib.idle_add(self._deliver, event)
             proc.wait()
-        except (OSError, NotInstalled) as e:
+        except OSError as e:
             GLib.idle_add(self._deliver, {"event": "log", "text": str(e)})
         self.code = code
         GLib.idle_add(self._finished, code)

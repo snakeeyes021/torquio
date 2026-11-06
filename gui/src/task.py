@@ -41,8 +41,8 @@ class TaskView(Gtk.Box):
         self.expander = Gtk.Expander(label=_("Details"), child=scroller)
         self.append(self.expander)
 
-    def start(self, name, *args):
-        host.Task(name, *args, on_event=self._event, on_done=self._done).start()
+    def start(self, name, *args, argv=None):
+        host.Task(name, *args, on_event=self._event, on_done=self._done, argv=argv).start()
         return self
 
     def _step(self, text):
@@ -101,7 +101,7 @@ class TaskView(Gtk.Box):
 class TaskDialog(Adw.Dialog):
     """A task in its own dialog. Closing it lets the task carry on; the window says when it's finished."""
 
-    def __init__(self, window, title, heading, done_heading, name, *args, on_done=None):
+    def __init__(self, window, title, heading, done_heading, name, *args, on_done=None, argv=None):
         super().__init__(title=title, content_width=520, content_height=560)
         self.window, self.done_heading, self.callback = window, done_heading, on_done
         self.view = TaskView(heading, on_done=self._done)
@@ -116,7 +116,7 @@ class TaskDialog(Adw.Dialog):
         self.set_child(toolbar)
         self.closed_early = False
         self.connect("closed", lambda *_: setattr(self, "closed_early", self.view.code is None))
-        self.view.start(name, *args)
+        self.view.start(name, *args, argv=argv)
 
     def _copy(self, *args):
         Gdk.Display.get_default().get_clipboard().set(self.view.log_text())
