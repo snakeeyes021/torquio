@@ -28,7 +28,7 @@ REPO = paths.repo_dir()
 LABELS = {"Cantai Local Render": "Cantai"}
 # The Steinberg programs listed, in this order; components bundled with them (HALion Sonic, Groove Agent,
 # Library Manager, ...) are left out. All third-party programs are listed.
-STEINBERG = ["Steinberg Download Assistant", "Steinberg Activation Manager", "Steinberg MediaBay", "Steinberg Dorico"]
+STEINBERG = ["Steinberg Download Assistant", "Steinberg Activation Manager", "Steinberg Dorico"]
 HIDDEN = re.compile(r"^(Microsoft |Wine ICU|Wine Mono|Wine Gecko)")
 
 

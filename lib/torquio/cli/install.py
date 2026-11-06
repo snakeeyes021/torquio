@@ -28,7 +28,6 @@ BANNER = [
     f'{GRAY}================================================================{RESET}',
 ]
 INSTALLER_PATTERNS = {
-    "mediabay": "MediaBay_Installer_win64*.zip",
     "sda": "Steinberg_Download_Assistant_*_Installer_win*.exe",
     "noteperformer": "NotePerformer-Installer-*.exe",
     "cantai": "Cantai-Windows-*Installer-*.exe.zip",
@@ -108,7 +107,7 @@ def choose_action():
     else:
         print("An existing installation was detected. How would you like to proceed?")
         echo(f"  {WINE}1){RESET} Configure Settings Only (No container or Wine rebuilding)")
-        echo(f"  {WINE}2){RESET} Re-run Windows Software Installers (MediaBay, SDA, NotePerformer, Cantai)")
+        echo(f"  {WINE}2){RESET} Re-run Windows Software Installers (SDA, NotePerformer, Cantai)")
         echo(f"  {WINE}3){RESET} Recreate Distrobox Container Only (Preserves Wine prefix & licenses)")
         echo(f"  {WINE}4){RESET} Fresh Reinstallation (Deletes container & Wine prefix)")
         echo(f"  {WINE}5){RESET} Cancel and Exit")
@@ -312,8 +311,8 @@ def main(args=()):
         search = [paths.installers_dir(), os.path.join(paths.home(), "Downloads"), os.getcwd()]
         installers = {key: find_installer(pattern, search) for key, pattern in INSTALLER_PATTERNS.items()}
         missing = False
-        # MediaBay isn't needed: the Download Assistant installs it (Torquio's PowerShell stand-in lets its
-        # installer run); a MediaBay zip that's there is still installed first
+        # MediaBay isn't Torquio's: the Download Assistant installs and updates it (the PowerShell stand-in
+        # lets its installer run under Wine)
         if not installers["sda"]:
             echo(f"  [{RED}MISSING{RESET}] Mandatory: Steinberg_Download_Assistant_*_Installer_win*.exe")
             missing = True
@@ -353,8 +352,6 @@ def main(args=()):
     if settings["import_path"]:
         echo(f"  - Import Shortcuts:           {WINE}{os.path.basename(settings['import_path'])}{RESET}")
     if install_software:
-        if installers["mediabay"]:
-            echo(f"  - MediaBay Installer:         {WINE}{os.path.basename(installers['mediabay'])}{RESET}")
         echo(f"  - SDA Installer:              {WINE}{os.path.basename(installers['sda'])}{RESET}")
         for key, label in (("noteperformer", "NotePerformer Installer:    "), ("cantai", "Cantai Installer:           ")):
             if installers[key]:
@@ -414,9 +411,6 @@ def main(args=()):
         must(repo_script("scripts/2-install/setup_prefix.sh"))
     if install_software:
         print("Phase 4: Installing Steinberg Components...")
-        if installers["mediabay"]:
-            print("Installing MediaBay...")
-            must(repo_script("scripts/2-install/install_mediabay.sh"))
         print("Installing SDA...")
         must(repo_script("scripts/2-install/install_sda.sh"))
         if installers["noteperformer"]:

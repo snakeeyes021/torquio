@@ -133,8 +133,7 @@ LEFTOVERS = {
     "Desktop/Firefox.desktop": "Exec=firefox\n",
 }
 GNOME_RESTORE = config(manage_graphics=True, original_scale_factor=0, original_kde_policy="false", original_cosmic_policy="none")
-INSTALLERS = {"Downloads/MediaBay_Installer_win64_1.3.80.zip": "", "Downloads/MediaBay_Installer_win64_1.4.10.zip": "",
-              "Downloads/Steinberg_Download_Assistant_1.39.2_Installer_win.exe": ""}
+INSTALLERS = {"Downloads/Steinberg_Download_Assistant_1.39.2_Installer_win.exe": ""}
 OPTIONAL_INSTALLERS = {"Downloads/NotePerformer-Installer-5.1.2.exe": "",
                        "Downloads/Cantai-Windows-3.1.1-Installer-x64.exe.zip": ""}
 CANTAI_FAILS = {"scripts/2-install/install_cantai.sh": "#!/bin/bash\necho '(stub) Cantai installer'\nexit 1\n"}

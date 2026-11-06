@@ -1,5 +1,12 @@
 # MediaBay updates without errors: options
 
+**2026-11-07, Matt: Torquio no longer manages MediaBay; the Download Assistant installs and updates it.** Torquio doesn't
+install a MediaBay zip, look for one, report MediaBay's status, or install an update the Download Assistant
+didn't (option D, removed). What stays is the Wine-level plumbing that lets the Download Assistant's own
+MediaBay installs run: patch 0012 (the script's signature) and the PowerShell stand-in (B). Tested on a fresh
+Ubuntu 24.04 install with no MediaBay zip (2026-11-06): the Download Assistant installed MediaBay 1.4.10.19
+itself.
+
 Status: **B implemented** (2026-11-04, backlog item 16, branch `feat/mediabay-native-script`; see "What Torquio
 does" at the end). Decided earlier: v0.6.5 ships patch 0012 with the install-after-the-Download-Assistant
 fallback; v0.7.0 runs `preinstall.ps1`'s step natively. Goal: the Download Assistant never reports a failed
@@ -115,9 +122,8 @@ package with its `preinstall.ps1`, run as the Download Assistant runs it: `Setup
 The updated MediaBay server starts. Not verified: the Download Assistant's own update (it needs a signed-in
 account) and the "in use" case with a real Dorico (the VM's Dorico isn't activated, so it never loads MediaBay).
 
-**Option A is no longer needed**; D stays as the safety net (after the Download Assistant closes, with no Steinberg
-program open, Torquio installs an update it downloaded but didn't install, e.g. one cancelled because Dorico was
-open).
+**Option A is no longer needed**, and D was removed on 2026-11-07 (see the top): an update cancelled because Dorico
+was open is left to the Download Assistant, which offers it again on its next start.
 
 **Risks:** a newer Install Assistant calling members the stand-in doesn't have would fail that package (a
 `MissingMethodException`; the log would show it); a future Steinberg package whose PowerShell script does more

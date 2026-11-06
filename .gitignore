@@ -11,7 +11,6 @@ setup_prefix.log
 dorico-prefix/
 
 # Extracted Installers (Legacy)
-MediaBay_extracted/
 
 # Local data and installers directory
 installers/

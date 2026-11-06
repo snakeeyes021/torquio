@@ -57,7 +57,7 @@ Download the following files to your `~/Downloads` folder (the Download Assistan
 *   `NotePerformer-Installer-*.exe` (3rd-party, Optional)
 *   `Cantai-Windows-Installer-*.exe.zip` (3rd-party, Optional; Torquio also adds its "Auto & Cantai" playback template to Dorico)
 
-*Note: You do not need to download the Dorico installer itself, or MediaBay's. The Download Assistant installs both once the environment is built.*
+*Note: You do not need to download the Dorico installer itself, or MediaBay's. The Download Assistant installs and updates both once the environment is built.*
 
 ## Step 2: Install & Build
 Open your terminal and run the following commands to clone the repository and start the automated build process:
