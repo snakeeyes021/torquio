@@ -29,27 +29,27 @@
 },
 {
 "text": "This app can't run programs on this computer ({}). It needs permission to talk to org.freedesktop.Flatpak.",
-"label": "⟨T-002 no sandbox permission explanation⟩"
+"label": "This app can't run programs on this computer ({}). It needs permission to talk to org.freedesktop.Flatpak."
 },
 {
 "text": "exit code {}",
-"label": "⟨T-003 exit number fragment⟩"
+"label": "exit code {}"
 },
 {
 "text": "{} isn't available",
-"label": "⟨T-004 helper missing fragment⟩"
+"label": "{} isn't available"
 },
 {
 "text": "Torquio took too long to answer ({}).",
-"label": "⟨T-005 Torquio timed out⟩"
+"label": "Torquio took too long to answer ({})."
 },
 {
 "text": "torquio api {verb} failed (exit code {code})",
-"label": "⟨T-006 Torquio request failed⟩"
+"label": "torquio api {verb} failed (exit code {code})"
 },
 {
 "text": "_Try Again",
-"label": "⟨T-007 ask once more button⟩"
+"label": "_Try Again"
 },
 {
 "text": "Torquio Needs Updating",
@@ -61,39 +61,39 @@
 },
 {
 "text": "_Update Torquio",
-"label": "⟨T-010 fetch newest Torquio button⟩"
+"label": "_Update Torquio"
 },
 {
 "text": "Updating…",
-"label": "⟨T-011 job running label⟩"
+"label": "Updating…"
 },
 {
 "text": "Couldn't Update Torquio",
-"label": "⟨T-012 that job failed title⟩"
+"label": "Couldn't Update Torquio"
 },
 {
 "text": "The Torquio on this computer isn't a git checkout, so it can't update itself.",
-"label": "⟨T-013 not updatable copy⟩"
+"label": "The Torquio on this computer isn't a git checkout, so it can't update itself."
 },
 {
 "text": "Torquio's files were changed on this computer, so it can't update itself. Run torquio -u in a terminal to see what changed.",
-"label": "⟨T-014 local edits block update⟩"
+"label": "Torquio's files were changed on this computer, so it can't update itself. Run torquio -u in a terminal to see what changed."
 },
 {
 "text": "The Torquio on this computer is on a branch that doesn't follow GitHub, so it can't update itself. Switch it to main (git checkout main) and try again.",
-"label": "⟨T-015 branch has no upstream⟩"
+"label": "The Torquio on this computer is on a branch that doesn't follow GitHub, so it can't update itself. Switch it to main (git checkout main) and try again."
 },
 {
 "text": "Torquio couldn't be updated from GitHub. Check your internet connection and try again.",
-"label": "⟨T-016 download of update failed⟩"
+"label": "Torquio couldn't be updated from GitHub. Check your internet connection and try again."
 },
 {
 "text": "Torquio was updated, but refreshing its launchers and settings failed",
-"label": "⟨T-017 update follow-up failed⟩"
+"label": "Torquio was updated, but refreshing its launchers and settings failed"
 },
 {
 "text": "Run torquio -u in a terminal to finish.",
-"label": "⟨T-018 finish in a terminal⟩"
+"label": "Run torquio -u in a terminal to finish."
 },
 {
 "text": "Torquio is updated, but its newest version is still older than this app. A newer Torquio should follow soon; until then, use the terminal (torquio).",
@@ -109,31 +109,31 @@
 },
 {
 "text": "_Get Started",
-"label": "⟨T-022 begin setup button⟩"
+"label": "_Get Started"
 },
 {
 "text": "Downloading Torquio…",
-"label": "⟨T-023 fetching Torquio label⟩"
+"label": "Downloading Torquio…"
 },
 {
 "text": "Welcome",
-"label": "⟨T-024 first step name⟩"
+"label": "Welcome"
 },
 {
 "text": "Couldn't Get Torquio",
-"label": "⟨T-025 fetching failed title⟩"
+"label": "Couldn't Get Torquio"
 },
 {
 "text": "Torquio needs git, which isn't installed on this computer. Install it from your distribution's software (on Fedora Atomic or Bazzite it's included).",
-"label": "⟨T-026 git missing explanation⟩"
+"label": "Torquio needs git, which isn't installed on this computer. Install it from your distribution's software (on Fedora Atomic or Bazzite it's included)."
 },
 {
 "text": "Couldn't download Torquio from GitHub. Check your internet connection.",
-"label": "⟨T-027 download failed, check network⟩"
+"label": "Couldn't download Torquio from GitHub. Check your internet connection."
 },
 {
 "text": "The Torquio on this computer is older than this app. Update it first.",
-"label": "⟨T-028 found Torquio too old⟩"
+"label": "The Torquio on this computer is older than this app. Update it first."
 },
 {
 "text": "What Torquio Needs",
@@ -145,19 +145,19 @@
 },
 {
 "text": "This Computer",
-"label": "⟨T-031 machine checks heading⟩"
+"label": "This Computer"
 },
 {
 "text": "Installed",
-"label": "⟨T-032 program present status⟩"
+"label": "Installed"
 },
 {
 "text": "Not installed: install it from your distribution's software",
-"label": "⟨T-033 program missing, where from⟩"
+"label": "Not installed: install it from your distribution's software"
 },
 {
 "text": "Podman or Docker",
-"label": "⟨T-034 container program row⟩"
+"label": "Podman or Docker"
 },
 {
 "text": "Neither is installed: Podman is the easier one",
@@ -165,15 +165,15 @@
 },
 {
 "text": "Installers",
-"label": "⟨T-036 setup files heading⟩"
+"label": "Installers"
 },
 {
 "text": "(optional)",
-"label": "⟨T-037 not required marker⟩"
+"label": "(optional)"
 },
 {
 "text": "Not found in Downloads",
-"label": "⟨T-038 required installer missing⟩"
+"label": "Not found in Downloads"
 },
 {
 "text": "Not found; you can add it later",
@@ -181,43 +181,43 @@
 },
 {
 "text": "Download",
-"label": "⟨T-040 web page⟩"
+"label": "Download"
 },
 {
 "text": "Open the download page",
-"label": "⟨T-041 link hover⟩"
+"label": "Open the download page"
 },
 {
 "text": "Choose…",
-"label": "⟨T-042 pick one⟩"
+"label": "Choose…"
 },
 {
 "text": "An installer saved somewhere else",
-"label": "⟨T-043 pick one hover⟩"
+"label": "An installer saved somewhere else"
 },
 {
 "text": "Check _Again",
-"label": "⟨T-044 recheck button⟩"
+"label": "Check _Again"
 },
 {
 "text": "_Continue",
-"label": "⟨T-045 go on button⟩"
+"label": "_Continue"
 },
 {
 "text": "Copying the installer…",
-"label": "⟨T-046 file being placed note⟩"
+"label": "Copying the installer…"
 },
 {
 "text": "Couldn't Use That File",
-"label": "⟨T-047 file not placed title⟩"
+"label": "Couldn't Use That File"
 },
 {
 "text": "It couldn't be copied to {}.",
-"label": "⟨T-048 copy failed, destination⟩"
+"label": "It couldn't be copied to {}."
 },
 {
 "text": "Choose the Installer",
-"label": "⟨T-049 setup file picker title⟩"
+"label": "Choose the Installer"
 },
 {
 "text": "A Few Choices",
@@ -225,31 +225,31 @@
 },
 {
 "text": "Display",
-"label": "⟨T-051 screen settings heading⟩"
+"label": "Display"
 },
 {
 "text": "Manage Scaling Automatically",
-"label": "⟨T-052 auto-size switch⟩"
+"label": "Manage Scaling Automatically"
 },
 {
 "text": "Sizes Dorico for your screen each time it starts (adjusts your desktop's XWayland setting, which you can restore later)",
-"label": "⟨T-053 what auto scaling does⟩"
+"label": "Sizes Dorico for your screen each time it starts (adjusts your desktop's XWayland setting, which you can restore later)"
 },
 {
 "text": "For Wayland sessions; set Wine's DPI later in Display & Scaling",
-"label": "⟨T-054 why auto scaling is off⟩"
+"label": "For Wayland sessions; set Wine's DPI later in Display & Scaling"
 },
 {
 "text": "Font Smoothing",
-"label": "⟨T-055 text drawing dropdown⟩"
+"label": "Font Smoothing"
 },
 {
 "text": "Bolder",
-"label": "⟨T-056 heavier text option⟩"
+"label": "Bolder"
 },
 {
 "text": "Crisper",
-"label": "⟨T-057 thinner text option⟩"
+"label": "Crisper"
 },
 {
 "text": "Bolder is FreeType v40, Crisper v35; easy to change later",
@@ -257,35 +257,35 @@
 },
 {
 "text": "Speed",
-"label": "⟨T-059 performance heading⟩"
+"label": "Speed"
 },
 {
 "text": "Kernel Fast Sync",
-"label": "⟨T-060 speed feature name⟩"
+"label": "Kernel Fast Sync"
 },
 {
 "text": "NTsync makes big scores much faster to edit",
-"label": "⟨T-061 fast sync benefit hover⟩"
+"label": "NTsync makes big scores much faster to edit"
 },
 {
 "text": "Your kernel supports it; enabling it needs your password",
-"label": "⟨T-062 can enable, needs password⟩"
+"label": "Your kernel supports it; enabling it needs your password"
 },
 {
 "text": "Enable",
-"label": "⟨T-063 switch on⟩"
+"label": "Enable"
 },
 {
 "text": "Active",
-"label": "⟨T-064 feature on status⟩"
+"label": "Active"
 },
 {
 "text": "Not supported by this kernel (6.14 or newer needed)",
-"label": "⟨T-065 kernel too old, version needed⟩"
+"label": "Not supported by this kernel (6.14 or newer needed)"
 },
 {
 "text": "Optional",
-"label": "⟨T-066 extras heading⟩"
+"label": "Optional"
 },
 {
 "text": "A Folder for Your Scores",
@@ -293,27 +293,27 @@
 },
 {
 "text": "Shown as drive D: in Dorico's dialogs",
-"label": "⟨T-068 how it will appear⟩"
+"label": "Shown as drive D: in Dorico's dialogs"
 },
 {
 "text": "{} as drive D:",
-"label": "⟨T-069 after picking⟩"
+"label": "{} as drive D:"
 },
 {
 "text": "Choose a Folder for Your Scores",
-"label": "⟨T-070 music place picker title⟩"
+"label": "Choose a Folder for Your Scores"
 },
 {
 "text": "Import Key Commands",
-"label": "⟨T-071 bring backup in switch⟩"
+"label": "Import Key Commands"
 },
 {
 "text": "_Install",
-"label": "⟨T-072 go button⟩"
+"label": "_Install"
 },
 {
 "text": "Installing",
-"label": "⟨T-073 setup running title⟩"
+"label": "Installing"
 },
 {
 "text": "Installing Torquio…",
@@ -325,7 +325,7 @@
 },
 {
 "text": "Details",
-"label": "⟨T-076 output fold-out⟩"
+"label": "Details"
 },
 {
 "text": "Something Went Wrong",
@@ -345,51 +345,51 @@
 },
 {
 "text": "Done",
-"label": "⟨T-081 last step name⟩"
+"label": "Done"
 },
 {
 "text": "Main Menu",
-"label": "⟨T-082 options button hover⟩"
+"label": "Main Menu"
 },
 {
 "text": "_Preferences",
-"label": "⟨T-083 settings menu item⟩"
+"label": "_Preferences"
 },
 {
 "text": "_Keyboard Shortcuts",
-"label": "⟨T-084 key combos menu item⟩"
+"label": "_Keyboard Shortcuts"
 },
 {
 "text": "_About Torquio",
-"label": "⟨T-085 credits menu item⟩"
+"label": "_About Torquio"
 },
 {
 "text": "Overview",
-"label": "⟨T-086 home page name⟩"
+"label": "Overview"
 },
 {
 "text": "Display & Scaling",
-"label": "⟨T-087 screen settings page name⟩"
+"label": "Display & Scaling"
 },
 {
 "text": "Folders",
-"label": "⟨T-088 places page name⟩"
+"label": "Folders"
 },
 {
 "text": "Key Commands",
-"label": "⟨T-089 shortcut backups page name⟩"
+"label": "Key Commands"
 },
 {
 "text": "AI Plug-ins",
-"label": "⟨T-090 AI add-ons page name⟩"
+"label": "AI Plug-ins"
 },
 {
 "text": "Maintenance",
-"label": "⟨T-091 tools page name⟩"
+"label": "Maintenance"
 },
 {
 "text": "Refresh",
-"label": "⟨T-092 re-read button hover⟩"
+"label": "Refresh"
 },
 {
 "text": "An update for Torquio is available",
@@ -397,75 +397,75 @@
 },
 {
 "text": "_Details",
-"label": "⟨T-094 what's new button⟩"
+"label": "_Details"
 },
 {
 "text": "Starting Dorico…",
-"label": "⟨T-095 Dorico launching note⟩"
+"label": "Starting Dorico…"
 },
 {
 "text": "Starting the Activation Manager…",
-"label": "⟨T-096 licence tool launching note⟩"
+"label": "Starting the Activation Manager…"
 },
 {
 "text": "Starting the Download Assistant…",
-"label": "⟨T-097 fetching tool launching note⟩"
+"label": "Starting the Download Assistant…"
 },
 {
 "text": "Starting…",
-"label": "⟨T-098 other launching note⟩"
+"label": "Starting…"
 },
 {
 "text": "Couldn't Start It",
-"label": "⟨T-099 launch failed title⟩"
+"label": "Couldn't Start It"
 },
 {
 "text": "Its launcher ({}) is missing. Fix Icons & Launchers in Maintenance puts it back.",
-"label": "⟨T-100 launcher missing, how fix⟩"
+"label": "Its launcher ({}) is missing. Fix Icons & Launchers in Maintenance puts it back."
 },
 {
 "text": "Another task is still running; try again when it has finished",
-"label": "⟨T-101 busy, try later note⟩"
+"label": "Another task is still running; try again when it has finished"
 },
 {
 "text": "Applied",
-"label": "⟨T-102 setting taken note⟩"
+"label": "Applied"
 },
 {
 "text": "Couldn't Change the Setting",
-"label": "⟨T-103 value not saved title⟩"
+"label": "Couldn't Change the Setting"
 },
 {
 "text": "Close Dorico?",
-"label": "⟨T-104 Dorico will quit title⟩"
+"label": "Close Dorico?"
 },
 {
 "text": "Applying this restarts Wine, which closes Dorico and Steinberg's programs. Save your work first.",
-"label": "⟨T-105 setting closes Dorico warning⟩"
+"label": "Applying this restarts Wine, which closes Dorico and Steinberg's programs. Save your work first."
 },
 {
 "text": "_Restart Wine",
-"label": "⟨T-106 go ahead button⟩"
+"label": "_Restart Wine"
 },
 {
 "text": "This replaces Torquio's container, which closes Dorico and Steinberg's programs. Save your work first.",
-"label": "⟨T-107 job closes Dorico warning⟩"
+"label": "This replaces Torquio's container, which closes Dorico and Steinberg's programs. Save your work first."
 },
 {
 "text": "_Cancel",
-"label": "⟨T-108 back out button⟩"
+"label": "_Cancel"
 },
 {
 "text": "_Close",
-"label": "⟨T-109 dismiss button⟩"
+"label": "_Close"
 },
 {
 "text": "Kernel fast sync is on",
-"label": "⟨T-110 speed feature on note⟩"
+"label": "Kernel fast sync is on"
 },
 {
 "text": "Kernel fast sync wasn't enabled",
-"label": "⟨T-111 speed feature failed note⟩"
+"label": "Kernel fast sync wasn't enabled"
 },
 {
 "text": "Ready When You Are",
@@ -485,83 +485,83 @@
 },
 {
 "text": "_Start Dorico",
-"label": "⟨T-116 launch Dorico button⟩"
+"label": "_Start Dorico"
 },
 {
 "text": "Get Dorico",
-"label": "⟨T-117 fetch Dorico button⟩"
+"label": "Get Dorico"
 },
 {
 "text": "Sign in to the Steinberg Download Assistant to install Dorico",
-"label": "⟨T-118 get Dorico hover⟩"
+"label": "Sign in to the Steinberg Download Assistant to install Dorico"
 },
 {
 "text": "_Activation Manager",
-"label": "⟨T-119 licence tool button⟩"
+"label": "_Activation Manager"
 },
 {
 "text": "_Download Assistant",
-"label": "⟨T-120 fetching tool button⟩"
+"label": "_Download Assistant"
 },
 {
 "text": "Environment",
-"label": "⟨T-121 machinery heading⟩"
+"label": "Environment"
 },
 {
 "text": "Wine Engine",
-"label": "⟨T-122 compatibility layer row⟩"
+"label": "Wine Engine"
 },
 {
 "text": "Prebuilt",
-"label": "⟨T-123 ready-made status⟩"
+"label": "Prebuilt"
 },
 {
 "text": "Compiled on this computer",
-"label": "⟨T-124 built-here engine status⟩"
+"label": "Compiled on this computer"
 },
 {
 "text": "Unknown",
-"label": "⟨T-125 no idea status⟩"
+"label": "Unknown"
 },
 {
 "text": "update available",
-"label": "⟨T-126 newer one fragment⟩"
+"label": "update available"
 },
 {
 "text": "Update",
-"label": "⟨T-127 get newer⟩"
+"label": "Update"
 },
 {
 "text": "Updating the Wine engine…",
-"label": "⟨T-128 engine updating heading⟩"
+"label": "Updating the Wine engine…"
 },
 {
 "text": "The Wine engine is up to date",
-"label": "⟨T-129 engine updated heading⟩"
+"label": "The Wine engine is up to date"
 },
 {
 "text": "Container",
-"label": "⟨T-130 environment row⟩"
+"label": "Container"
 },
 {
 "text": "Not created",
-"label": "⟨T-131 environment missing status⟩"
+"label": "Not created"
 },
 {
 "text": "NTsync speeds up big scores' selections and edits considerably",
-"label": "⟨T-132 fast sync benefit hover⟩"
+"label": "NTsync speeds up big scores' selections and edits considerably"
 },
 {
 "text": "Available, not enabled",
-"label": "⟨T-133 can enable status⟩"
+"label": "Available, not enabled"
 },
 {
 "text": "Not supported by this kernel",
-"label": "⟨T-134 kernel unsupported status⟩"
+"label": "Not supported by this kernel"
 },
 {
 "text": "Playback",
-"label": "⟨T-135 sound plug-ins row⟩"
+"label": "Playback"
 },
 {
 "text": "Dorico's own sounds",
@@ -573,127 +573,127 @@
 },
 {
 "text": "Scaling",
-"label": "⟨T-138 size settings heading⟩"
+"label": "Scaling"
 },
 {
 "text": "Sets Wine's DPI and your desktop's XWayland setting for Dorico",
-"label": "⟨T-139 what auto scaling changes⟩"
+"label": "Sets Wine's DPI and your desktop's XWayland setting for Dorico"
 },
 {
 "text": "Automatic scaling is for Wayland sessions; set Wine's DPI by hand",
-"label": "⟨T-140 why auto is off here⟩"
+"label": "Automatic scaling is for Wayland sessions; set Wine's DPI by hand"
 },
 {
 "text": "Match the Screen's Physical DPI",
-"label": "⟨T-141 true density switch⟩"
+"label": "Match the Screen's Physical DPI"
 },
 {
 "text": "Size Dorico by the monitor's real pixel density instead of its scale",
-"label": "⟨T-142 physical size explained⟩"
+"label": "Size Dorico by the monitor's real pixel density instead of its scale"
 },
 {
 "text": "Wine DPI",
-"label": "⟨T-143 manual size field⟩"
+"label": "Wine DPI"
 },
 {
 "text": "96 is 100 %, 120 is 125 %, 144 is 150 %, 192 is 200 %",
-"label": "⟨T-144 number to zoom cheat sheet⟩"
+"label": "96 is 100 %, 120 is 125 %, 144 is 150 %, 192 is 200 %"
 },
 {
 "text": "Your Desktop's XWayland Setting Was Changed",
-"label": "⟨T-145 desktop value altered row⟩"
+"label": "Your Desktop's XWayland Setting Was Changed"
 },
 {
 "text": "It's {current} now; it was {original} before Automated Mode",
-"label": "⟨T-146 now versus before values⟩"
+"label": "It's {current} now; it was {original} before Automated Mode"
 },
 {
 "text": "Restore",
-"label": "⟨T-147 put back⟩"
+"label": "Restore"
 },
 {
 "text": "Text",
-"label": "⟨T-148 lettering heading⟩"
+"label": "Text"
 },
 {
 "text": "FreeType v40: heavier text, the default",
-"label": "⟨T-149 first option explained⟩"
+"label": "FreeType v40: heavier text, the default"
 },
 {
 "text": "FreeType v35: thinner, sharper text",
-"label": "⟨T-150 second option explained⟩"
+"label": "FreeType v35: thinner, sharper text"
 },
 {
 "text": "This Display",
-"label": "⟨T-151 screen facts heading⟩"
+"label": "This Display"
 },
 {
 "text": "Desktop",
-"label": "⟨T-152 environment fact⟩"
+"label": "Desktop"
 },
 {
 "text": "Monitor",
-"label": "⟨T-153 screen fact⟩"
+"label": "Monitor"
 },
 {
 "text": "Desktop Scale",
-"label": "⟨T-154 zoom fact⟩"
+"label": "Desktop Scale"
 },
 {
 "text": "Physical DPI",
-"label": "⟨T-155 pixel density fact⟩"
+"label": "Physical DPI"
 },
 {
 "text": "Wine DPI Now",
-"label": "⟨T-156 current size fact⟩"
+"label": "Wine DPI Now"
 },
 {
 "text": "Dorico Will Use",
-"label": "⟨T-157 next size fact⟩"
+"label": "Dorico Will Use"
 },
 {
 "text": "{} DPI",
-"label": "⟨T-158 number with unit⟩"
+"label": "{} DPI"
 },
 {
 "text": "Manage Scaling Automatically?",
-"label": "⟨T-159 auto-size? title⟩"
+"label": "Manage Scaling Automatically?"
 },
 {
 "text": "Each time Dorico starts, Torquio sets Wine's DPI for the screen it's on and adjusts your desktop's XWayland scaling setting, which other X11 apps share. Your current setting is kept so you can restore it here.",
-"label": "⟨T-160 auto scaling consequences⟩"
+"label": "Each time Dorico starts, Torquio sets Wine's DPI for the screen it's on and adjusts your desktop's XWayland scaling setting, which other X11 apps share. Your current setting is kept so you can restore it here."
 },
 {
 "text": "_Manage Scaling",
-"label": "⟨T-161 turn on button⟩"
+"label": "_Manage Scaling"
 },
 {
 "text": "Restore Your Desktop's Setting?",
-"label": "⟨T-162 undo desktop change? title⟩"
+"label": "Restore Your Desktop's Setting?"
 },
 {
 "text": "Automated Mode changed your desktop's XWayland scaling to {current}. Put it back to {original}?",
-"label": "⟨T-163 changed value, offer undo⟩"
+"label": "Automated Mode changed your desktop's XWayland scaling to {current}. Put it back to {original}?"
 },
 {
 "text": "_Keep Current",
-"label": "⟨T-164 leave it button⟩"
+"label": "_Keep Current"
 },
 {
 "text": "_Restore",
-"label": "⟨T-165 put back button⟩"
+"label": "_Restore"
 },
 {
 "text": "Couldn't Restore the Setting",
-"label": "⟨T-166 put back failed title⟩"
+"label": "Couldn't Restore the Setting"
 },
 {
 "text": "Desktop scaling setting restored",
-"label": "⟨T-167 put back note⟩"
+"label": "Desktop scaling setting restored"
 },
 {
 "text": "Wine DPI set to {}",
-"label": "⟨T-168 manual size saved note⟩"
+"label": "Wine DPI set to {}"
 },
 {
 "text": "Make folders on this computer easy to reach from Dorico's Open and Save dialogs: as a drive (D:, E:…) or as a shortcut on Wine's Desktop.",
@@ -701,19 +701,19 @@
 },
 {
 "text": "_Add Folder…",
-"label": "⟨T-170 add place button⟩"
+"label": "_Add Folder…"
 },
 {
 "text": "Drives",
-"label": "⟨T-171 drive letters heading⟩"
+"label": "Drives"
 },
 {
 "text": "Desktop Shortcuts",
-"label": "⟨T-172 Wine home-screen icons heading⟩"
+"label": "Desktop Shortcuts"
 },
 {
 "text": "Remove",
-"label": "⟨T-173 bin button hover⟩"
+"label": "Remove"
 },
 {
 "text": "No Folders Yet",
@@ -725,63 +725,63 @@
 },
 {
 "text": "New drives appear in Dorico's dialogs once Dorico and Steinberg's programs have been closed.",
-"label": "⟨T-176 when drives show up⟩"
+"label": "New drives appear in Dorico's dialogs once Dorico and Steinberg's programs have been closed."
 },
 {
 "text": "Choose a Folder for Dorico",
-"label": "⟨T-177 place picker title⟩"
+"label": "Choose a Folder for Dorico"
 },
 {
 "text": "Add “{}”",
-"label": "⟨T-178 add picked folder title⟩"
+"label": "Add “{}”"
 },
 {
 "text": "How should it appear in Dorico?",
-"label": "⟨T-179 choose how question⟩"
+"label": "How should it appear in Dorico?"
 },
 {
 "text": "On Wine's _Desktop",
-"label": "⟨T-180 as desktop icon button⟩"
+"label": "On Wine's _Desktop"
 },
 {
 "text": "As a _Drive",
-"label": "⟨T-181 as lettered disk button⟩"
+"label": "As a _Drive"
 },
 {
 "text": "Folder added",
-"label": "⟨T-182 place in list note⟩"
+"label": "Folder added"
 },
 {
 "text": "Removed {}",
-"label": "⟨T-183 taken off note⟩"
+"label": "Removed {}"
 },
 {
 "text": "_Undo",
-"label": "⟨T-184 bring back button⟩"
+"label": "_Undo"
 },
 {
 "text": "Couldn't List the Folders",
-"label": "⟨T-185 page load failed title⟩"
+"label": "Couldn't List the Folders"
 },
 {
 "text": "Couldn't Add the Folder",
-"label": "⟨T-186 adding failed title⟩"
+"label": "Couldn't Add the Folder"
 },
 {
 "text": "That folder doesn't exist.",
-"label": "⟨T-187 folder gone error⟩"
+"label": "That folder doesn't exist."
 },
 {
 "text": "The folder couldn't be mapped.",
-"label": "⟨T-188 add folder failed error⟩"
+"label": "The folder couldn't be mapped."
 },
 {
 "text": "Couldn't Remove the Folder",
-"label": "⟨T-189 taking off failed title⟩"
+"label": "Couldn't Remove the Folder"
 },
 {
 "text": "That isn't one of the mapped Desktop shortcuts.",
-"label": "⟨T-190 not our shortcut error⟩"
+"label": "That isn't one of the mapped Desktop shortcuts."
 },
 {
 "text": "Keep your Dorico shortcuts safe, or bring them over from another computer.",
@@ -789,11 +789,11 @@
 },
 {
 "text": "Dorico's Key Commands",
-"label": "⟨T-192 their shortcuts heading⟩"
+"label": "Dorico's Key Commands"
 },
 {
 "text": "Custom Key Commands",
-"label": "⟨T-193 changed shortcuts row⟩"
+"label": "Custom Key Commands"
 },
 {
 "text": "None yet: customize them in Dorico's Preferences",
@@ -801,55 +801,55 @@
 },
 {
 "text": "_Export to Downloads",
-"label": "⟨T-195 back up button⟩"
+"label": "_Export to Downloads"
 },
 {
 "text": "Saved {}",
-"label": "⟨T-196 backup written note⟩"
+"label": "Saved {}"
 },
 {
 "text": "_Show",
-"label": "⟨T-197 see file button⟩"
+"label": "_Show"
 },
 {
 "text": "Couldn't Export",
-"label": "⟨T-198 backup failed title⟩"
+"label": "Couldn't Export"
 },
 {
 "text": "Dorico has no custom key commands to export yet.",
-"label": "⟨T-199 nothing to back up error⟩"
+"label": "Dorico has no custom key commands to export yet."
 },
 {
 "text": "Import",
-"label": "⟨T-200 bring in⟩"
+"label": "Import"
 },
 {
 "text": "Imported key commands take effect the next time Dorico starts.",
-"label": "⟨T-201 when import takes effect⟩"
+"label": "Imported key commands take effect the next time Dorico starts."
 },
 {
 "text": "In Downloads",
-"label": "⟨T-202 where it was found⟩"
+"label": "In Downloads"
 },
 {
 "text": "_Choose a Backup…",
-"label": "⟨T-203 pick saved file button⟩"
+"label": "_Choose a Backup…"
 },
 {
 "text": "Choose a Key Commands Backup",
-"label": "⟨T-204 saved file picker title⟩"
+"label": "Choose a Key Commands Backup"
 },
 {
 "text": "Key commands will be imported when Dorico next starts",
-"label": "⟨T-205 import queued note⟩"
+"label": "Key commands will be imported when Dorico next starts"
 },
 {
 "text": "Couldn't Import",
-"label": "⟨T-206 bringing in failed title⟩"
+"label": "Couldn't Import"
 },
 {
 "text": "Choose a key commands backup (.zip or .json).",
-"label": "⟨T-207 wrong file type error⟩"
+"label": "Choose a key commands backup (.zip or .json)."
 },
 {
 "text": "AI plug-ins such as Cantai run their models on a GPU when they can, which makes rendering much faster.",
@@ -857,275 +857,275 @@
 },
 {
 "text": "GPU",
-"label": "⟨T-209 graphics card heading⟩"
+"label": "GPU"
 },
 {
 "text": "Render On",
-"label": "⟨T-210 which card dropdown⟩"
+"label": "Render On"
 },
 {
 "text": "Automatic",
-"label": "⟨T-211 pick for me option⟩"
+"label": "Automatic"
 },
 {
 "text": "Off (the CPU)",
-"label": "⟨T-212 no graphics card option⟩"
+"label": "Off (the CPU)"
 },
 {
 "text": "Takes effect the next time Dorico starts",
-"label": "⟨T-213 applies next start⟩"
+"label": "Takes effect the next time Dorico starts"
 },
 {
 "text": "Dorico will use it from its next start",
-"label": "⟨T-214 card change saved note⟩"
+"label": "Dorico will use it from its next start"
 },
 {
 "text": "NVIDIA Access",
-"label": "⟨T-215 NVIDIA card row⟩"
+"label": "NVIDIA Access"
 },
 {
 "text": "Enabled",
-"label": "⟨T-216 ready status⟩"
+"label": "Enabled"
 },
 {
 "text": "Not set up",
-"label": "⟨T-217 not set up status⟩"
+"label": "Not set up"
 },
 {
 "text": "Set Up",
-"label": "⟨T-218 prepare⟩"
+"label": "Set Up"
 },
 {
 "text": "Setting up NVIDIA access…",
-"label": "⟨T-219 NVIDIA setup running heading⟩"
+"label": "Setting up NVIDIA access…"
 },
 {
 "text": "NVIDIA access is set up",
-"label": "⟨T-220 NVIDIA setup done heading⟩"
+"label": "NVIDIA access is set up"
 },
 {
 "text": "Wine Engine GPU Support",
-"label": "⟨T-221 layer can use card row⟩"
+"label": "Wine Engine GPU Support"
 },
 {
 "text": "Yes",
-"label": "⟨T-222 can status⟩"
+"label": "Yes"
 },
 {
 "text": "Needs an engine update",
-"label": "⟨T-223 newer layer required status⟩"
+"label": "Needs an engine update"
 },
 {
 "text": "Direct3D 12 (vkd3d-proton)",
-"label": "⟨T-224 graphics add-on row⟩"
+"label": "Direct3D 12 (vkd3d-proton)"
 },
 {
 "text": "Not downloaded yet",
-"label": "⟨T-225 add-on missing status⟩"
+"label": "Not downloaded yet"
 },
 {
 "text": "Not installed",
-"label": "⟨T-226 plug-in absent status⟩"
+"label": "Not installed"
 },
 {
 "text": "Renders on the GPU",
-"label": "⟨T-227 uses card status⟩"
+"label": "Renders on the GPU"
 },
 {
 "text": "Renders on the CPU",
-"label": "⟨T-228 uses processor status⟩"
+"label": "Renders on the CPU"
 },
 {
 "text": "Wine Tools",
-"label": "⟨T-229 Wine utilities heading⟩"
+"label": "Wine Tools"
 },
 {
 "text": "Wine Configuration",
-"label": "⟨T-230 Wine options row⟩"
+"label": "Wine Configuration"
 },
 {
 "text": "Libraries, audio and Windows version",
-"label": "⟨T-231 what's set there⟩"
+"label": "Libraries, audio and Windows version"
 },
 {
 "text": "Registry Editor",
-"label": "⟨T-232 settings database row⟩"
+"label": "Registry Editor"
 },
 {
 "text": "Control Panel",
-"label": "⟨T-233 Windows system settings row⟩"
+"label": "Control Panel"
 },
 {
 "text": "File Manager",
-"label": "⟨T-234 Wine browser row⟩"
+"label": "File Manager"
 },
 {
 "text": "Wine's own, inside the prefix",
-"label": "⟨T-235 which file manager⟩"
+"label": "Wine's own, inside the prefix"
 },
 {
 "text": "Command Prompt",
-"label": "⟨T-236 text console row⟩"
+"label": "Command Prompt"
 },
 {
 "text": "Run a Windows Program…",
-"label": "⟨T-237 launch Windows app row⟩"
+"label": "Run a Windows Program…"
 },
 {
 "text": "An installer (.exe or .msi) or a program",
-"label": "⟨T-238 which files⟩"
+"label": "An installer (.exe or .msi) or a program"
 },
 {
 "text": "Choose a Windows Program",
-"label": "⟨T-239 Windows app picker title⟩"
+"label": "Choose a Windows Program"
 },
 {
 "text": "Running {}…",
-"label": "⟨T-240 app launching note⟩"
+"label": "Running {}…"
 },
 {
 "text": "Open Drive C:",
-"label": "⟨T-241 main disk row⟩"
+"label": "Open Drive C:"
 },
 {
 "text": "The Wine prefix in your file manager",
-"label": "⟨T-242 what opens, where⟩"
+"label": "The Wine prefix in your file manager"
 },
 {
 "text": "Opening {}…",
-"label": "⟨T-243 utility launching note⟩"
+"label": "Opening {}…"
 },
 {
 "text": "{} Didn't Start",
-"label": "⟨T-244 utility failed title⟩"
+"label": "{} Didn't Start"
 },
 {
 "text": "Wine couldn't run it. Is Torquio's container working? Export Logs collects the details for a bug report.",
-"label": "⟨T-245 tool failed, what next⟩"
+"label": "Wine couldn't run it. Is Torquio's container working? Export Logs collects the details for a bug report."
 },
 {
 "text": "Wine",
-"label": "⟨T-246 Wine session heading⟩"
+"label": "Wine"
 },
 {
 "text": "Restart Wine",
-"label": "⟨T-247 reboot Wine row⟩"
+"label": "Restart Wine"
 },
 {
 "text": "Restarts Wine's Windows session (wineboot)",
-"label": "⟨T-248 what restarts⟩"
+"label": "Restarts Wine's Windows session (wineboot)"
 },
 {
 "text": "Close All Wine Programs",
-"label": "⟨T-249 stop everything row⟩"
+"label": "Close All Wine Programs"
 },
 {
 "text": "Dorico, the Activation Manager and the Download Assistant too",
-"label": "⟨T-250 includes Dorico warning⟩"
+"label": "Dorico, the Activation Manager and the Download Assistant too"
 },
 {
 "text": "Dorico or one of Steinberg's programs is open, and this closes it. Save your work first.",
-"label": "⟨T-251 open programs will close⟩"
+"label": "Dorico or one of Steinberg's programs is open, and this closes it. Save your work first."
 },
 {
 "text": "_Close and Continue",
-"label": "⟨T-252 go ahead button⟩"
+"label": "_Close and Continue"
 },
 {
 "text": "Restarting Wine…",
-"label": "⟨T-253 rebooting note⟩"
+"label": "Restarting Wine…"
 },
 {
 "text": "Closing Wine programs…",
-"label": "⟨T-254 shutting note⟩"
+"label": "Closing Wine programs…"
 },
 {
 "text": "Wine restarted",
-"label": "⟨T-255 reboot done note⟩"
+"label": "Wine restarted"
 },
 {
 "text": "Wine programs closed",
-"label": "⟨T-256 shut down done note⟩"
+"label": "Wine programs closed"
 },
 {
 "text": "Wine didn't respond; try again, or restart your computer",
-"label": "⟨T-257 Wine stuck note⟩"
+"label": "Wine didn't respond; try again, or restart your computer"
 },
 {
 "text": "Repair",
-"label": "⟨T-258 repairs heading⟩"
+"label": "Repair"
 },
 {
 "text": "Fix Icons & Launchers",
-"label": "⟨T-259 repair menu entries row⟩"
+"label": "Fix Icons & Launchers"
 },
 {
 "text": "Menu entries, file types and launchers",
-"label": "⟨T-260 what gets repaired⟩"
+"label": "Menu entries, file types and launchers"
 },
 {
 "text": "Refreshing icons and launchers…",
-"label": "⟨T-261 repair running heading⟩"
+"label": "Refreshing icons and launchers…"
 },
 {
 "text": "Icons and launchers are refreshed",
-"label": "⟨T-262 repair done heading⟩"
+"label": "Icons and launchers are refreshed"
 },
 {
 "text": "Rebuild…",
-"label": "⟨T-263 make from source⟩"
+"label": "Rebuild…"
 },
 {
 "text": "Compile it on this computer",
-"label": "⟨T-264 make here hover⟩"
+"label": "Compile it on this computer"
 },
 {
 "text": "Compile the Wine Engine?",
-"label": "⟨T-265 make from source? title⟩"
+"label": "Compile the Wine Engine?"
 },
 {
 "text": "Compiling Torquio's Wine engine on this computer takes 20 to 40 minutes and closes Dorico while it runs. The prebuilt engine is the same; this is for testing changes to it.",
-"label": "⟨T-266 build cost, who needs it⟩"
+"label": "Compiling Torquio's Wine engine on this computer takes 20 to 40 minutes and closes Dorico while it runs. The prebuilt engine is the same; this is for testing changes to it."
 },
 {
 "text": "_Compile",
-"label": "⟨T-267 start making button⟩"
+"label": "_Compile"
 },
 {
 "text": "Compiling the Wine engine…",
-"label": "⟨T-268 build running heading⟩"
+"label": "Compiling the Wine engine…"
 },
 {
 "text": "The Wine engine is compiled",
-"label": "⟨T-269 build done heading⟩"
+"label": "The Wine engine is compiled"
 },
 {
 "text": "Export Logs",
-"label": "⟨T-270 save records row⟩"
+"label": "Export Logs"
 },
 {
 "text": "A zip for bug reports, with personal details removed",
-"label": "⟨T-271 what the logs file is⟩"
+"label": "A zip for bug reports, with personal details removed"
 },
 {
 "text": "Collecting logs…",
-"label": "⟨T-272 gathering heading⟩"
+"label": "Collecting logs…"
 },
 {
 "text": "Logs saved. Project names are still in them: have a look before posting them publicly.",
-"label": "⟨T-273 logs done, privacy caution⟩"
+"label": "Logs saved. Project names are still in them: have a look before posting them publicly."
 },
 {
 "text": "Logs saved to Downloads",
-"label": "⟨T-274 records ready note⟩"
+"label": "Logs saved to Downloads"
 },
 {
 "text": "_Uninstall Torquio…",
-"label": "⟨T-275 removal button⟩"
+"label": "_Uninstall Torquio…"
 },
 {
 "text": "Uninstall Torquio",
-"label": "⟨T-276 removal title⟩"
+"label": "Uninstall Torquio"
 },
 {
 "text": "This deletes Torquio's container, its Wine prefix (with Dorico, its settings and anything else installed in it), launchers, file types and icons. Your own files and projects outside the prefix stay.",
@@ -1133,7 +1133,7 @@
 },
 {
 "text": "Checking…",
-"label": "⟨T-278 looking heading⟩"
+"label": "Checking…"
 },
 {
 "text": "Before You Go",
@@ -1141,43 +1141,43 @@
 },
 {
 "text": "Checks",
-"label": "⟨T-280 look-up failed row⟩"
+"label": "Checks"
 },
 {
 "text": "Licenses",
-"label": "⟨T-281 licences row⟩"
+"label": "Licenses"
 },
 {
 "text": "Still activated: {}. Deactivate them first (Steinberg's in the Activation Manager, Cantai in Cantai), or they can't be deactivated from this computer.",
-"label": "⟨T-282 active licences warning⟩"
+"label": "Still activated: {}. Deactivate them first (Steinberg's in the Activation Manager, Cantai in Cantai), or they can't be deactivated from this computer."
 },
 {
 "text": "Couldn't tell whether Steinberg's licenses are deactivated. Check in the Activation Manager that every product is deactivated.",
-"label": "⟨T-283 licences unknown warning⟩"
+"label": "Couldn't tell whether Steinberg's licenses are deactivated. Check in the Activation Manager that every product is deactivated."
 },
 {
 "text": "None activated",
-"label": "⟨T-284 no active licences⟩"
+"label": "None activated"
 },
 {
 "text": "Projects in the Prefix",
-"label": "⟨T-285 files inside row⟩"
+"label": "Projects in the Prefix"
 },
 {
 "text": "Deleted with it: {}",
-"label": "⟨T-286 projects that will go⟩"
+"label": "Deleted with it: {}"
 },
 {
 "text": "None found",
-"label": "⟨T-287 nothing there status⟩"
+"label": "None found"
 },
 {
 "text": "Restore My Desktop's Scaling Setting",
-"label": "⟨T-288 put desktop back switch⟩"
+"label": "Restore My Desktop's Scaling Setting"
 },
 {
 "text": "Back to {}",
-"label": "⟨T-289 old value⟩"
+"label": "Back to {}"
 },
 {
 "text": "I understand those licenses can't be deactivated afterwards",
@@ -1189,7 +1189,7 @@
 },
 {
 "text": "Steinberg's products and any plug-ins such as Cantai",
-"label": "⟨T-292 which licences⟩"
+"label": "Steinberg's products and any plug-ins such as Cantai"
 },
 {
 "text": "I've saved the projects I want to keep elsewhere",
@@ -1201,19 +1201,19 @@
 },
 {
 "text": "Type “{}” to confirm",
-"label": "⟨T-295 enter the word⟩"
+"label": "Type “{}” to confirm"
 },
 {
 "text": "uninstall",
-"label": "⟨T-296 the word⟩"
+"label": "uninstall"
 },
 {
 "text": "_Uninstall",
-"label": "⟨T-297 remove now button⟩"
+"label": "_Uninstall"
 },
 {
 "text": "Uninstalling…",
-"label": "⟨T-298 removal running heading⟩"
+"label": "Uninstalling…"
 },
 {
 "text": "Torquio has been removed",
@@ -1221,120 +1221,120 @@
 },
 {
 "text": "Copy Log",
-"label": "⟨T-300 clipboard button hover⟩"
+"label": "Copy Log"
 },
 {
 "text": "Log copied",
-"label": "⟨T-301 on clipboard note⟩"
+"label": "Log copied"
 },
 {
 "text": "{} didn't finish",
-"label": "⟨T-302 job failed note⟩"
+"label": "{} didn't finish"
 },
 {
 "text": "Update Torquio",
-"label": "⟨T-303 newer Torquio title⟩"
+"label": "Update Torquio"
 },
 {
 "text": "Checking what's new…",
-"label": "⟨T-304 looking for changes text⟩"
+"label": "Checking what's new…"
 },
 {
 "text": "Torquio is up to date.",
-"label": "⟨T-305 nothing new text⟩"
+"label": "Torquio is up to date."
 },
 {
 "text": "{} changes, including:",
-"label": "⟨T-306 list intro⟩"
+"label": "{} changes, including:"
 },
 {
 "text": "…and {} more",
-"label": "⟨T-307 rest of list line⟩"
+"label": "…and {} more"
 },
 {
 "text": "Couldn't reach GitHub.",
-"label": "⟨T-308 offline error⟩"
+"label": "Couldn't reach GitHub."
 },
 {
 "text": "_Later",
-"label": "⟨T-309 not now button⟩"
+"label": "_Later"
 },
 {
 "text": "_Update",
-"label": "⟨T-310 go button⟩"
+"label": "_Update"
 },
 {
 "text": "Updating Torquio…",
-"label": "⟨T-311 installing newer heading⟩"
+"label": "Updating Torquio…"
 },
 {
 "text": "Torquio is up to date",
-"label": "⟨T-312 update done heading⟩"
+"label": "Torquio is up to date"
 },
 {
 "text": "Preferences",
-"label": "⟨T-313 settings title⟩"
+"label": "Preferences"
 },
 {
 "text": "General",
-"label": "⟨T-314 main section name⟩"
+"label": "General"
 },
 {
 "text": "Updates",
-"label": "⟨T-315 newer versions heading⟩"
+"label": "Updates"
 },
 {
 "text": "Check for Updates",
-"label": "⟨T-316 look online switch⟩"
+"label": "Check for Updates"
 },
 {
 "text": "Looks on GitHub at most once a day and shows a banner when there's a new version",
-"label": "⟨T-317 how update checks work⟩"
+"label": "Looks on GitHub at most once a day and shows a banner when there's a new version"
 },
 {
 "text": "Saved",
-"label": "⟨T-318 stored note⟩"
+"label": "Saved"
 },
 {
 "text": "Torquio on This Computer",
-"label": "⟨T-319 installed Torquio heading⟩"
+"label": "Torquio on This Computer"
 },
 {
 "text": "Version",
-"label": "⟨T-320 release fact⟩"
+"label": "Version"
 },
 {
 "text": "Branch",
-"label": "⟨T-321 development line fact⟩"
+"label": "Branch"
 },
 {
 "text": "Folder",
-"label": "⟨T-322 location fact⟩"
+"label": "Folder"
 },
 {
 "text": "Start Dorico",
 "context": "shortcut window",
-"label": "⟨T-323 launch Dorico shortcut⟩"
+"label": "Start Dorico"
 },
 {
 "text": "Refresh",
 "context": "shortcut window",
-"label": "⟨T-324 reload shortcut⟩"
+"label": "Refresh"
 },
 {
 "text": "Preferences",
 "context": "shortcut window",
-"label": "⟨T-325 settings shortcut⟩"
+"label": "Preferences"
 },
 {
 "text": "Show Shortcuts",
 "context": "shortcut window",
-"label": "⟨T-326 this list shortcut⟩"
+"label": "Show Shortcuts"
 },
 {
 "text": "Quit",
 "context": "shortcut window",
-"label": "⟨T-327 close app shortcut⟩"
+"label": "Quit"
 },
 {
 "text": "Steinberg's Dorico on Linux, set up for you",
@@ -1342,11 +1342,11 @@
 },
 {
 "text": "Built On",
-"label": "⟨T-329 made from heading⟩"
+"label": "Built On"
 },
 {
 "text": "With Thanks To",
-"label": "⟨T-330 inspired by heading⟩"
+"label": "With Thanks To"
 },
 {
 "text": "The first release of Torquio's app: everything the torquio menu does, in a window.",
@@ -1354,19 +1354,19 @@
 },
 {
 "text": "A setup assistant that checks what's needed, finds your installers and installs Torquio",
-"label": "⟨T-332 highlight: guided setup⟩"
+"label": "A setup assistant that checks what's needed, finds your installers and installs Torquio"
 },
 {
 "text": "Dorico, the Activation Manager and the Download Assistant one click away",
-"label": "⟨T-333 highlight: one-click start⟩"
+"label": "Dorico, the Activation Manager and the Download Assistant one click away"
 },
 {
 "text": "Display scaling, folders, key commands and the GPU for AI plug-ins",
-"label": "⟨T-334 highlight: settings pages⟩"
+"label": "Display scaling, folders, key commands and the GPU for AI plug-ins"
 },
 {
 "text": "Wine's tools, repairs, engine updates, logs for bug reports, and uninstalling",
-"label": "⟨T-335 highlight: maintenance page⟩"
+"label": "Wine's tools, repairs, engine updates, logs for bug reports, and uninstalling"
 },
 {
 "text": "Run Dorico on Linux",
@@ -1374,7 +1374,7 @@
 },
 {
 "text": "Dorico;Steinberg;Wine;Notation;Score;",
-"label": "⟨T-337 search words⟩"
+"label": "Dorico;Steinberg;Wine;Notation;Score;"
 },
 {
 "text": "Display scaling for Dorico, automatic or by hand",
@@ -1398,95 +1398,95 @@
 },
 {
 "text": "Torquio is an independent project, not affiliated with or endorsed by Steinberg Media Technologies GmbH. Dorico is a trademark of Steinberg.",
-"label": "⟨T-343 independence and trademark note⟩"
+"label": "Torquio is an independent project, not affiliated with or endorsed by Steinberg Media Technologies GmbH. Dorico is a trademark of Steinberg."
 },
 {
 "text": "Setting up the container",
-"label": "⟨T-344 install step: environment⟩"
+"label": "Setting up the container"
 },
 {
 "text": "Getting the Wine engine",
-"label": "⟨T-345 install step: engine⟩"
+"label": "Getting the Wine engine"
 },
 {
 "text": "Preparing Windows: fonts, .NET and runtimes (the longest step)",
-"label": "⟨T-346 install step: Windows parts⟩"
+"label": "Preparing Windows: fonts, .NET and runtimes (the longest step)"
 },
 {
 "text": "Installing Steinberg's components and your plug-ins",
-"label": "⟨T-347 install step: Steinberg parts⟩"
+"label": "Installing Steinberg's components and your plug-ins"
 },
 {
 "text": "Adding Dorico to your desktop",
-"label": "⟨T-348 install step: app menu⟩"
+"label": "Adding Dorico to your desktop"
 },
 {
 "text": "Mapping your folder",
-"label": "⟨T-349 install step: music place⟩"
+"label": "Mapping your folder"
 },
 {
 "text": "Downloading the update",
-"label": "⟨T-350 self-refresh step: fetch⟩"
+"label": "Downloading the update"
 },
 {
 "text": "Refreshing launchers and settings",
-"label": "⟨T-351 self-refresh step: in line⟩"
+"label": "Refreshing launchers and settings"
 },
 {
 "text": "Icons and menu entries",
-"label": "⟨T-352 repair step: app grid⟩"
+"label": "Icons and menu entries"
 },
 {
 "text": "Wine prefix settings",
-"label": "⟨T-353 repair step: Windows side⟩"
+"label": "Wine prefix settings"
 },
 {
 "text": "Launchers",
-"label": "⟨T-354 repair step: start-up files⟩"
+"label": "Launchers"
 },
 {
 "text": "Downloading the Wine engine",
-"label": "⟨T-355 engine step: download⟩"
+"label": "Downloading the Wine engine"
 },
 {
 "text": "Replacing the container",
-"label": "⟨T-356 engine step: swap⟩"
+"label": "Replacing the container"
 },
 {
 "text": "Compiling the Wine engine (20-40 minutes)",
-"label": "⟨T-357 build step: compile, duration⟩"
+"label": "Compiling the Wine engine (20-40 minutes)"
 },
 {
 "text": "Compiling the Wine engine",
-"label": "⟨T-358 build step: compile⟩"
+"label": "Compiling the Wine engine"
 },
 {
 "text": "Re-creating the container with NVIDIA access",
-"label": "⟨T-359 GPU step: new environment⟩"
+"label": "Re-creating the container with NVIDIA access"
 },
 {
 "text": "Setting up GPU access",
-"label": "⟨T-360 GPU step: set up⟩"
+"label": "Setting up GPU access"
 },
 {
 "text": "Restoring your desktop's scaling setting",
-"label": "⟨T-361 uninstall step: desktop value⟩"
+"label": "Restoring your desktop's scaling setting"
 },
 {
 "text": "Removing the container",
-"label": "⟨T-362 uninstall step: environment⟩"
+"label": "Removing the container"
 },
 {
 "text": "Removing Torquio's data",
-"label": "⟨T-363 uninstall step: Windows side⟩"
+"label": "Removing Torquio's data"
 },
 {
 "text": "Removing launchers and file types",
-"label": "⟨T-364 uninstall step: menu entries⟩"
+"label": "Removing launchers and file types"
 },
 {
 "text": "Torquio Graphics Change",
-"label": "⟨T-365 scaling changed title⟩"
+"label": "Torquio Graphics Change"
 },
 {
 "text": "Torquio detected a display scaling change. To apply this change, the active WINE session needs to be restarted.",
@@ -1502,7 +1502,7 @@
 },
 {
 "text": "Torquio Graphics Management",
-"label": "⟨T-369 desktop setting change title⟩"
+"label": "Torquio Graphics Management"
 },
 {
 "text": "You've configured Torquio to automatically handle graphics/scaling changes. Torquio is about to adjust your global XWayland scaling policy for optimal Dorico performance.",
@@ -1510,11 +1510,11 @@
 },
 {
 "text": "Reminder: This is a persistent system setting change and may affect the scaling of other running XWayland applications. Your current settings will be backed up first so they can be easily restored later.",
-"label": "⟨T-371 lasting, affects others, undoable⟩"
+"label": "Reminder: This is a persistent system setting change and may affect the scaling of other running XWayland applications. Your current settings will be backed up first so they can be easily restored later."
 },
 {
 "text": "Proceed with applying this change?",
-"label": "⟨T-372 go ahead? question⟩"
+"label": "Proceed with applying this change?"
 },
 {
 "text": "Torquio adjusted your desktop's XWayland scaling setting for Dorico, as you set it to manage scaling. Your previous setting is backed up; Configure Graphics & Scaling can restore it.",
@@ -1522,27 +1522,27 @@
 },
 {
 "text": "Torquio Launch Error",
-"label": "⟨T-374 launcher problem title⟩"
+"label": "Torquio Launch Error"
 },
 {
 "text": "Dorico could not be located in your Wine prefix.",
-"label": "⟨T-375 Dorico not installed⟩"
+"label": "Dorico could not be located in your Wine prefix."
 },
 {
 "text": "Please open the Steinberg Download Assistant (SDA) to download and install Dorico.",
-"label": "⟨T-376 how to get Dorico⟩"
+"label": "Please open the Steinberg Download Assistant (SDA) to download and install Dorico."
 },
 {
 "text": "Steinberg Activation Manager could not be located in your Wine prefix.",
-"label": "⟨T-377 licence tool not installed⟩"
+"label": "Steinberg Activation Manager could not be located in your Wine prefix."
 },
 {
 "text": "Please open the Steinberg Download Assistant (SDA) to install it.",
-"label": "⟨T-378 how to get licence tool⟩"
+"label": "Please open the Steinberg Download Assistant (SDA) to install it."
 },
 {
 "text": "Torquio Time Sync Warning",
-"label": "⟨T-379 clock wrong title⟩"
+"label": "Torquio Time Sync Warning"
 },
 {
 "text": "WARNING: Your system clock is out of sync!",
@@ -1554,6 +1554,6 @@
 },
 {
 "text": "Please synchronize your system clock to prevent licensing issues.",
-"label": "⟨T-382 what to do⟩"
+"label": "Please synchronize your system clock to prevent licensing issues."
 }
 ]
