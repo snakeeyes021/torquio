@@ -122,10 +122,11 @@ def call(function):
 
 def system_info():
     lines = [f"Exported: {datetime.datetime.now().astimezone():%Y-%m-%d %H:%M:%S %z}", ""]
-    git = ["git", "-C", REPO]
+    from . import appinfo
+    branch = appinfo.branch()
     lines += ["== Torquio",
-              f"Version: {run(git + ['describe', '--always', '--dirty', '--tags'])} "
-              f"(branch {run(git + ['rev-parse', '--abbrev-ref', 'HEAD'])})", ""]
+              f"Version: {appinfo.version() or 'unknown'}" + (f" (branch {branch})" if branch else " (the app's copy)"),
+              ""]
     os_name = "unknown"
     try:
         os_name = re.search(r'^PRETTY_NAME="?(.*?)"?$', open("/etc/os-release").read(), re.M).group(1)

@@ -53,6 +53,8 @@ def log_dir():
 
 
 def installers_dir():
+    """Where Torquio keeps the installers it was given: the checkout's installers/ folder. The app's copy keeps
+    them in its installers/ folder too, which the app carries over each time it replaces that copy."""
     return os.path.join(repo_dir(), "installers")
 
 

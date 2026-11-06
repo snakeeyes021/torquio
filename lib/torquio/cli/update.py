@@ -22,6 +22,11 @@ def update_torquio(menu=False):
     strict = not menu
     echo(f"{BLUE}=== Update Torquio ==={RESET}")
     echo()
+    from .. import appinfo
+    if appinfo.is_app_copy():
+        echo(f"{YELLOW}This copy of Torquio comes with the Torquio app, which keeps it up to date.{RESET}")
+        print("Update the app (in GNOME Software, or with 'flatpak update') to update Torquio.")
+        return 0
     if not run.succeeds(_git("rev-parse", "--is-inside-work-tree")):
         echo(f"{RED}This copy of Torquio can't update itself (it wasn't installed with 'git clone').{RESET}")
         print("Download the latest version from https://github.com/snakeeyes021/torquio instead.")
@@ -88,6 +93,23 @@ def post_update(old_head):
     return 0
 
 
+def refresh_after_app_update():
+    """After the app places a new copy of itself on the host (and on its first run over an install made from a
+    git checkout): what --post-update does, from that copy, without asking anything. A newer Wine engine isn't
+    downloaded here (it's large); the app offers it."""
+    if container.exists() and os.path.isfile(os.path.join(paths.prefix_dir(), ".torquio_core_installed")):
+        refresh_launchers(pause=False)
+        run.check(engine_cli.setup_gpu_access(quiet=True), True)
+        prefix.apply_settings()
+        run.check(engine_cli.fix_machine_identity(quiet=True), True)
+        from ..launch.common import apps_running
+        if not apps_running():
+            mediabay.install_failed_update()
+    else:
+        print("Torquio isn't installed yet, so there's nothing else to refresh.")
+    return 0
+
+
 def refresh_launchers(pause=True):
     """Fix Icons & Refresh Launchers: icons and desktop files, prefix registry settings, and the launchers in
     ~/.local/bin."""
@@ -126,6 +148,13 @@ def install_launchers():
             text = f.read().replace("@TORQUIO_REPO_DIR@", repo)
         with open(os.path.join(bindir, name), "w") as f:
             f.write(text)
+    # The `torquio` command: this copy's (after the app places its copy, the terminal runs that one too)
+    link = os.path.join(bindir, "torquio")
+    target = os.path.join(repo, "torquio")
+    if os.path.realpath(link) != os.path.realpath(target):
+        if os.path.islink(link) or os.path.exists(link):
+            os.remove(link)
+        os.symlink(target, link)
     # Older versions copied the monitor query here too; the launchers now use the Torquio folder's own
     try:
         os.remove(os.path.join(bindir, "torquio_graphics.py"))

@@ -12,14 +12,23 @@ def prebuilt_image():
     has to be compiled locally: not a git checkout, local changes to those files, or build_from_source set."""
     if config.get_text("build_from_source", "false") == "true":
         return ""
+    tree = build_tree()
+    return f"{paths.image_repo()}:build-{tree[:12]}" if tree else ""
+
+
+def build_tree():
+    """The git tree ID of this copy's Wine build files (scripts/1-build), which names their prebuilt image; ""
+    when a checkout has local changes to them. Without git (the copy inside the app, and the one it places on
+    the host) the same ID is computed from the files."""
     repo = paths.repo_dir()
-    code, changes = run.capture(["git", "-C", repo, "status", "--porcelain", "--", "scripts/1-build"])
-    if changes:
-        return ""
-    code, tree = run.capture(["git", "-C", repo, "rev-parse", "HEAD:scripts/1-build"])
-    if code != 0:
-        return ""
-    return f"{paths.image_repo()}:build-{tree.strip()[:12]}"
+    if os.path.isdir(os.path.join(repo, ".git")) or os.path.isfile(os.path.join(repo, ".git")):
+        code, changes = run.capture(["git", "-C", repo, "status", "--porcelain", "--", "scripts/1-build"])
+        if changes:
+            return ""
+        code, tree = run.capture(["git", "-C", repo, "rev-parse", "HEAD:scripts/1-build"])
+        return tree.strip() if code == 0 else ""
+    from . import treehash
+    return treehash.tree_id(os.path.join(repo, "scripts", "1-build"))
 
 
 def is_prebuilt(image):

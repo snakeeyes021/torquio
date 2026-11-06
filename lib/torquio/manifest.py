@@ -237,7 +237,8 @@ def manifest():
     if image:
         prebuilt = image.startswith(paths.image_repo()) and ":" in image
         lines.append(f"*   **Container Image:** `{image}`" if prebuilt else "*   **Container Image:** compiled locally")
-        tree = subprocess.run(["git", "-C", REPO, "rev-parse", "HEAD:scripts/1-build"], capture_output=True, text=True).stdout.strip()
+        from . import engine
+        tree = engine.build_tree()
         if prebuilt and tree and not image.endswith(f":build-{tree[:12]}"):
             warnings.append(f"The container runs {image}, not the engine built from this copy's Wine build files (build-{tree[:12]}). "
                             "Update it (Wine Tools > Update / Rebuild Wine Engine) before a release.")

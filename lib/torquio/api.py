@@ -78,10 +78,9 @@ def result(**values):
 # ---- data ------------------------------------------------------------------------------------------------------
 
 def version():
-    code, describe = run.capture(["git", "-C", paths.repo_dir(), "describe", "--tags", "--always", "--dirty"])
-    branch = run.capture(["git", "-C", paths.repo_dir(), "rev-parse", "--abbrev-ref", "HEAD"])[1].strip()
-    return {"api": API_VERSION, "torquio": describe.strip() if code == 0 else "", "branch": branch,
-            "repo": paths.repo_dir()}
+    from . import appinfo
+    return {"api": API_VERSION, "torquio": appinfo.version(), "branch": appinfo.branch(),
+            "repo": paths.repo_dir(), "app_copy": appinfo.is_app_copy()}
 
 
 def _char_device(path):
@@ -106,6 +105,9 @@ def _engine(image):
 
 
 def _pending_updates():
+    from . import appinfo
+    if appinfo.is_app_copy():
+        return 0  # the app's copy is updated with the app
     code, out = run.capture(["git", "-C", paths.repo_dir(), "rev-list", "--count", "HEAD..@{u}"])
     return int(out.strip()) if code == 0 and out.strip().isdigit() else 0
 
@@ -420,6 +422,14 @@ def task_update():
     return run.interactive([os.path.join(repo, "torquio"), "--post-update", old_head], stdin=run.DEVNULL)
 
 
+def task_app_refresh():
+    """After the app has placed a new copy of Torquio on the host: launchers, icons, the `torquio` command and the
+    prefix's settings, from that copy (what Update Torquio's refresh does), without questions."""
+    from .cli import update
+    phase("Updating Torquio's files on this computer")
+    return update.refresh_after_app_update()
+
+
 def task_fix_icons():
     """Fix Icons & Refresh Launchers, step by step (what refresh_launchers does)."""
     from . import uninstall
@@ -552,6 +562,7 @@ def task_uninstall(restore="true"):
 
 
 TASKS = {"install": task_install, "update": task_update, "fix-icons": task_fix_icons,
+         "app-refresh": task_app_refresh,
          "engine-update": task_engine_update, "engine-rebuild": task_engine_rebuild, "setup-gpu": task_setup_gpu,
          "ntsync": task_ntsync, "logs": task_logs, "wine": task_wine, "uninstall": task_uninstall}
 
