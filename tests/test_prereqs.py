@@ -13,6 +13,7 @@ OS = {
     "debian": 'ID=debian\n',
     "tumbleweed": 'ID="opensuse-tumbleweed"\nID_LIKE="opensuse suse"\n',
     "aeon": 'ID="opensuse-aeon"\nID_LIKE="opensuse suse"\n',
+    "microos": 'ID="opensuse-microos"\nID_LIKE="opensuse suse"\n',
     "arch": 'ID=arch\n',
     "manjaro": 'ID=manjaro\nID_LIKE=arch\n',
     "endeavour": 'ID=endeavouros\nID_LIKE=arch\n',
@@ -31,7 +32,7 @@ def fam(name, **kw):
 class Families(unittest.TestCase):
     def test_families(self):
         expected = {"fedora": "dnf", "rocky": "dnf", "ubuntu": "apt", "mint": "apt", "pop": "apt",
-                    "debian": "apt", "tumbleweed": "zypper", "aeon": "image-suse", "arch": "pacman",
+                    "debian": "apt", "tumbleweed": "zypper", "aeon": "builtin", "microos": "image-suse", "arch": "pacman",
                     "manjaro": "pacman", "endeavour": "pacman", "steamos": "builtin", "vanilla": "builtin",
                     "nixos": "nix", "void": "unknown"}
         for name, family in expected.items():
@@ -40,8 +41,20 @@ class Families(unittest.TestCase):
 
     def test_image_based_fedora(self):
         self.assertEqual(fam("silverblue", ostree=True), "image-fedora")
-        self.assertEqual(fam("bazzite", ostree=True), "image-fedora")
+        self.assertEqual(fam("bazzite", ostree=True), "builtin")  # Universal Blue: both included (README)
+        self.assertEqual(fam("silverblue", ostree=True, ublue=True), "builtin")  # a downstream uBlue image
         self.assertEqual(fam("fedora", ostree=False), "dnf")
+
+
+class Readme(unittest.TestCase):
+    def test_the_readme_gives_the_same_commands(self):
+        import os
+        readme = open(os.path.join(os.path.dirname(__file__), "..", "README.md"), encoding="utf-8").read()
+        for family, keys in (("dnf", ["distrobox"]), ("apt", ["distrobox", "podman"]),
+                             ("pacman", ["distrobox", "podman"]), ("zypper", ["distrobox", "podman"])):
+            with self.subTest(family=family):
+                self.assertIn(prereqs.install_plan(family, keys)["shown"], readme)
+        self.assertIn(prereqs.DISTROBOX_USER_INSTALL, readme)
 
 
 class Plans(unittest.TestCase):
@@ -52,10 +65,12 @@ class Plans(unittest.TestCase):
 
     def test_commands(self):
         p = prereqs.install_plan("apt", ["distrobox", "podman"])
+        # Shown as the README gives them; run without questions
+        self.assertEqual(p["shown"], "sudo apt install distrobox podman")
         self.assertEqual(p["command"], "apt-get update && apt-get install -y distrobox podman")
-        self.assertEqual(p["shown"], "sudo apt update && sudo apt install -y distrobox podman")
-        p = prereqs.install_plan("pacman", ["distrobox"])
-        self.assertEqual(p["shown"], "sudo pacman -S --needed distrobox")
+        self.assertEqual(prereqs.install_plan("dnf", ["distrobox"])["shown"], "sudo dnf install distrobox")
+        p = prereqs.install_plan("pacman", ["distrobox", "podman"])
+        self.assertEqual(p["shown"], "sudo pacman -S distrobox podman")
         self.assertTrue(p["root"])
         self.assertEqual(prereqs.install_plan("apt", ["distrobox"])["alternative"], prereqs.DISTROBOX_USER_INSTALL)
 

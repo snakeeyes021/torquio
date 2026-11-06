@@ -156,6 +156,7 @@ echo "podman=$(have podman)"
 echo "docker=$(have docker)"
 echo "ostree=$([ -e /run/ostree-booted ] && echo 1 || echo 0)"
 echo "transactional=$([ -x /usr/sbin/transactional-update ] && [ ! -w /usr ] && echo 1 || echo 0)"
+echo "ublue=$([ -d /usr/share/ublue-os ] && echo 1 || echo 0)"
 echo "pkexec=$(have pkexec)"
 echo "---"
 cat /etc/os-release 2>/dev/null || cat /usr/lib/os-release 2>/dev/null
@@ -175,7 +176,7 @@ def facts():
     info = prereqs.parse_os_release(os_text)
     data["name"] = info.get("PRETTY_NAME") or info.get("NAME") or ""
     data["family"] = prereqs.family(info, ostree=data.get("ostree", False),
-                                    transactional=data.get("transactional", False))
+                                    transactional=data.get("transactional", False), ublue=data.get("ublue", False))
     data["missing"] = prereqs.missing(data.get("python", False), data.get("distrobox", False),
                                       data.get("podman", False), data.get("docker", False))
     return data

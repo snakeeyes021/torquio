@@ -160,8 +160,10 @@ class Setup(Adw.Bin):
                 add(self.missing_group, row)
         if plan["command"]:
             self.missing_group.set_description(
-                _("On {name}, Torquio would run this command{root}:").format(
-                    name=name, root=_(" as administrator (it asks for your password)") if plan["root"] else ""))
+                (_("On {name}, Torquio would run this command as administrator (it asks for your password), "
+                   "answering its questions with yes:") if plan["root"] else
+                 _("On {name}, Torquio would run this command, for your user only (no password needed):"))
+                .format(name=name))
             add(self.missing_group, self._command_row(plan["shown"]))
             buttons = Gtk.Box(spacing=12, halign=Gtk.Align.END, margin_top=6)
             buttons.append(self._button(_("_Copy Command"), lambda: self._copy(plan["shown"]), suggested=False))

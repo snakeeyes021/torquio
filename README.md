@@ -21,8 +21,12 @@ Before running the installer, ensure your host system has the following installe
 On traditional (non-immutable) distros, these generally aren't installed by default, so just install them from your distro's package manager. For example:
 
 * **Fedora Workstation / KDE Plasma Desktop** (Podman is already included): `sudo dnf install distrobox`
-* **Ubuntu / Debian**: `sudo apt install distrobox podman`
-* **Arch**: `sudo pacman -S distrobox podman`
+* **Ubuntu / Debian** (and Linux Mint, Pop!_OS): `sudo apt install distrobox podman`
+* **Arch** (and Manjaro, EndeavourOS): `sudo pacman -S distrobox podman`
+* **openSUSE Tumbleweed / Leap**: `sudo zypper install distrobox podman`
+* **NixOS**: add `virtualisation.podman.enable = true;` and `environment.systemPackages = with pkgs; [ distrobox ];` to your configuration, then rebuild
+
+The Torquio app checks these for you on its "What Torquio Needs" page: it shows what's missing and the command for your system, and runs it (asking for your password) or lets you copy it. On systems it doesn't recognise, it says what's needed instead of guessing.
 
 On many immutable distros, the above are included by default, so you're good to go. That includes:
 

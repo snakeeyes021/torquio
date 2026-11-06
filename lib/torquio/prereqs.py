@@ -1,5 +1,6 @@
 """What Torquio needs on the host (Python 3.9+, Distrobox, Podman or Docker) and how each kind of distribution
-installs it. Pure functions of /etc/os-release's text and a few facts, so the app can use them before Torquio
+installs it. README.md's "Requirements" section is the source of truth: the commands shown here are the README's,
+and the families it doesn't list follow the same idea; change both together. Pure functions of /etc/os-release's text and a few facts, so the app can use them before Torquio
 itself can run (it needs Python), and tests can cover every family.
 
 Families: dnf, apt, zypper, pacman (mutable: the package manager, as root); image-fedora (Fedora Atomic, Bazzite
@@ -12,11 +13,13 @@ import shlex
 # Package names per family (the same everywhere they're packaged)
 PACKAGES = {"python": "python3", "distrobox": "distrobox", "podman": "podman"}
 
-# Distrobox's documented install without root (into ~/.local, no package manager, no restart)
-DISTROBOX_URL = "https://raw.githubusercontent.com/89luca89/distrobox/main/install"
-# curl, or wget where there's no curl (Ubuntu's desktop has only wget)
-DISTROBOX_USER_INSTALL = f"{{ curl -fsSL {DISTROBOX_URL} || wget -qO- {DISTROBOX_URL}; }} | sh -s -- -P ~/.local/"
+# Distrobox's documented install without root (into ~/.local, no package manager, no restart), exactly as the
+# README gives it for the upstream Fedora Atomic family
+DISTROBOX_USER_INSTALL = "curl https://raw.githubusercontent.com/89luca89/distrobox/main/install | sh -s -- -P ~/.local/"
+# Image-based systems whose image may lack Distrobox: only the user-level install, never a change to the image
 IMAGE_FAMILIES = ("image-fedora", "image-suse")
+# Systems the README lists as including both (the Universal Blue images, SteamOS, openSUSE Aeon and Kalpa)
+UBLUE_IDS = ("bazzite", "bluefin", "aurora", "ucore", "secureblue")
 
 
 def parse_os_release(text):
@@ -35,18 +38,20 @@ def parse_os_release(text):
     return info
 
 
-def family(info, ostree=False, transactional=False):
+def family(info, ostree=False, transactional=False, ublue=False):
     """The distribution's family from os-release (ID, ID_LIKE, VARIANT_ID), whether it boots an ostree image
-    (/run/ostree-booted) and whether it's a transactional openSUSE (Aeon, MicroOS)."""
+    (/run/ostree-booted), whether it's a transactional openSUSE (Aeon, MicroOS) and whether it's a Universal Blue
+    image (/usr/share/ublue-os)."""
     ids = [info.get("ID", "").lower()] + info.get("ID_LIKE", "").lower().split()
     variant = info.get("VARIANT_ID", "").lower()
     if "nixos" in ids:
         return "nix"
-    if ids[0] in ("steamos", "vanilla", "vanillaos"):
+    if ids[0] in ("steamos", "vanilla", "vanillaos") or ids[0] in UBLUE_IDS or (ublue and ostree):
         return "builtin"
     if any(i.startswith("opensuse") or i == "suse" or i == "sles" for i in ids):
-        if transactional or ids[0] in ("opensuse-microos", "opensuse-aeon", "opensuse-kalpa") or \
-                variant in ("aeon", "kalpa", "microos"):
+        if ids[0] in ("opensuse-aeon", "opensuse-kalpa") or variant in ("aeon", "kalpa"):
+            return "builtin"
+        if transactional or ids[0] == "opensuse-microos" or variant == "microos":
             return "image-suse"
         return "zypper"
     if ostree and any(i in ("fedora", "rhel", "centos") for i in ids):
@@ -106,17 +111,17 @@ def install_plan(fam, keys):
         return plan
     plan["root"] = True
     if fam == "dnf":
+        plan["shown"] = f"sudo dnf install {names}"
         plan["command"] = f"dnf install -y {names}"
     elif fam == "apt":
+        plan["shown"] = f"sudo apt install {names}"
         plan["command"] = f"apt-get update && apt-get install -y {names}"
-        plan["shown"] = f"sudo apt update && sudo apt install -y {names}"
     elif fam == "zypper":
+        plan["shown"] = f"sudo zypper install {names}"
         plan["command"] = f"zypper --non-interactive install {names}"
     elif fam == "pacman":
-        plan["command"] = f"pacman -S --needed --noconfirm {names}"
-        plan["shown"] = f"sudo pacman -S --needed {names}"
-    if not plan["shown"]:
-        plan["shown"] = "sudo " + plan["command"].replace(" && ", " && sudo ")
+        plan["shown"] = f"sudo pacman -S {names}"
+        plan["command"] = f"pacman -S --noconfirm {names}"
     if "distrobox" in keys:
         plan["alternative"] = DISTROBOX_USER_INSTALL
     return plan
