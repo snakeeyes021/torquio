@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tarfile
 import threading
+from gettext import gettext as _
 
 from gi.repository import Gio, GLib
 
@@ -47,7 +48,7 @@ def run_full(cmd, timeout=60):
         p = subprocess.run(command(cmd), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                            stderr=subprocess.PIPE, text=True, errors="replace", timeout=timeout)
     except FileNotFoundError:
-        return 127, "", f"{command(cmd)[0]} isn't available"
+        return 127, "", _("{} isn't available").format(command(cmd)[0])
     except subprocess.TimeoutExpired:
         return 124, "", ""
     return p.returncode, p.stdout, p.stderr
@@ -70,9 +71,9 @@ def reach_host():
     missing): the one start-up failure left for a normal install."""
     code, _out, err = run_full(["true"], timeout=20)
     if code != 0:
-        raise HostError("This app can't run programs on this computer"
-                        + (f" ({err.strip().splitlines()[-1]})" if err.strip() else f" (exit code {code})")
-                        + ". It needs permission to talk to org.freedesktop.Flatpak.")
+        detail = err.strip().splitlines()[-1] if err.strip() else _("exit code {}").format(code)
+        raise HostError(_("This app can't run programs on this computer ({}). It needs permission to talk to "
+                          "org.freedesktop.Flatpak.").format(detail))
 
 
 def copy_dir():
@@ -120,7 +121,7 @@ def place_copy():
         return False
     stamp = bundled_stamp()
     if not stamp:
-        raise HostError("This build of the app doesn't contain Torquio (gui/bundle.py didn't run).")
+        raise HostError(_("This build of the app doesn't contain Torquio (gui/bundle.py didn't run)."))
     code, out = run(["cat", os.path.join(HOST_COPY, STAMP)], timeout=20)
     try:
         if code == 0 and json.loads(out) == stamp:
@@ -137,9 +138,9 @@ def place_copy():
         err = proc.stderr.read().decode("utf-8", "replace")
         code = proc.wait(timeout=300)
     except (OSError, subprocess.TimeoutExpired) as e:
-        raise HostError(f"Couldn't put Torquio's files on this computer ({e}).")
+        raise HostError(_("Couldn't put Torquio's files on this computer ({}).").format(e))
     if code != 0:
-        raise HostError("Couldn't put Torquio's files on this computer"
+        raise HostError(_("Couldn't put Torquio's files on this computer")
                         + (f":\n{_last_lines(err)}" if err.strip() else "."))
     return True
 
@@ -201,11 +202,13 @@ def api(verb, *args, timeout=120):
         data = None
     if not isinstance(data, dict):
         if code == 124:
-            raise HostError(f"Torquio took too long to answer ({verb}).")
+            raise HostError(_("Torquio took too long to answer ({}).").format(verb))
         detail = _last_lines(err) or _last_lines(out)
-        raise HostError(f"torquio api {verb} failed (exit code {code})" + (f":\n{detail}" if detail else "."))
+        raise HostError(_("torquio api {verb} failed (exit code {code})").format(verb=verb, code=code)
+                        + (f":\n{detail}" if detail else "."))
     if code != 0:
-        raise HostError(data.get("error", f"torquio api {verb} failed (exit code {code})"))
+        raise HostError(data.get("error") or
+                        _("torquio api {verb} failed (exit code {code})").format(verb=verb, code=code))
     return data
 
 

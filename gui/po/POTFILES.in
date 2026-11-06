@@ -3,6 +3,7 @@
 gui/data/tech.redfoxlabs.Torquio.desktop.in
 gui/data/tech.redfoxlabs.Torquio.gschema.xml
 gui/data/tech.redfoxlabs.Torquio.metainfo.xml.in
+gui/src/host.py
 gui/src/main.py
 gui/src/preferences.py
 gui/src/task.py
