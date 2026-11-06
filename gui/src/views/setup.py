@@ -165,7 +165,7 @@ class Setup(Adw.Bin):
             add(self.missing_group, self._command_row(plan["shown"]))
             buttons = Gtk.Box(spacing=12, halign=Gtk.Align.END, margin_top=6)
             buttons.append(self._button(_("_Copy Command"), lambda: self._copy(plan["shown"]), suggested=False))
-            install = self._button(_("_Install"), lambda: self._install(plan["command"], plan["root"]))
+            install = self._button(_("_Install"), lambda: self._install_missing(plan["command"], plan["root"]))
             if plan["root"] and not facts.get("pkexec"):
                 install.set_sensitive(False)
                 install.set_tooltip_text(_("This system can't ask for an administrator password here; run the "
@@ -181,7 +181,7 @@ class Setup(Adw.Bin):
             add(self.missing_group, self._command_row(plan["alternative"]))
             box = Gtk.Box(spacing=12, halign=Gtk.Align.END, margin_top=6)
             box.append(self._button(_("Copy"), lambda: self._copy(plan["alternative"]), suggested=False))
-            box.append(self._button(_("Install for Me Only"), lambda: self._install(plan["alternative"], False),
+            box.append(self._button(_("Install for Me Only"), lambda: self._install_missing(plan["alternative"], False),
                                     suggested=False))
             add(self.missing_group, box)
         note = installable["note"]
@@ -245,7 +245,7 @@ class Setup(Adw.Bin):
         Gdk.Display.get_default().get_clipboard().set(text)
         self.window.toast(_("Copied"))
 
-    def _install(self, command, root):
+    def _install_missing(self, command, root):
         """Run the shown command (as administrator through pkexec when it needs root), with its output live, then
         check again."""
         argv = (["pkexec", "sh", "-c", command + " 2>&1"] if root else ["sh", "-c", command + " 2>&1"])
