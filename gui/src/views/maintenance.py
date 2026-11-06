@@ -149,18 +149,18 @@ class UninstallDialog(Adw.Dialog):
         self.checks = Adw.PreferencesGroup(title=_("Checking…"))
         self.page.add(self.checks)
         self.confirm_group = Adw.PreferencesGroup(visible=False)
-        self.restore = Adw.SwitchRow(title=_("Restore My Desktop's Scaling Setting"), active=True, visible=False)
+        self.restore = Adw.SwitchRow(use_markup=False, title=_("Restore My Desktop's Scaling Setting"), active=True, visible=False)
         self.entry = Adw.EntryRow(title=_("Type “{}” to confirm").format(self.WORD))
         self.entry.connect("changed", lambda *_: self._update())
-        self.aware = Adw.SwitchRow(title=_("I understand those licenses can't be deactivated afterwards"),
+        self.aware = Adw.SwitchRow(use_markup=False, title=_("I understand those licenses can't be deactivated afterwards"),
                                    visible=False)
         self.aware.connect("notify::active", lambda *_: self._update())
         # As in the terminal, every uninstall asks about licenses and projects, whatever the checks found
-        self.deactivated = Adw.SwitchRow(title=_("I've deactivated every license in this installation"),
+        self.deactivated = Adw.SwitchRow(use_markup=False, title=_("I've deactivated every license in this installation"),
                                          subtitle=_("Steinberg's products and any plug-ins such as Cantai"),
                                          visible=False)
         self.deactivated.connect("notify::active", lambda *_: self._update())
-        self.saved = Adw.SwitchRow(title=_("I've saved the projects I want to keep elsewhere"), visible=False)
+        self.saved = Adw.SwitchRow(use_markup=False, title=_("I've saved the projects I want to keep elsewhere"), visible=False)
         self.saved.connect("notify::active", lambda *_: self._update())
         for row in (self.restore, self.aware, self.deactivated, self.saved, self.entry):
             self.confirm_group.add(row)

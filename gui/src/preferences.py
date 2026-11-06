@@ -12,7 +12,7 @@ class Preferences(Adw.PreferencesDialog):
         self.window = window
         page = Adw.PreferencesPage(title=_("General"), icon_name="preferences-system-symbolic")
         updates = Adw.PreferencesGroup(title=_("Updates"))
-        self.check = Adw.SwitchRow(title=_("Check for Updates"),
+        self.check = Adw.SwitchRow(use_markup=False, title=_("Check for Updates"),
                                    subtitle=_("Looks on GitHub at most once a day and shows a banner when there's a "
                                               "new version"),
                                    active=window.status.get("settings", {}).get("check_for_updates", True))

@@ -18,7 +18,7 @@ class Plugins(Page):
         self.widget.set_description(_("AI plug-ins such as Cantai run their models on a GPU when they can, which "
                                       "makes rendering much faster."))
         group = Adw.PreferencesGroup(title=_("GPU"))
-        self.gpu = Adw.ComboRow(title=_("Render On"), model=Gtk.StringList.new([]))
+        self.gpu = Adw.ComboRow(use_markup=False, title=_("Render On"), model=Gtk.StringList.new([]))
         self.gpu.connect("notify::selected", self._gpu_changed)
         group.add(self.gpu)
         self.nvidia = StatusRow(_("NVIDIA Access"), "video-display-symbolic")

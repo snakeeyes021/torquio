@@ -21,13 +21,14 @@ class Display(Page):
                                       "you move between a laptop screen and a monitor."))
 
         scaling = Adw.PreferencesGroup(title=_("Scaling"))
-        self.manage = Adw.SwitchRow(title=_("Manage Scaling Automatically"),
+        self.manage = Adw.SwitchRow(use_markup=False, title=_("Manage Scaling Automatically"),
                                     subtitle=_("Sets Wine's DPI and your desktop's XWayland setting for Dorico"))
         self.manage.connect("notify::active", self._manage_changed)
-        self.match = Adw.SwitchRow(title=_("Match the Screen's Physical DPI"),
+        self.match = Adw.SwitchRow(use_markup=False, title=_("Match the Screen's Physical DPI"),
                                    subtitle=_("Size Dorico by the monitor's real pixel density instead of its scale"))
         self.match.connect("notify::active", lambda *_: self._set_bool("match_physical_dpi", self.match))
         self.dpi = Adw.SpinRow.new_with_range(48, 480, 1)
+        self.dpi.set_use_markup(False)
         self.dpi.set_title(_("Wine DPI"))
         self.dpi.set_subtitle(_("96 is 100 %, 120 is 125 %, 144 is 150 %, 192 is 200 %"))
         self.dpi.get_adjustment().set_page_increment(24)
@@ -46,7 +47,7 @@ class Display(Page):
         self.widget.add(self.restore_group)
 
         text = Adw.PreferencesGroup(title=_("Text"))
-        self.font = Adw.ComboRow(title=_("Font Smoothing"), model=Gtk.StringList.new([f[1] for f in FONTS]))
+        self.font = Adw.ComboRow(use_markup=False, title=_("Font Smoothing"), model=Gtk.StringList.new([f[1] for f in FONTS]))
         self.font.connect("notify::selected", self._font_changed)
         text.add(self.font)
         self.widget.add(text)
