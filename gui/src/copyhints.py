@@ -22,7 +22,8 @@ def _load():
 
 
 def label(text, context=""):
-    """The hint label for a string of the copy list; unlisted strings are marked, so they stand out."""
+    """The hint label for a string of the copy list; unlisted strings (the list has only the strings with voice)
+    show their own text, and are logged."""
     if not ENABLED:
         return text
     _load()
@@ -31,7 +32,7 @@ def label(text, context=""):
         found = _labels.get(("", text))
     if found is None:
         print(f"copyhints: not in the copy list: {text!r}", file=sys.stderr, flush=True)
-        return f"⟨? {text}⟩"
+        return text
     return found
 
 

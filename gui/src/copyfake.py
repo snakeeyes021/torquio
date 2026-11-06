@@ -57,7 +57,25 @@ BASE = {
 
 DATA = copy.deepcopy(BASE)
 ERRORS = {}  # verb -> the error message Torquio answers with
+# What the computer has, per kind of system (host.facts()); KNOBS["facts"] picks one
+_HAVE = {"python": True, "distrobox": True, "podman": True, "docker": False, "ostree": False,
+         "transactional": False, "ublue": False, "pkexec": True, "os": ""}
+FACTS = {
+    "all": dict(_HAVE, name="Fedora Linux 44 (Workstation Edition)", family="dnf", missing=[]),
+    "apt": dict(_HAVE, distrobox=False, podman=False, name="Ubuntu 24.04.5 LTS", family="apt",
+                missing=["distrobox", "podman"]),
+    "image": dict(_HAVE, distrobox=False, podman=False, ostree=True, name="Fedora Linux 44 (Silverblue)",
+                  family="image-fedora", missing=["distrobox", "podman"]),
+    "builtin": dict(_HAVE, distrobox=False, podman=False, ostree=True, ublue=True, name="Bazzite",
+                    family="builtin", missing=["distrobox", "podman"]),
+    "nix": dict(_HAVE, distrobox=False, podman=False, name="NixOS 25.11", family="nix",
+                missing=["distrobox", "podman"]),
+    "unknown": dict(_HAVE, distrobox=False, podman=False, name="Void Linux", family="unknown",
+                    missing=["distrobox", "podman"]),
+}
+
 KNOBS = {
+    "facts": "all",        # a key of FACTS
     "host": "ok",          # ok | unreachable | missing (no Torquio) | tooold | slow | crash
     "git": True, "clone": True, "copy": True, "launcher": True,
     "update_old": 0,       # update_old_torquio's script exit code (2, 3, 4, 5 or another failure)
@@ -191,12 +209,6 @@ def run_full(cmd, timeout=60):
             KNOBS["host"] = KNOBS["after_clone"]
             return 0, "", ""
         return 128, "", "fatal: unable to access GitHub"
-    if cmd[:3] == ["sh", "-c", host.UPDATE_OLD]:
-        _wait("update_old")
-        code = KNOBS["update_old"]
-        if code == 0 and not KNOBS["still_old"]:
-            KNOBS["host"] = "ok"
-        return code, "", "error: the post-update step stopped here"
     if cmd[:2] == ["sh", "-c"]:
         _wait("copy")
         return (0, "", "") if KNOBS["copy"] else (1, "", "")
@@ -259,9 +271,7 @@ def install():
     host.host_path = lambda path: path
     # The app's copy of Torquio isn't placed, and the computer is "Fedora with everything"
     host.place_copy = lambda: False
-    host.facts = lambda: {"python": True, "distrobox": True, "podman": True, "docker": False, "ostree": False,
-                          "transactional": False, "ublue": False, "pkexec": True, "os": "",
-                          "name": "Fedora Linux 44 (Workstation Edition)", "family": "dnf", "missing": []}
+    host.facts = lambda: dict(FACTS[KNOBS.get("facts", "all")])
     host.Task.start = _start_task
     host.Task._finished = _finished
     preset(os.environ.get("TORQUIO_COPY_STATE", ""))

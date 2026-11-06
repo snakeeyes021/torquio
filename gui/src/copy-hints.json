@@ -1555,5 +1555,41 @@
 {
 "text": "Please synchronize your system clock to prevent licensing issues.",
 "label": "Please synchronize your system clock to prevent licensing issues."
+},
+{
+"text": "On {name}, Torquio would run this command as administrator (it asks for your password), answering its questions with yes:",
+"label": "⟨T-383 admin install command intro⟩"
+},
+{
+"text": "On {name}, Torquio would run this command, for your user only (no password needed):",
+"label": "⟨T-384 per-user install command intro⟩"
+},
+{
+"text": "{name} normally comes with Distrobox and Podman. If they're missing, update the system, then check again.",
+"label": "⟨T-385 system usually has them⟩"
+},
+{
+"text": "{name} is an image-based system, and Torquio never changes its system image. {items} is normally part of it: use your system's own way to get an image that includes it (an update, or a rebase to such an image), then check again.",
+"label": "⟨T-386 image-based system, won't change it⟩"
+},
+{
+"text": "On NixOS, add these lines to your configuration, rebuild, then check again:",
+"label": "⟨T-387 NixOS config lines intro⟩"
+},
+{
+"text": "Torquio needs Distrobox, which runs Torquio's Linux container, and Podman (or Docker), which Distrobox uses. Install them the way your system installs software, then check again.",
+"label": "⟨T-388 unknown system, what's needed⟩"
+},
+{
+"text": "I'm Removing the App Too",
+"label": "⟨T-389 also removing the app⟩"
+},
+{
+"text": "Torquio Has Been Removed",
+"label": "⟨T-390 everything removed heading⟩"
+},
+{
+"text": "You can remove this app now, in your software manager or with <tt>flatpak uninstall tech.redfoxlabs.Torquio</tt>.",
+"label": "⟨T-391 now remove the app⟩"
 }
 ]
