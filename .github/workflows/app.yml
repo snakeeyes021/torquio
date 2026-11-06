@@ -1,0 +1,43 @@
+# The Torquio app as a Flatpak bundle (torquio.flatpak), with Torquio itself inside it (docs/GUI.md, "One app").
+# Built on every push that changes the app or what it carries (kept as a workflow artifact for testing), and
+# attached to the GitHub release when a v* tag is pushed. The GNOME runtime it needs comes from Flathub when the
+# bundle is installed (`flatpak install torquio.flatpak`).
+name: App
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+    paths:
+      - 'gui/**'
+      - 'lib/**'
+      - 'scripts/**'
+      - 'desktop_stubs/**'
+      - 'torquio'
+      - 'meson.build'
+      - 'tech.redfoxlabs.Torquio.json'
+      - '.github/workflows/app.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the Flatpak bundle
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: torquio.flatpak
+          manifest-path: tech.redfoxlabs.Torquio.json
+          cache-key: flatpak-builder-${{ github.sha }}
+      - name: Attach it to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: torquio.flatpak
