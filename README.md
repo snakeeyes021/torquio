@@ -1,4 +1,7 @@
 # Torquio
+
+![Language](https://img.shields.io/badge/Language-Python%20%7C%20Bash-blue) ![Platform](https://img.shields.io/badge/Platform-Linux-blue) ![Target](https://img.shields.io/badge/Target-Steinberg%20Dorico-blue) ![License](https://img.shields.io/badge/License-GPL%203.0-blue)
+
 A unified installation framework for Dorico on Linux
 
 ## The Mission
