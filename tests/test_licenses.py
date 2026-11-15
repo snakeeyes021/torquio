@@ -61,6 +61,15 @@ class Licenses(unittest.TestCase):
         self.assertEqual(plugins, [("Cantai", "in Cantai itself")])
         self.assertEqual(licenses.format_plugins(plugins), "Cantai\tin Cantai itself")
 
+    def test_cantai_installed_without_known_settings_counts_as_active(self):
+        # Another Cantai version may keep its activation elsewhere; its activations are limited, so "can't tell"
+        # must not read as deactivated
+        self.write("drive_c/users/me/AppData/Local/Programs/Common/VST3/Cantai.vst3/Contents/x", "")
+        self.assertEqual(licenses.active_plugins(self.prefix),
+                         [("Cantai", "in Cantai itself (Torquio can't tell whether it's activated)")])
+        self.write(CANTAI, '<VALUE name="activationToken" val=""/>')
+        self.assertEqual(licenses.active_plugins(self.prefix), [])
+
 
 if __name__ == "__main__":
     unittest.main()

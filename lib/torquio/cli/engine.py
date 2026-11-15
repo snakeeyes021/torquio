@@ -213,6 +213,12 @@ def fix_machine_identity(quiet=False, strict=True):
         if not quiet:
             echo(f"{GREEN}This computer's identity is already stable; nothing to do.{RESET}")
         return 0
+    if quiet:
+        # After an update or a refresh: never changed here. Changing it can cost a plug-in activation (Cantai's are
+        # limited) if anything is still activated, so it's only done when asked for, with the checks below.
+        print("This computer's Windows identity can be made stable with 'torquio --fix-identity' (deactivate "
+              "Cantai and other plug-in licenses first). Nothing was changed.")
+        return 0
     echo(f"{BLUE}=== Computer Identity ==={RESET}")
     print("Windows programs identify this computer by an ID that Torquio's container made up when it was created.")
     print("Torquio now derives it from your computer instead, so it stays the same even if the container ever has")
@@ -229,8 +235,18 @@ def fix_machine_identity(quiet=False, strict=True):
         echo()
         print("Deactivate them, then run 'torquio --fix-identity'.")
         return 0
-    if not ui.yes(ui.ask("Have you deactivated every plug-in license tied to this computer, and should Torquio "
-                         "change the ID now? [y/N]: ", strict=False)):
+    from .. import plugins as plugin_runtimes
+    if plugin_runtimes.cantai_installed():
+        # Torquio can't always tell whether Cantai is activated (newer versions may keep it elsewhere), and its
+        # activations are limited: only a typed confirmation goes ahead
+        echo(f"{YELLOW}Cantai is installed. If it's still activated, changing the ID uses up one of its limited "
+             f"activations.{RESET}")
+        confirm = "cantai is deactivated"
+        if ui.ask(f"To go ahead, deactivate Cantai in Cantai itself, then type '{confirm}': ", strict=False).strip().lower() != confirm:
+            print("Nothing was changed. You can do this later with 'torquio --fix-identity'.")
+            return 0
+    elif not ui.yes(ui.ask("Have you deactivated every plug-in license tied to this computer, and should Torquio "
+                           "change the ID now? [y/N]: ", strict=False)):
         print("Nothing was changed. You can do this later with 'torquio --fix-identity'.")
         return 0
     print("Closing Wine (and Dorico, if it's open)...")

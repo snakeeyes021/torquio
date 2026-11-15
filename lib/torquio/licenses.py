@@ -58,12 +58,26 @@ def cantai_active(drive_c):
     return False
 
 
+def cantai_settings_found(drive_c):
+    return bool(glob.glob(os.path.join(drive_c, "users", "*", "AppData", "Roaming", "Cantai", "Cantai.settings")))
+
+
+def cantai_installed(drive_c):
+    return bool(glob.glob(os.path.join(drive_c, "users", "*", "AppData", "Local", "Programs", "Common", "VST3",
+                                       "Cantai.vst3")) or
+                glob.glob(os.path.join(drive_c, "Program Files", "Common Files", "VST3", "Cantai.vst3")))
+
+
 def active_plugins(prefix):
-    """[(name, where to deactivate it)] for each third-party plug-in with an activated license."""
+    """[(name, where to deactivate it)] for each third-party plug-in with an activated license. Cantai counts when
+    its settings hold an activation, and also when it's installed but its settings aren't where Torquio looks
+    (another version may keep them elsewhere): its activations are limited, so "can't tell" counts as active."""
     drive_c = os.path.join(prefix, "drive_c")
     active = []
     if cantai_active(drive_c):
         active.append(("Cantai", "in Cantai itself"))
+    elif cantai_installed(drive_c) and not cantai_settings_found(drive_c):
+        active.append(("Cantai", "in Cantai itself (Torquio can't tell whether it's activated)"))
     return active
 
 
