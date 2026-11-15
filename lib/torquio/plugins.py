@@ -59,6 +59,11 @@ def provision():
     (each part is independent; what failed is said, and the next run tries again)."""
     failed = 0
     for name in missing():
+        # WebView2's installer hands over to its updater through the Windows shell, which needs the desktop
+        # session (it fails from e.g. an SSH login); it's set up the next time Torquio runs on the desktop
+        if name == "webview2" and not (os.environ.get("WAYLAND_DISPLAY") or os.environ.get("DISPLAY")):
+            print("Cantai's editor needs the WebView2 runtime; Torquio sets it up the next time it runs on the desktop.")
+            continue
         print(WHAT[name])
         if run.interactive([os.path.join(paths.repo_dir(), SCRIPTS[name])]) != 0:
             print(f"Couldn't set up {name}; Torquio tries again next time.")

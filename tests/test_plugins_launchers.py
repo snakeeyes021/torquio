@@ -71,9 +71,17 @@ class Plugins(Base):
     def test_provision_runs_only_whats_missing(self):
         self.cantai()
         self.vkd3d()
-        with mock.patch.object(plugins.run, "interactive", return_value=0) as ran:
+        with mock.patch.dict(os.environ, {"WAYLAND_DISPLAY": "wayland-0"}), \
+                mock.patch.object(plugins.run, "interactive", return_value=0) as ran:
             self.assertEqual(plugins.provision(), 0)
         self.assertEqual([os.path.basename(c.args[0][0]) for c in ran.call_args_list], ["install_webview2.sh"])
+
+    def test_webview2_waits_for_the_desktop(self):
+        self.cantai()
+        with mock.patch.dict(os.environ, {}, clear=True), \
+                mock.patch.object(plugins.run, "interactive", return_value=0) as ran:
+            self.assertEqual(plugins.provision(), 0)
+        self.assertEqual([os.path.basename(c.args[0][0]) for c in ran.call_args_list], ["install_vkd3d_proton.sh"])
 
 
 class Launchers(Base):
