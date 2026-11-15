@@ -100,6 +100,23 @@ class Launchers(Base):
         touch(os.path.join(self.bindir, "torquio-sam"), text)
         self.assertEqual(update.stale_launchers(), [])
 
+    def test_rewriting_one_leaves_another_copys_and_the_command_alone(self):
+        other = os.path.join(self.home, "other-torquio")
+        touch(os.path.join(other, "torquio"))
+        update.install_launchers()
+        for name in ("torquio-sam", "torquio-sda-handler"):
+            path = os.path.join(self.bindir, name)
+            with open(path) as f:
+                text = f.read().replace(REPO, other)
+            touch(path, text)
+        os.remove(os.path.join(self.bindir, "torquio"))
+        os.symlink(os.path.join(other, "torquio"), os.path.join(self.bindir, "torquio"))
+        touch(os.path.join(self.bindir, "torquio-dorico"), "#!/bin/bash\n# July\n")
+        self.assertEqual(update.ensure_launchers(), ["torquio-dorico"])
+        with open(os.path.join(self.bindir, "torquio-sam")) as f:
+            self.assertIn(f'REPO = "{other}"', f.read())
+        self.assertEqual(os.readlink(os.path.join(self.bindir, "torquio")), os.path.join(other, "torquio"))
+
     def test_launchers_of_a_copy_that_is_gone_are_replaced(self):
         update.install_launchers()
         text = open(os.path.join(self.bindir, "torquio-sam")).read().replace(REPO, "/nowhere/torquio")

@@ -179,27 +179,26 @@ def ensure_launchers():
         return []
     stale = stale_launchers()
     if stale:
-        install_launchers()
+        install_launchers(stale, link=not os.path.exists(os.path.join(paths.home(), ".local/bin/torquio")))
     return stale
 
 
-def install_launchers():
-    """Copy the launchers to ~/.local/bin, with this copy's path filled in."""
+def install_launchers(names=LAUNCHERS, link=True):
+    """Copy the launchers (`names`, all by default) to ~/.local/bin, with this copy's path filled in, and (`link`)
+    point the `torquio` command at this copy."""
     repo = paths.repo_dir()
     bindir = os.path.join(paths.home(), ".local/bin")
     os.makedirs(bindir, exist_ok=True)
-    for name in LAUNCHERS:
-        with open(os.path.join(repo, "scripts/3-runtime_handlers", name)) as f:
-            text = f.read().replace("@TORQUIO_REPO_DIR@", repo)
+    for name in names:
         with open(os.path.join(bindir, name), "w") as f:
-            f.write(text)
+            f.write(_launcher_text(name, repo))
     # The `torquio` command: this copy's (after the app places its copy, the terminal runs that one too)
-    link = os.path.join(bindir, "torquio")
+    link_path = os.path.join(bindir, "torquio")
     target = os.path.join(repo, "torquio")
-    if os.path.realpath(link) != os.path.realpath(target):
-        if os.path.islink(link) or os.path.exists(link):
-            os.remove(link)
-        os.symlink(target, link)
+    if link and os.path.realpath(link_path) != os.path.realpath(target):
+        if os.path.islink(link_path) or os.path.exists(link_path):
+            os.remove(link_path)
+        os.symlink(target, link_path)
     # Older versions copied the monitor query here too; the launchers now use the Torquio folder's own
     try:
         os.remove(os.path.join(bindir, "torquio_graphics.py"))
