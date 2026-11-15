@@ -18,6 +18,14 @@ def main(kind, argv):
     log_kind, label = KINDS[kind]
     session_log.start(log_kind, label, argv[0])
     arg = argv[1] if len(argv) > 1 else ""
+    # The launchers rewrite themselves when they're older than this copy (never stopping the launch)
+    try:
+        from ..cli.update import ensure_launchers
+        stale = ensure_launchers()
+        if stale:
+            print(f"Refreshed the launchers ({', '.join(stale)}): they were older than this copy of Torquio.")
+    except Exception as e:  # noqa: BLE001
+        print(f"Couldn't check the launchers: {e}")
     try:
         if kind == "dorico":
             from . import dorico

@@ -30,7 +30,8 @@ BANNER = [
 INSTALLER_PATTERNS = {
     "sda": "Steinberg_Download_Assistant_*_Installer_win*.exe",
     "noteperformer": "NotePerformer-Installer-*.exe",
-    "cantai": "Cantai-Windows-*Installer-*.exe.zip",
+    # Cantai's zip, or the same download already unzipped (a folder named like it), or its setup program
+    "cantai": ("Cantai-Windows-*Installer-*.exe.zip", "Cantai-Windows-*Installer-*.exe/", "CantaiLocalRenderVST-*-Setup.exe"),
 }
 
 
@@ -56,15 +57,21 @@ def repo_script(script, *args):
 
 
 def find_installer(pattern, search_dirs):
-    """The newest file matching `pattern` directly in any of the folders (find ... | sort -V | tail -n 1)."""
+    """The newest file matching `pattern` (or any of several) directly in any of the folders (find ... | sort -V |
+    tail -n 1). A pattern ending in "/" matches folders instead (an unzipped download)."""
     import fnmatch
+    patterns = (pattern,) if isinstance(pattern, str) else pattern
     found = []
     for directory in search_dirs:
         try:
             entries = list(os.scandir(directory))
         except OSError:
             continue
-        found += [e.path for e in entries if e.is_file(follow_symlinks=False) and fnmatch.fnmatchcase(e.name, pattern)]
+        for p in patterns:
+            if p.endswith("/"):
+                found += [e.path for e in entries if e.is_dir(follow_symlinks=False) and fnmatch.fnmatchcase(e.name, p[:-1])]
+            else:
+                found += [e.path for e in entries if e.is_file(follow_symlinks=False) and fnmatch.fnmatchcase(e.name, p)]
     return versions.sort(found)[-1] if found else ""
 
 

@@ -1,6 +1,6 @@
 # MediaBay updates without errors: options
 
-**2026-11-07, Matt: Torquio no longer manages MediaBay; the Download Assistant installs and updates it.** Torquio doesn't
+**Since 2026-11-07, Torquio doesn't manage MediaBay; the Download Assistant installs and updates it.** Torquio doesn't
 install a MediaBay zip, look for one, report MediaBay's status, or install an update the Download Assistant
 didn't (option D, removed). What stays is the Wine-level plumbing that lets the Download Assistant's own
 MediaBay installs run: patch 0012 (the script's signature) and the PowerShell stand-in (B). Tested on a fresh

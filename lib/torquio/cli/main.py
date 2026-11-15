@@ -154,6 +154,11 @@ def main(argv):
     session_log.start("main", "Main", argv[0])
     environment()
     args = argv[1:]
+    # Launchers left over from an older version (e.g. Torquio's folder was updated with git pull) are rewritten
+    # first, so whatever runs next uses this copy's
+    from .update import ensure_launchers
+    if ensure_launchers():
+        print("Refreshed Torquio's launchers in ~/.local/bin (they were from an older version).")
     try:
         return run_command(args)
     except KeyboardInterrupt:

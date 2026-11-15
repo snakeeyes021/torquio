@@ -2,8 +2,9 @@
 Refresh Launchers."""
 import glob
 import os
+import re
 
-from .. import container, engine, paths, prefix, run, ui, uninstall
+from .. import container, engine, paths, plugins, prefix, run, ui, uninstall
 from ..ui import BLUE, GREEN, RED, RESET, YELLOW, echo
 from . import engine as engine_cli
 
@@ -44,6 +45,10 @@ def update_torquio(menu=False):
     count = int(out.strip() or 0)
     if count == 0:
         echo(f"{GREEN}Torquio is up to date.{RESET}")
+        # It may have been updated another way (git pull), so nothing else refreshed what depends on it
+        if ensure_launchers():
+            print("Refreshed the launchers (they were from an older version of Torquio).")
+        run.check(plugins.provision(), False)
         return 0
     changed = run.capture(_git("status", "--porcelain", "--untracked-files=no"), stderr=None)[1]
     ahead = run.capture(_git("rev-list", "--count", "@{u}..HEAD"), stderr=None)[1].strip()
@@ -79,6 +84,7 @@ def post_update(old_head):
         run.check(engine_cli.setup_gpu_access(quiet=True), True)
         prefix.apply_settings()
         run.check(engine_cli.fix_machine_identity(quiet=True), True)
+        run.check(plugins.provision(), False)
         # Also when the engine was already out of date (e.g. Torquio was updated with git pull, or an earlier
         # offer was declined), not only when this update changed it
         if any(line.startswith("scripts/1-build/") for line in changed.splitlines()) or engine.outdated():
@@ -99,6 +105,7 @@ def refresh_after_app_update():
         run.check(engine_cli.setup_gpu_access(quiet=True), True)
         prefix.apply_settings()
         run.check(engine_cli.fix_machine_identity(quiet=True), True)
+        run.check(plugins.provision(), False)
     else:
         print("Torquio isn't installed yet, so there's nothing else to refresh.")
     return 0
@@ -123,6 +130,7 @@ def refresh_launchers(pause=True):
                                f'cd "{repo}" && ./scripts/2-install/setup_prefix.sh']), True)
     print("Copying launcher wrapper scripts to ~/.local/bin/...")
     install_launchers()
+    run.check(plugins.provision(), False)
     echo(f"{GREEN}Launchers and icons successfully refreshed!{RESET}")
     echo()
     if pause:
@@ -130,6 +138,49 @@ def refresh_launchers(pause=True):
 
 
 LAUNCHERS = ("torquio-dorico", "torquio-sam", "torquio-sda-handler")
+LAUNCHER_REPO = re.compile(r'^REPO = "(.*)"$', re.M)
+
+
+def _launcher_text(name, repo):
+    with open(os.path.join(repo, "scripts/3-runtime_handlers", name)) as f:
+        return f.read().replace("@TORQUIO_REPO_DIR@", repo)
+
+
+def stale_launchers():
+    """The launchers in ~/.local/bin that this copy should rewrite: ones that point at this copy but differ from
+    what it writes now, older launchers that don't say which copy they belong to (the Bash ones before v0.6.0),
+    ones pointing at a copy that no longer exists, and missing ones. Launchers of another existing copy (e.g. the
+    app's while a developer checkout runs) are left to that copy."""
+    repo = paths.repo_dir()
+    bindir = os.path.join(paths.home(), ".local/bin")
+    stale = []
+    for name in LAUNCHERS:
+        try:
+            with open(os.path.join(bindir, name), encoding="utf-8", errors="replace") as f:
+                current = f.read()
+        except OSError:
+            stale.append(name)
+            continue
+        m = LAUNCHER_REPO.search(current)
+        owner = m.group(1) if m else ""
+        if owner and os.path.realpath(owner) != os.path.realpath(repo) and \
+                os.path.isfile(os.path.join(owner, "torquio")):
+            continue
+        if current != _launcher_text(name, repo):
+            stale.append(name)
+    return stale
+
+
+def ensure_launchers():
+    """Rewrite the launchers when they're stale (e.g. Torquio's folder was updated with git pull, so "Update
+    Torquio" had nothing to do and never refreshed them). Only once Torquio is installed. Returns the names
+    rewritten."""
+    if not os.path.isfile(os.path.join(paths.prefix_dir(), ".torquio_core_installed")):
+        return []
+    stale = stale_launchers()
+    if stale:
+        install_launchers()
+    return stale
 
 
 def install_launchers():

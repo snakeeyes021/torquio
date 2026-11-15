@@ -155,6 +155,10 @@ def status():
         "updates_pending": _pending_updates() if config.get_text("check_for_updates", "true") == "true" else 0,
     }
     data["installed"] = exists and data["prefix"]["core_installed"]
+    # Launchers this copy should rewrite (older ones, e.g. after Torquio's folder was updated with git pull);
+    # the app then runs app-refresh
+    from .cli.update import stale_launchers
+    data["launchers_stale"] = stale_launchers() if data["installed"] else []
     return data
 
 
@@ -450,6 +454,10 @@ def task_fix_icons():
         return 1
     phase("Launchers")
     install_launchers()
+    from . import plugins
+    if plugins.missing():
+        phase("What installed plug-ins need")
+        plugins.provision()
     return 0
 
 
@@ -525,6 +533,9 @@ def task_wine(name, *args):
                    else shlex.quote(windows))
         # A program's own exit code isn't Torquio's to judge (installers return 3010 and the like)
         prefix.enter_visibly(prefix.env_script(freetype) + f"wine {program}")
+        # If it was a plug-in's installer (e.g. Cantai's), what the plug-in needs is set up now
+        from . import plugins
+        plugins.provision()
         return 0
     if name in WINE_PROGRAMS:
         return prefix.enter_visibly(prefix.env_script(freetype) + WINE_PROGRAMS[name])

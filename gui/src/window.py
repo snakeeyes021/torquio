@@ -114,7 +114,11 @@ class TorquioWindow(Adw.ApplicationWindow):
             self._message(_("Couldn't Reach Torquio"), GLib.markup_escape_text(str(err)))
             return
         self.facts, self.version, self.status = result["facts"], result["version"], result["status"] or {}
-        if result["placed"] and self.status.get("installed"):
+        # A new copy placed, or launchers older than the copy (e.g. Torquio was updated with git pull): refresh,
+        # once per session for the second (so a refresh that keeps failing doesn't repeat on every refresh)
+        stale = self.status.get("launchers_stale") and not getattr(self, "_launchers_refreshed", False)
+        if (result["placed"] or stale) and self.status.get("installed"):
+            self._launchers_refreshed = True
             self._refresh_install()
         # TORQUIO_GUI_SETUP=1 shows the setup assistant on an installed system (for working on it)
         if result["status"] is None or not self.status.get("installed") or \

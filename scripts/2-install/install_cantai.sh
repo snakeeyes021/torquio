@@ -11,8 +11,11 @@ FOUND_INSTALLER=""
 # 1. Search Phase
 echo "Searching for Cantai installer..."
 # Cantai's download is a zip (e.g. Cantai-Windows-Installer-v3.1.1.exe.zip) holding the setup program
-# (e.g. CantaiLocalRenderVST-3.1.1-Setup.exe). Pick the highest version found.
-FOUND_INSTALLER=$(find "${SEARCH_DIRS[@]}" -maxdepth 1 -type f -name "Cantai-Windows-*Installer-*.exe.zip" 2>/dev/null | sort -V | tail -n 1)
+# (e.g. CantaiLocalRenderVST-3.1.1-Setup.exe). It may already be unzipped (some browsers and file managers do
+# that): a folder named like the zip without ".zip", or the setup program on its own. Pick the highest version.
+FOUND_INSTALLER=$(find "${SEARCH_DIRS[@]}" -maxdepth 1 \( -type f -name "Cantai-Windows-*Installer-*.exe.zip" \
+    -o -type d -name "Cantai-Windows-*Installer-*.exe" -o -type f -name "CantaiLocalRenderVST-*-Setup.exe" \) \
+    2>/dev/null | sort -V | tail -n 1)
 
 if [ -n "$FOUND_INSTALLER" ]; then
     echo "Found Cantai installer: $FOUND_INSTALLER"
@@ -27,14 +30,20 @@ if [ -z "$FOUND_INSTALLER" ]; then
 fi
 
 # 3. Extraction Phase
-echo "Extracting Cantai archive..."
 TMP_DIR=$(mktemp -d)
 # Ensure the temporary directory is cleaned up upon script exit or failure
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-unzip -q "$FOUND_INSTALLER" -d "$TMP_DIR"
-
-EXTRACTED_EXE=$(find "$TMP_DIR" -type f -iname "*.exe" | head -n 1)
+if [ -d "$FOUND_INSTALLER" ]; then
+    EXTRACTED_EXE=$(find "$FOUND_INSTALLER" -maxdepth 2 -type f -iname "*Setup*.exe" | sort -V | tail -n 1)
+    [ -n "$EXTRACTED_EXE" ] || EXTRACTED_EXE=$(find "$FOUND_INSTALLER" -maxdepth 2 -type f -iname "*.exe" | head -n 1)
+elif [[ "$FOUND_INSTALLER" == *.zip ]]; then
+    echo "Extracting Cantai archive..."
+    unzip -q "$FOUND_INSTALLER" -d "$TMP_DIR"
+    EXTRACTED_EXE=$(find "$TMP_DIR" -type f -iname "*.exe" | head -n 1)
+else
+    EXTRACTED_EXE="$FOUND_INSTALLER"
+fi
 
 if [ -z "$EXTRACTED_EXE" ]; then
     echo "Error: No setup program found in $FOUND_INSTALLER"

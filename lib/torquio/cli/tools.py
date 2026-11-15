@@ -28,6 +28,9 @@ def run_custom_exe(selected=""):
     program = f'msiexec /i "{windows}"' if selected.endswith(".msi") else f'"{windows}"'
     prefix.enter_visibly(prefix.env_script(freetype) + f"wine {program}")
     print("Execution completed.")
+    # If it was a plug-in's installer (e.g. Cantai's), what the plug-in needs is set up now
+    from .. import plugins
+    plugins.provision()
 
 
 def ntsync_active():
